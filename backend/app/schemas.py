@@ -28,6 +28,15 @@ class TokenOut(BaseModel):
     role: str
 
 
+class ForgotPasswordIn(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordIn(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8)
+
+
 # ---------- Allergeni / profilo ----------
 class AllergenOut(BaseModel):
     id: int
@@ -115,13 +124,18 @@ class RestaurantIn(BaseModel):
     image_url: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    website: Optional[str] = None
+    description: Optional[str] = None
 
 
 class RestaurantOut(BaseModel):
     id: int
     public_code: str
+    slug: Optional[str] = None
     name: str
     city: Optional[str]
+    website: Optional[str] = None
+    description: Optional[str] = None
     is_active: int = 1
     address: Optional[str]
     phone: Optional[str]
@@ -288,3 +302,181 @@ class UserProfileOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------- Foto (storage privato, URL firmati) ----------
+class PhotoOut(BaseModel):
+    id: int
+    url: str  # signed URL a scadenza
+    is_cover: bool = False
+    sort_order: int = 0
+
+
+class ProfilePhotoOut(BaseModel):
+    photo_url: str
+
+
+# ---------- Pagina pubblica ristorante ----------
+class PublicReviewOut(BaseModel):
+    id: int
+    rating: int
+    comment: Optional[str] = None
+    author_name: str
+    reply: Optional[str] = None
+    created_at: datetime
+
+
+class PublicRestaurantOut(BaseModel):
+    public_code: str
+    slug: Optional[str] = None
+    name: str
+    city: Optional[str] = None
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    phone: Optional[str] = None
+    website: Optional[str] = None
+    description: Optional[str] = None
+    opening_hours: Optional[str] = None
+    image_url: Optional[str] = None
+    photos: list[PhotoOut] = []
+    business_plan: str = "free"
+    is_verified: bool = False
+    rating_avg: Optional[float] = None
+    rating_count: int = 0
+    menu_available: bool = False  # dettaglio allergeni visibile solo con piano Pro/Premium attivo
+    piatti: list[DishOut] = []
+    safety_notice: str = (
+        "Informazioni sugli allergeni dichiarate dal ristoratore. "
+        "Comunica sempre allergie e intolleranze al personale prima di ordinare."
+    )
+
+
+# ---------- Documenti medici + estrazione AI ----------
+class MedicalDocumentOut(BaseModel):
+    id: int
+    filename: str
+    mime_type: str
+    status: str
+    ai_consent_at: Optional[datetime] = None
+    uploaded_at: datetime
+    url: Optional[str] = None  # signed URL breve (5 min), generato a richiesta
+
+    class Config:
+        from_attributes = True
+
+
+class ExtractionOut(BaseModel):
+    id: int
+    allergen_code: str
+    confidence: Optional[float] = None
+    applied: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class DocumentExtractionResultOut(BaseModel):
+    document_id: int
+    status: str
+    extractions: list[ExtractionOut]
+    remaining_this_month: int
+    note: str = ""
+
+
+class ConfirmExtractionIn(BaseModel):
+    document_id: int
+    allergen_codes: list[str]  # sottoinsieme di quelli estratti che l'utente conferma
+
+
+# ---------- Recensioni ----------
+class ReviewIn(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    comment: Optional[str] = Field(default=None, max_length=2000)
+
+
+class ReviewOut(BaseModel):
+    id: int
+    restaurant_id: int
+    rating: int
+    comment: Optional[str] = None
+    author_name: str
+    is_mine: bool = False
+    reply: Optional[str] = None
+    created_at: datetime
+
+
+class ReviewReplyIn(BaseModel):
+    reply: str = Field(min_length=1, max_length=2000)
+
+
+class InternalReviewOut(BaseModel):
+    id: int
+    restaurant_id: int
+    restaurant_name: str
+    user_email: str
+    rating: int
+    comment: Optional[str] = None
+    is_hidden: bool = False
+    hidden_reason: Optional[str] = None
+    reported_count: int = 0
+    created_at: datetime
+
+
+class ModerateReviewIn(BaseModel):
+    is_hidden: bool
+    hidden_reason: Optional[str] = Field(default=None, max_length=255)
+
+
+# ---------- Notifiche ----------
+class DeviceTokenIn(BaseModel):
+    expo_token: str = Field(min_length=10, max_length=255)
+
+
+class NotificationOut(BaseModel):
+    id: int
+    type: str
+    payload_json: Optional[str] = None
+    read_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ---------- Billing (Stripe) ----------
+class CheckoutSessionIn(BaseModel):
+    restaurant_id: int
+    plan: str = Field(pattern="^(verified|pro|premium)$")
+
+
+class CheckoutSessionOut(BaseModel):
+    checkout_url: str
+
+
+class PortalSessionIn(BaseModel):
+    restaurant_id: int
+
+
+class PortalSessionOut(BaseModel):
+    portal_url: str
+
+
+class InvoiceOut(BaseModel):
+    id: int
+    stripe_invoice_id: str
+    amount_cents: int
+    status: str
+    pdf_url: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ---------- Documenti legali ----------
+class LegalDocOut(BaseModel):
+    doc: str
+    title: str
+    version: str
+    content_markdown: str

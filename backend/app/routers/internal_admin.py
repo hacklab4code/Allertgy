@@ -7,12 +7,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Restaurant, User
+from ..models import DocumentAccessLog, MedicalDocument, Restaurant, Review, User
 from ..schemas import (
     InternalRestaurantBusinessIn,
     InternalRestaurantOut,
+    InternalReviewOut,
     InternalSummaryOut,
     InternalUserOut,
+    ModerateReviewIn,
     PlanDefinitionOut,
 )
 from ..security import require_internal_admin
@@ -225,6 +227,90 @@ def update_restaurant_business(
     db.refresh(restaurant)
     owner = db.get(User, restaurant.owner_user_id) if restaurant.owner_user_id else None
     return _restaurant_to_internal(restaurant, owner)
+
+
+@router.get("/reviews", response_model=list[InternalReviewOut])
+def list_reviews_for_moderation(db: Session = Depends(get_db)):
+    """Tutte le recensioni (prima le più segnalate) per la moderazione."""
+    reviews = db.scalars(
+        select(Review).order_by(
+            Review.reported_count.desc(), Review.created_at.desc()
+        ).limit(500)
+    ).all()
+    restaurant_names = {
+        r.id: r.name for r in db.scalars(select(Restaurant)).all()
+    }
+    return [
+        InternalReviewOut(
+            id=rev.id,
+            restaurant_id=rev.restaurant_id,
+            restaurant_name=restaurant_names.get(rev.restaurant_id, "?"),
+            user_email=rev.user.email if rev.user else "?",
+            rating=rev.rating,
+            comment=rev.comment,
+            is_hidden=bool(rev.is_hidden),
+            hidden_reason=rev.hidden_reason,
+            reported_count=rev.reported_count or 0,
+            created_at=rev.created_at,
+        )
+        for rev in reviews
+    ]
+
+
+@router.patch("/reviews/{review_id}/moderate", response_model=InternalReviewOut)
+def moderate_review(
+    review_id: int,
+    data: ModerateReviewIn,
+    db: Session = Depends(get_db),
+):
+    rev = db.get(Review, review_id)
+    if not rev:
+        raise HTTPException(404, "Recensione non trovata")
+    rev.is_hidden = 1 if data.is_hidden else 0
+    rev.hidden_reason = data.hidden_reason if data.is_hidden else None
+    if not data.is_hidden:
+        rev.reported_count = 0
+    db.commit()
+    restaurant = db.get(Restaurant, rev.restaurant_id)
+    return InternalReviewOut(
+        id=rev.id,
+        restaurant_id=rev.restaurant_id,
+        restaurant_name=restaurant.name if restaurant else "?",
+        user_email=rev.user.email if rev.user else "?",
+        rating=rev.rating,
+        comment=rev.comment,
+        is_hidden=bool(rev.is_hidden),
+        hidden_reason=rev.hidden_reason,
+        reported_count=rev.reported_count or 0,
+        created_at=rev.created_at,
+    )
+
+
+@router.get("/document-access-log")
+def document_access_log(db: Session = Depends(get_db)):
+    """Solo metadati (chi/quando/quale documento): mai i contenuti sanitari."""
+    rows = db.execute(
+        select(
+            DocumentAccessLog.id,
+            DocumentAccessLog.document_id,
+            DocumentAccessLog.accessed_by,
+            DocumentAccessLog.accessed_at,
+            MedicalDocument.user_id,
+        )
+        .join(MedicalDocument, MedicalDocument.id == DocumentAccessLog.document_id)
+        .order_by(DocumentAccessLog.accessed_at.desc())
+        .limit(500)
+    ).all()
+    return [
+        {
+            "id": row.id,
+            "document_id": row.document_id,
+            "document_owner_user_id": row.user_id,
+            "accessed_by_user_id": row.accessed_by,
+            "accessed_at": row.accessed_at,
+        }
+        for row in rows
+    ]
 
 
 @router.get("/users", response_model=list[InternalUserOut])

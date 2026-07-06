@@ -1,12 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Allergen, Dish, Restaurant
-from ..schemas import DishEvaluationOut, DishOut, MenuEvaluationIn, MenuEvaluationOut, MenuOut
+from ..models import Allergen, Dish, Restaurant, Review, User, UserFavorite
+from ..schemas import (
+    DishEvaluationOut,
+    DishOut,
+    MenuEvaluationIn,
+    MenuEvaluationOut,
+    MenuOut,
+    PhotoOut,
+    PublicRestaurantOut,
+)
+from ..security import get_current_user
+from ..services import storage
 
 router = APIRouter(prefix="/restaurants", tags=["restaurants"])
+
+MENU_PLANS = {"pro", "premium"}
+MENU_ACCESS_STATUSES = {"trialing", "active", "comped"}
 
 
 def dish_to_out(d: Dish) -> DishOut:
@@ -144,6 +157,104 @@ def evaluate_menu(
             for d in menu.piatti
         ],
     )
+
+
+@router.get("/{code_or_slug}/public", response_model=PublicRestaurantOut)
+def public_restaurant_page(code_or_slug: str, db: Session = Depends(get_db)):
+    """Pagina pubblica del locale, senza login: per /r/{slug} sulla dashboard web.
+
+    Il dettaglio allergeni per piatto è visibile solo con piano Pro/Premium attivo
+    (coerente col gating dell'editor menù).
+    """
+    r = db.scalar(
+        select(Restaurant).where(
+            (Restaurant.slug == code_or_slug) | (Restaurant.public_code == code_or_slug),
+            Restaurant.is_active == 1,
+        )
+    )
+    if not r:
+        raise HTTPException(404, "Locale non trovato")
+
+    rating_avg, rating_count = db.execute(
+        select(func.avg(Review.rating), func.count(Review.id)).where(
+            Review.restaurant_id == r.id, Review.is_hidden == 0
+        )
+    ).one()
+
+    has_menu_plan = (
+        (r.business_plan or "free") in MENU_PLANS
+        and (r.subscription_status or "free") in MENU_ACCESS_STATUSES
+    ) or r.subscription_status == "comped"
+    menu_available = bool(has_menu_plan and (r.menu_version or 0) > 0)
+
+    return PublicRestaurantOut(
+        public_code=r.public_code,
+        slug=r.slug,
+        name=r.name,
+        city=r.city,
+        address=r.address,
+        latitude=r.latitude,
+        longitude=r.longitude,
+        phone=r.phone,
+        website=r.website,
+        description=r.description,
+        opening_hours=r.opening_hours,
+        image_url=r.image_url,
+        photos=[
+            PhotoOut(
+                id=p.id,
+                url=storage.signed_url(p.storage_key, 3600),
+                is_cover=bool(p.is_cover),
+                sort_order=p.sort_order,
+            )
+            for p in r.photos
+        ],
+        business_plan=r.business_plan or "free",
+        is_verified=bool(r.is_verified),
+        rating_avg=round(float(rating_avg), 1) if rating_avg is not None else None,
+        rating_count=int(rating_count or 0),
+        menu_available=menu_available,
+        piatti=[dish_to_out(d) for d in r.dishes if d.is_available] if menu_available else [],
+    )
+
+
+# ---------- Preferiti (server-side, per notifiche menù aggiornato) ----------
+
+@router.get("/favorites/mine", response_model=list[str])
+def my_favorites(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Codici pubblici dei locali preferiti dell'utente (per sincronizzare l'app)."""
+    return list(db.scalars(
+        select(Restaurant.public_code)
+        .join(UserFavorite, UserFavorite.restaurant_id == Restaurant.id)
+        .where(UserFavorite.user_id == user.id)
+    ).all())
+
+
+@router.post("/{public_code}/favorite", status_code=204)
+def add_favorite(
+    public_code: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    r = _get_active_restaurant(public_code, db)
+    if not db.get(UserFavorite, (user.id, r.id)):
+        db.add(UserFavorite(user_id=user.id, restaurant_id=r.id))
+        db.commit()
+
+
+@router.delete("/{public_code}/favorite", status_code=204)
+def remove_favorite(
+    public_code: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    r = _get_active_restaurant(public_code, db)
+    fav = db.get(UserFavorite, (user.id, r.id))
+    if fav:
+        db.delete(fav)
+        db.commit()
 
 
 @router.get("", response_model=list[MenuOut])

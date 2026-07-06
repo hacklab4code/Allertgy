@@ -31,6 +31,7 @@ class User(Base):
     onboarding_completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     apple_health_connected: Mapped[Optional[int]] = mapped_column(Integer, default=0)
     emergency_medicines: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    photo_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=text("CURRENT_TIMESTAMP")
     )
@@ -76,6 +77,10 @@ class UserAllergen(Base):
     allergen_id: Mapped[int] = mapped_column(
         ForeignKey("allergens.id", ondelete="CASCADE"), primary_key=True
     )
+    source: Mapped[str] = mapped_column(
+        Enum("manual", "document_ai", name="user_allergen_source"), default="manual"
+    )
+    confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
 class Restaurant(Base):
@@ -115,10 +120,20 @@ class Restaurant(Base):
     sdi_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     pec_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     commercial_notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    slug: Mapped[Optional[str]] = mapped_column(String(160), unique=True, nullable=True)
+    website: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    stripe_price_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=text("CURRENT_TIMESTAMP")
     )
 
+    photos: Mapped[list["RestaurantPhoto"]] = relationship(
+        back_populates="restaurant", cascade="all, delete-orphan", lazy="selectin",
+        order_by="RestaurantPhoto.sort_order",
+    )
     dishes: Mapped[list["Dish"]] = relationship(
         back_populates="restaurant", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -193,6 +208,182 @@ class UserDocument(Base):
     filename: Mapped[str] = mapped_column(String(255))
     file_path: Mapped[str] = mapped_column(String(500))
     status: Mapped[str] = mapped_column(String(50), default="pending")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    token_hash: Mapped[str] = mapped_column(String(255))
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    requested_ip: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
+class RestaurantPhoto(Base):
+    __tablename__ = "restaurant_photos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        ForeignKey("restaurants.id", ondelete="CASCADE")
+    )
+    storage_key: Mapped[str] = mapped_column(String(255))
+    is_cover: Mapped[int] = mapped_column(Integer, default=0)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    restaurant: Mapped["Restaurant"] = relationship(back_populates="photos")
+
+
+class MedicalDocument(Base):
+    __tablename__ = "medical_documents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    storage_key: Mapped[str] = mapped_column(String(255))
+    filename: Mapped[str] = mapped_column(String(255))
+    mime_type: Mapped[str] = mapped_column(String(100))
+    status: Mapped[str] = mapped_column(
+        Enum("pending", "processed", "failed", name="medical_document_status"),
+        default="pending",
+    )
+    ai_consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    extractions: Mapped[list["AllergenExtraction"]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class AllergenExtraction(Base):
+    __tablename__ = "allergen_extractions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("medical_documents.id", ondelete="CASCADE")
+    )
+    allergen_code: Mapped[str] = mapped_column(String(30))
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    applied: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
+class DocumentAccessLog(Base):
+    __tablename__ = "document_access_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("medical_documents.id", ondelete="CASCADE")
+    )
+    accessed_by: Mapped[int] = mapped_column(Integer)
+    accessed_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
+class Review(Base):
+    __tablename__ = "reviews"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        ForeignKey("restaurants.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    rating: Mapped[int] = mapped_column(Integer)
+    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_hidden: Mapped[int] = mapped_column(Integer, default=0)
+    hidden_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    reported_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+
+    user: Mapped["User"] = relationship(lazy="joined")
+    reply: Mapped[Optional["ReviewReply"]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin", uselist=False
+    )
+
+
+class ReviewReply(Base):
+    __tablename__ = "review_replies"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    review_id: Mapped[int] = mapped_column(
+        ForeignKey("reviews.id", ondelete="CASCADE"), unique=True
+    )
+    reply: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
+class UserFavorite(Base):
+    __tablename__ = "user_favorites"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    restaurant_id: Mapped[int] = mapped_column(
+        ForeignKey("restaurants.id", ondelete="CASCADE"), primary_key=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
+class DeviceToken(Base):
+    __tablename__ = "device_tokens"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    expo_token: Mapped[str] = mapped_column(String(255), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    type: Mapped[str] = mapped_column(String(50))
+    payload_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
+class Invoice(Base):
+    __tablename__ = "invoices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        ForeignKey("restaurants.id", ondelete="CASCADE")
+    )
+    stripe_invoice_id: Mapped[str] = mapped_column(String(100), unique=True)
+    amount_cents: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(30))
+    pdf_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=text("CURRENT_TIMESTAMP")
     )

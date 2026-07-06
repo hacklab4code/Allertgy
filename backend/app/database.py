@@ -209,5 +209,182 @@ def run_migrations():
             except Exception as e:
                 print(f"❌ Errore migrazione menu_audit_logs: {e}")
                 db.rollback()
+
+        # ---- Migrazione v5 (piano di lancio) ----
+        _run_v5_migrations(db)
     finally:
         db.close()
+
+
+def _add_column_if_missing(db, table: str, col: str, col_type: str) -> None:
+    from sqlalchemy import text
+    try:
+        db.execute(text(f"SELECT {col} FROM {table} LIMIT 1"))
+    except Exception:
+        db.rollback()
+        try:
+            db.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+            db.commit()
+            print(f"🚀 Database Migrazione v5: Aggiunta colonna {col} a '{table}'")
+        except Exception as e:
+            print(f"❌ Errore migrazione {table} ({col}): {e}")
+            db.rollback()
+
+
+def _create_table_if_missing(db, name: str, ddl: str) -> None:
+    from sqlalchemy import text
+    try:
+        db.execute(text(f"SELECT 1 FROM {name} LIMIT 1"))
+    except Exception:
+        db.rollback()
+        try:
+            db.execute(text(ddl))
+            db.commit()
+            print(f"🚀 Database Migrazione v5: Creata tabella '{name}'")
+        except Exception as e:
+            print(f"❌ Errore migrazione {name}: {e}")
+            db.rollback()
+
+
+def _run_v5_migrations(db) -> None:
+    """Replica database/schema_v5.sql: recupero password, foto, pagina pubblica,
+    documenti medici + AI, recensioni, notifiche, Stripe."""
+    _add_column_if_missing(db, "users", "photo_key", "VARCHAR(255) NULL")
+    _add_column_if_missing(
+        db, "user_allergens", "source",
+        "ENUM('manual','document_ai') NOT NULL DEFAULT 'manual'",
+    )
+    _add_column_if_missing(db, "user_allergens", "confirmed_at", "DATETIME NULL")
+    _add_column_if_missing(db, "restaurants", "slug", "VARCHAR(160) NULL UNIQUE")
+    _add_column_if_missing(db, "restaurants", "website", "VARCHAR(255) NULL")
+    _add_column_if_missing(db, "restaurants", "description", "TEXT NULL")
+    _add_column_if_missing(db, "restaurants", "stripe_customer_id", "VARCHAR(100) NULL")
+    _add_column_if_missing(db, "restaurants", "stripe_subscription_id", "VARCHAR(100) NULL")
+    _add_column_if_missing(db, "restaurants", "stripe_price_id", "VARCHAR(100) NULL")
+    _add_column_if_missing(db, "reviews", "reported_count", "INT UNSIGNED NOT NULL DEFAULT 0")
+
+    _create_table_if_missing(db, "password_reset_tokens", """
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+          id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          user_id      INT UNSIGNED NOT NULL,
+          token_hash   VARCHAR(255) NOT NULL,
+          expires_at   DATETIME NOT NULL,
+          used_at      DATETIME NULL,
+          requested_ip VARCHAR(45),
+          created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_prt_token_hash (token_hash),
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+    _create_table_if_missing(db, "restaurant_photos", """
+        CREATE TABLE IF NOT EXISTS restaurant_photos (
+          id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          restaurant_id INT UNSIGNED NOT NULL,
+          storage_key   VARCHAR(255) NOT NULL,
+          is_cover      TINYINT(1) NOT NULL DEFAULT 0,
+          sort_order    TINYINT UNSIGNED NOT NULL DEFAULT 0,
+          created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+    _create_table_if_missing(db, "medical_documents", """
+        CREATE TABLE IF NOT EXISTS medical_documents (
+          id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          user_id       INT UNSIGNED NOT NULL,
+          storage_key   VARCHAR(255) NOT NULL,
+          filename      VARCHAR(255) NOT NULL,
+          mime_type     VARCHAR(100) NOT NULL,
+          status        ENUM('pending','processed','failed') NOT NULL DEFAULT 'pending',
+          ai_consent_at DATETIME NULL,
+          uploaded_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+    _create_table_if_missing(db, "allergen_extractions", """
+        CREATE TABLE IF NOT EXISTS allergen_extractions (
+          id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          document_id   INT UNSIGNED NOT NULL,
+          allergen_code VARCHAR(30) NOT NULL,
+          confidence    DECIMAL(3,2),
+          applied       TINYINT(1) NOT NULL DEFAULT 0,
+          created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (document_id) REFERENCES medical_documents(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+    _create_table_if_missing(db, "document_access_log", """
+        CREATE TABLE IF NOT EXISTS document_access_log (
+          id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          document_id INT UNSIGNED NOT NULL,
+          accessed_by INT UNSIGNED NOT NULL,
+          accessed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (document_id) REFERENCES medical_documents(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+    _create_table_if_missing(db, "reviews", """
+        CREATE TABLE IF NOT EXISTS reviews (
+          id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          restaurant_id INT UNSIGNED NOT NULL,
+          user_id       INT UNSIGNED NOT NULL,
+          rating        TINYINT UNSIGNED NOT NULL,
+          comment       TEXT,
+          is_hidden     TINYINT(1) NOT NULL DEFAULT 0,
+          hidden_reason VARCHAR(255) NULL,
+          reported_count INT UNSIGNED NOT NULL DEFAULT 0,
+          created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_review_user_restaurant (restaurant_id, user_id),
+          FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+    _create_table_if_missing(db, "review_replies", """
+        CREATE TABLE IF NOT EXISTS review_replies (
+          id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          review_id  INT UNSIGNED NOT NULL UNIQUE,
+          reply      TEXT NOT NULL,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (review_id) REFERENCES reviews(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+    _create_table_if_missing(db, "user_favorites", """
+        CREATE TABLE IF NOT EXISTS user_favorites (
+          user_id       INT UNSIGNED NOT NULL,
+          restaurant_id INT UNSIGNED NOT NULL,
+          created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (user_id, restaurant_id),
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+    _create_table_if_missing(db, "device_tokens", """
+        CREATE TABLE IF NOT EXISTS device_tokens (
+          user_id    INT UNSIGNED NOT NULL,
+          expo_token VARCHAR(255) NOT NULL,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (user_id, expo_token),
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+    _create_table_if_missing(db, "notifications", """
+        CREATE TABLE IF NOT EXISTS notifications (
+          id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          user_id      INT UNSIGNED NOT NULL,
+          type         VARCHAR(50) NOT NULL,
+          payload_json JSON,
+          read_at      DATETIME NULL,
+          created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+    _create_table_if_missing(db, "invoices", """
+        CREATE TABLE IF NOT EXISTS invoices (
+          id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          restaurant_id     INT UNSIGNED NOT NULL,
+          stripe_invoice_id VARCHAR(100) NOT NULL UNIQUE,
+          amount_cents      INT NOT NULL,
+          status            VARCHAR(30) NOT NULL,
+          pdf_url           VARCHAR(500),
+          created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)

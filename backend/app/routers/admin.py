@@ -13,7 +13,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Allergen, Dish, DishAllergen, MenuAuditLog, Restaurant, User
+from ..models import (
+    Allergen,
+    Dish,
+    DishAllergen,
+    MenuAuditLog,
+    Restaurant,
+    RestaurantPhoto,
+    User,
+    UserFavorite,
+)
 from ..schemas import (
     AnalyzeOut,
     ApproveMenuIn,
@@ -21,11 +30,15 @@ from ..schemas import (
     DishOut,
     MenuAuditOut,
     MenuSaveIn,
+    PhotoOut,
     RestaurantIn,
     RestaurantOut,
 )
 from ..security import require_owner
+from ..services import storage
 from ..services.menu_analyze import analyze_menu_image
+from ..services.push import notify_users
+from ..services.slugs import ensure_slug
 from ..legal import MENU_CONFIRMATION_VERSION
 from .restaurants import dish_to_out
 
@@ -40,6 +53,8 @@ MAX_MENU_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_DISH_IMAGE_BYTES = 5 * 1024 * 1024
 MENU_PLANS = {"pro", "premium"}
 MENU_ACCESS_STATUSES = {"trialing", "active", "comped"}
+# Limiti galleria foto per piano (vedi PIANO_LANCIO.md §7)
+PLAN_PHOTO_LIMITS = {"free": 1, "verified": 3, "pro": 8, "premium": 20}
 
 
 async def _read_image_upload(file: UploadFile, *, max_bytes: int) -> tuple[bytes, str]:
@@ -165,8 +180,8 @@ def create_restaurant(
     else:
         raise HTTPException(500, "Impossibile generare un codice univoco")
     r = Restaurant(
-        public_code=code, 
-        name=data.name, 
+        public_code=code,
+        name=data.name,
         city=data.city,
         address=data.address,
         phone=data.phone,
@@ -177,6 +192,7 @@ def create_restaurant(
         longitude=data.longitude,
         owner_user_id=user.id
     )
+    ensure_slug(db, r)
     db.add(r)
     db.commit()
     db.refresh(r)
@@ -200,8 +216,11 @@ def update_restaurant(
     r.opening_hours = data.opening_hours
     r.latitude = data.latitude
     r.longitude = data.longitude
+    r.website = data.website
+    r.description = data.description
     if data.image_url is not None:
         r.image_url = data.image_url
+    ensure_slug(db, r)
     _add_menu_audit(db, r, user, "restaurant_updated", note="Impostazioni locale aggiornate")
     db.commit()
     db.refresh(r)
@@ -322,9 +341,107 @@ def approve_menu(
         legal_version=MENU_CONFIRMATION_VERSION,
         note="Menù approvato e pubblicato dal ristoratore",
     )
+    # Push agli utenti che hanno il locale tra i preferiti
+    fav_user_ids = list(db.scalars(
+        select(UserFavorite.user_id).where(UserFavorite.restaurant_id == r.id)
+    ).all())
+    notify_users(
+        db,
+        fav_user_ids,
+        "menu_updated",
+        f"Menù aggiornato — {r.name}",
+        "Un locale tra i tuoi preferiti ha pubblicato un nuovo menù. Controlla il semaforo!",
+        {"public_code": r.public_code},
+    )
     db.commit()
     db.refresh(r)
     return r
+
+
+# ---------- Galleria foto locale (limite per piano) ----------
+
+def _photo_to_out(p: RestaurantPhoto) -> PhotoOut:
+    return PhotoOut(
+        id=p.id,
+        url=storage.signed_url(p.storage_key, 3600),
+        is_cover=bool(p.is_cover),
+        sort_order=p.sort_order,
+    )
+
+
+@router.get("/restaurants/{rid}/photos", response_model=list[PhotoOut])
+def list_photos(
+    rid: int,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    r = _my_restaurant(rid, user, db)
+    return [_photo_to_out(p) for p in r.photos]
+
+
+@router.post("/restaurants/{rid}/photos", response_model=PhotoOut, status_code=201)
+async def upload_photo(
+    rid: int,
+    file: UploadFile = File(...),
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    r = _my_restaurant(rid, user, db)
+    plan = r.business_plan or "free"
+    limit = PLAN_PHOTO_LIMITS.get(plan, 1)
+    if len(r.photos) >= limit:
+        raise HTTPException(
+            402,
+            f"Il piano {plan.capitalize()} include al massimo {limit} foto in galleria. "
+            "Passa a un piano superiore per aggiungerne altre.",
+        )
+    content, mime_type = await _read_image_upload(file, max_bytes=MAX_DISH_IMAGE_BYTES)
+    key = f"gallery/{r.id}/{uuid.uuid4()}{ALLOWED_IMAGE_TYPES[mime_type]}"
+    storage.put_bytes(key, content, mime_type)
+    photo = RestaurantPhoto(
+        restaurant_id=r.id,
+        storage_key=key,
+        is_cover=0 if r.photos else 1,  # la prima foto diventa copertina
+        sort_order=len(r.photos),
+    )
+    db.add(photo)
+    db.commit()
+    db.refresh(photo)
+    return _photo_to_out(photo)
+
+
+@router.post("/restaurants/{rid}/photos/{photo_id}/cover", response_model=list[PhotoOut])
+def set_cover_photo(
+    rid: int,
+    photo_id: int,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    r = _my_restaurant(rid, user, db)
+    target = next((p for p in r.photos if p.id == photo_id), None)
+    if not target:
+        raise HTTPException(404, "Foto non trovata")
+    for p in r.photos:
+        p.is_cover = 1 if p.id == photo_id else 0
+    db.commit()
+    db.refresh(r)
+    return [_photo_to_out(p) for p in r.photos]
+
+
+@router.delete("/restaurants/{rid}/photos/{photo_id}", status_code=204)
+def delete_photo(
+    rid: int,
+    photo_id: int,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    r = _my_restaurant(rid, user, db)
+    target = next((p for p in r.photos if p.id == photo_id), None)
+    if not target:
+        raise HTTPException(404, "Foto non trovata")
+    storage.delete(target.storage_key)
+    db.delete(target)
+    db.commit()
 
 
 @router.get("/restaurants/{rid}/menu/audit", response_model=list[MenuAuditOut])

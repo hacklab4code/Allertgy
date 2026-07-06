@@ -1,17 +1,23 @@
-from datetime import datetime, timezone
+import hashlib
+import secrets
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..database import get_db
-from ..models import User
-from ..schemas import LoginIn, RegisterIn, TokenOut
+from ..models import PasswordResetToken, User
+from ..schemas import ForgotPasswordIn, LoginIn, RegisterIn, ResetPasswordIn, TokenOut
 from ..security import create_token, hash_password, verify_password
 from ..rate_limit import rate_limiter
 from ..legal import LEGAL_TERMS_VERSION, PRIVACY_VERSION
+from ..services.emailer import send_password_reset
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+RESET_TOKEN_TTL_MINUTES = 30
 
 
 def _validate_password_strength(password: str) -> None:
@@ -61,3 +67,50 @@ def login(data: LoginIn, db: Session = Depends(get_db)):
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Credenziali errate")
     return TokenOut(access_token=create_token(user), role=user.role)
+
+
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+@router.post("/forgot-password", status_code=202, dependencies=[Depends(rate_limiter(3, 3600))])
+def forgot_password(data: ForgotPasswordIn, request: Request, db: Session = Depends(get_db)):
+    """Invia il link di reset. La risposta è identica sia che l'email esista o no
+    (anti user-enumeration)."""
+    user = db.scalar(select(User).where(User.email == data.email))
+    if user:
+        token = secrets.token_urlsafe(32)
+        db.add(PasswordResetToken(
+            user_id=user.id,
+            token_hash=_hash_reset_token(token),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_TTL_MINUTES),
+            requested_ip=request.client.host if request.client else None,
+        ))
+        db.commit()
+        reset_url = f"{settings.public_web_url}/reset-password?token={token}"
+        send_password_reset(user.email, reset_url)
+    return {"detail": "Se l'indirizzo esiste, riceverai un'email con le istruzioni."}
+
+
+@router.post("/reset-password", dependencies=[Depends(rate_limiter(5, 300))])
+def reset_password(data: ResetPasswordIn, db: Session = Depends(get_db)):
+    _validate_password_strength(data.new_password)
+    prt = db.scalar(
+        select(PasswordResetToken).where(
+            PasswordResetToken.token_hash == _hash_reset_token(data.token)
+        )
+    )
+    now = datetime.now(timezone.utc)
+    if (
+        not prt
+        or prt.used_at is not None
+        or prt.expires_at.replace(tzinfo=timezone.utc) < now
+    ):
+        raise HTTPException(400, "Link di reset non valido o scaduto. Richiedine uno nuovo.")
+    user = db.get(User, prt.user_id)
+    if not user:
+        raise HTTPException(400, "Link di reset non valido o scaduto. Richiedine uno nuovo.")
+    user.password_hash = hash_password(data.new_password)
+    prt.used_at = now
+    db.commit()
+    return {"detail": "Password aggiornata. Ora puoi accedere con la nuova password."}
