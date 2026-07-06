@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas">
+  <style>
+    body { margin: 0; background: #ECF1EE; }
+    * { box-sizing: border-box; }
+  </style>
+</helmet>
+<div style="display:flex;gap:56px;padding:64px;align-items:flex-start;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#10201B">
+
+  <!-- 01 Panoramica -->
+  <div data-screen-label="Panoramica" style="display:flex;flex-direction:column;gap:14px;flex-shrink:0">
+    <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#596B63">01 · Panoramica</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+      <div style="min-height:100%;background:#F7FAF8;display:flex;flex-direction:column">
+        <div style="flex:1;padding:70px 20px 20px;display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+            <div>
+              <div style="font-size:22px;font-weight:800">Trattoria Da Bruno</div>
+              <div style="font-size:13px;color:#596B63">Bologna · <span style="font-family:ui-monospace,Menlo,monospace">TDB-214</span></div>
+            </div>
+            <span style="font-size:11px;font-weight:700;color:#0B5D4D;background:#DDF8EA;border:1px solid #BFE9D2;border-radius:6px;padding:3px 9px;flex-shrink:0">Piano Pro</span>
+          </div>
+          <div style="background:#EAF7EE;border:1px solid #C9E9D4;border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+            <div style="width:10px;height:10px;border-radius:50%;background:#16A34A;flex-shrink:0"></div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:700;color:#16713B">Menu pubblicato</div>
+              <div style="font-size:12px;color:#3E6B4E">Versione del 2 luglio, ore 18:40</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="background:#FFFFFF;border:1px solid #DDE8E2;border-radius:16px;padding:14px 16px">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#596B63">Piatti</div>
+              <div style="font-size:24px;font-weight:800;margin-top:4px">42</div>
+              <div style="font-size:12px;color:#596B63">12 con tracce</div>
+            </div>
+            <div style="background:#FFFFFF;border:1px solid #DDE8E2;border-radius:16px;padding:14px 16px">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#596B63">Scansioni QR</div>
+              <div style="font-size:24px;font-weight:800;margin-top:4px">184</div>
+              <div style="font-size:12px;color:#596B63">ultimi 30 giorni</div>
+            </div>
+          </div>
+          <div style="background:#FFFFFF;border:1px solid #DDE8E2;border-radius:16px;overflow:hidden">
+            <div style="padding:14px 16px;border-bottom:1px solid #EEF5F1;display:flex;justify-content:space-between;align-items:center;min-height:52px;cursor:pointer" style-hover="background:#F7FAF8">
+              <div>
+                <div style="font-size:14px;font-weight:600">Modifica menu</div>
+                <div style="font-size:12px;color:#596B63">Piatti, allergeni e tracce</div>
+              </div>
+              <span style="color:#94A3B8">›</span>
+            </div>
+            <div style="padding:14px 16px;border-bottom:1px solid #EEF5F1;display:flex;justify-content:space-between;align-items:center;min-height:52px;cursor:pointer" style-hover="background:#F7FAF8">
+              <div>
+                <div style="font-size:14px;font-weight:600">QR e materiali</div>
+                <div style="font-size:12px;color:#596B63">Table card e registro allergeni</div>
+              </div>
+              <span style="color:#94A3B8">›</span>
+            </div>
+            <div style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center;min-height:52px;cursor:pointer" style-hover="background:#F7FAF8">
+              <div>
+                <div style="font-size:14px;font-weight:600">Dati locale</div>
+                <div style="font-size:12px;color:#596B63">Indirizzo, contatti, referente</div>
+              </div>
+              <span style="color:#94A3B8">›</span>
+            </div>
+          </div>
+          <div style="background:#EEF5F1;border:1px solid #DDE8E2;border-radius:14px;padding:12px 14px;font-size:12px;color:#596B63;line-height:1.5">Verifica locale attiva: i clienti vedono il badge <span style="color:#2563EB;font-weight:700">✓ Verificato</span> sul tuo menu.</div>
+        </div>
+        <sc-for list="{{ tabBar1 }}" as="t" hint-placeholder-count="4">
+          <div style="display:none">{{ t.label }}</div>
+        </sc-for>
+        <div style="background:#FFFFFF;border-top:1px solid #DDE8E2;padding:10px 8px 40px;display:flex">
+          <sc-for list="{{ tabBar1x }}" as="t" hint-placeholder-count="4">
+            <div style="{{ t.style }}">
+              <div style="{{ t.dotStyle }}"></div>
+              <span>{{ t.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </x-import>
+  </div>
+
+  <!-- 02 Menu -->
+  <div data-screen-label="Menu" style="display:flex;flex-direction:column;gap:14px;flex-shrink:0">
+    <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#596B63">02 · Menu</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+      <div style="min-height:100%;background:#F7FAF8;display:flex;flex-direction:column">
+        <div style="flex:1;padding:70px 20px 20px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:22px;font-weight:800">Menu</div>
+            <button style="height:38px;padding:0 14px;background:#FFFFFF;color:#0B5D4D;border:1px solid #DDE8E2;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">+ Nuovo piatto</button>
+          </div>
+          <button style="height:48px;background:#FFFFFF;color:#0B5D4D;border:1px solid #DDE8E2;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">📷 Carica foto menu — compilazione con AI</button>
+          <div style="background:#FFFFFF;border:1px solid #DDE8E2;border-radius:16px;overflow:hidden">
+            <sc-for list="{{ dishRows }}" as="d" hint-placeholder-count="8">
+              <div style="padding:12px 16px;border-bottom:1px solid #EEF5F1;display:flex;align-items:center;gap:10px;cursor:pointer;min-height:52px" style-hover="background:#F7FAF8">
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:baseline;gap:8px">
+                    <span style="font-size:14px;font-weight:600">{{ d.name }}</span>
+                    <span style="font-size:11.5px;color:#94A3B8">{{ d.price }}</span>
+                  </div>
+                  <div style="font-size:11.5px;margin-top:2px;line-height:1.45">
+                    <span style="color:#DC2626;font-weight:600">{{ d.contieneText }}</span>
+                    <span style="color:#B45309;font-weight:600">{{ d.tracceText }}</span>
+                    <span style="color:#94A3B8">{{ d.nessunoText }}</span>
+                  </div>
+                </div>
+                <span style="color:#94A3B8">›</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="background:#FFFFFF;border-top:1px solid #DDE8E2;padding:12px 20px 44px;display:flex;flex-direction:column;gap:10px">
+          <div onClick="{{ toggleLegal }}" style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+            <span style="{{ legalBoxStyle }}">{{ legalMark }}</span>
+            <span style="font-size:12px;color:#10201B;line-height:1.45">Confermo che allergeni e possibili tracce corrispondono a quanto servito nel locale.</span>
+          </div>
+          <button style="{{ publishBtnStyle }}">{{ publishLabel }}</button>
+        </div>
+      </div>
+    </x-import>
+  </div>
+
+  <!-- 03 Editor piatto -->
+  <div data-screen-label="Editor piatto" style="display:flex;flex-direction:column;gap:14px;flex-shrink:0">
+    <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#596B63">03 · Editor piatto</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+      <div style="min-height:100%;background:#F7FAF8;display:flex;flex-direction:column">
+        <div style="flex:1;padding:70px 20px 20px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <button style="width:36px;height:36px;border-radius:50%;background:#FFFFFF;border:1px solid #DDE8E2;color:#596B63;font-size:16px;cursor:pointer;flex-shrink:0">‹</button>
+            <div>
+              <div style="font-size:18px;font-weight:800">Tagliatelle al ragù</div>
+              <div style="font-size:12px;color:#596B63">Primi · € 13</div>
+            </div>
+          </div>
+          <div style="font-size:12.5px;color:#596B63;line-height:1.5">Per ogni allergene indica se è <span style="font-weight:700;color:#DC2626">contenuto</span>, presente come <span style="font-weight:700;color:#B45309">tracce</span> o assente.</div>
+          <div style="background:#FFFFFF;border:1px solid #DDE8E2;border-radius:16px;padding:6px 16px">
+            <sc-for list="{{ editorRows }}" as="a" hint-placeholder-count="14">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #EEF5F1;min-height:44px">
+                <span style="font-size:13.5px;font-weight:600">{{ a.name }}</span>
+                <div style="display:flex;border:1px solid #DDE8E2;border-radius:9px;overflow:hidden;flex-shrink:0">
+                  <sc-for list="{{ a.segs }}" as="sg" hint-placeholder-count="3">
+                    <button onClick="{{ sg.onClick }}" style="{{ sg.style }}">{{ sg.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="background:#FFFFFF;border-top:1px solid #DDE8E2;padding:12px 20px 44px;display:flex;gap:10px">
+          <button style="height:48px;flex:1;background:#FFFFFF;color:#0B5D4D;border:1px solid #DDE8E2;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Annulla</button>
+          <button style="height:48px;flex:2;background:#0F8A6A;color:#FFFFFF;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">{{ saveLabel }}</button>
+        </div>
+      </div>
+    </x-import>
+  </div>
+
+  <!-- 04 QR e stampa -->
+  <div data-screen-label="QR e stampa" style="display:flex;flex-direction:column;gap:14px;flex-shrink:0">
+    <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#596B63">04 · QR e stampa</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+      <div style="min-height:100%;background:#F7FAF8;display:flex;flex-direction:column">
+        <div style="flex:1;padding:70px 20px 20px;display:flex;flex-direction:column;gap:16px">
+          <div style="font-size:22px;font-weight:800">QR e materiali</div>
+          <div style="background:#FFFFFF;border:1px solid #10201B;border-radius:4px;padding:24px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center">
+            <div style="font-size:18px;font-weight:800">AllerTgy</div>
+            <div style="font-size:13px;font-weight:600;line-height:1.5">Scansiona per leggere il menu allergeni del locale</div>
+            <div style="width:130px;height:130px;border:3px solid #10201B;border-radius:8px;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:7px;padding:12px">
+              <div style="background:#10201B;border-radius:2px"></div>
+              <div></div>
+              <div style="background:#10201B;border-radius:2px"></div>
+              <div></div>
+              <div style="background:#10201B;border-radius:2px"></div>
+              <div></div>
+              <div style="background:#10201B;border-radius:2px"></div>
+              <div style="background:#10201B;border-radius:2px;opacity:0.35"></div>
+              <div></div>
+            </div>
+            <div style="font-family:ui-monospace,Menlo,monospace;font-size:24px;font-weight:700;letter-spacing:2px">TDB-214</div>
+            <div style="font-size:11px;color:#596B63;line-height:1.5;border-top:1px solid #DDE8E2;padding-top:10px">Comunica sempre le tue allergie al personale.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button style="height:50px;background:#0F8A6A;color:#FFFFFF;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Condividi o stampa table card</button>
+            <button style="height:50px;background:#FFFFFF;color:#0B5D4D;border:1px solid #DDE8E2;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">Scarica registro allergeni (PDF)</button>
+          </div>
+          <div style="font-size:11.5px;color:#94A3B8;line-height:1.5;text-align:center">Il registro riporta piatti, allergeni contenuti e possibili tracce nella versione pubblicata del menu.</div>
+        </div>
+      </div>
+    </x-import>
+  </div>
+
+  <!-- 05 Account -->
+  <div data-screen-label="Account ristoratore" style="display:flex;flex-direction:column;gap:14px;flex-shrink:0">
+    <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#596B63">05 · Account</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+      <div style="min-height:100%;background:#F7FAF8;display:flex;flex-direction:column;padding:70px 20px 40px;gap:16px">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="width:52px;height:52px;border-radius:14px;background:#DDF8EA;color:#0B5D4D;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800">B</div>
+          <div>
+            <div style="font-size:18px;font-weight:800">Bruno Casadei</div>
+            <div style="font-size:13px;color:#596B63">Titolare · Trattoria Da Bruno</div>
+          </div>
+        </div>
+        <div style="background:#FFFFFF;border:2px solid #0F8A6A;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:15px;font-weight:800">Piano Pro</div>
+            <span style="font-size:11px;font-weight:700;color:#16713B;background:#EAF7EE;border:1px solid #C9E9D4;border-radius:6px;padding:2px 8px">Attivo</span>
+          </div>
+          <div style="font-size:13px;color:#596B63;line-height:1.5">€ 49/mese · rinnovo il 14 agosto 2026 · carta ····4451</div>
+          <button style="height:40px;align-self:flex-start;padding:0 14px;background:#FFFFFF;color:#0B5D4D;border:1px solid #DDE8E2;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Gestisci abbonamento</button>
+        </div>
+        <div style="background:#FFFFFF;border:1px solid #DDE8E2;border-radius:16px;overflow:hidden">
+          <div style="padding:14px 16px;border-bottom:1px solid #EEF5F1;display:flex;justify-content:space-between;align-items:center;min-height:52px;cursor:pointer" style-hover="background:#F7FAF8">
+            <div>
+              <div style="font-size:14px;font-weight:600">Dati locale</div>
+              <div style="font-size:12px;color:#596B63">Via delle Lame 57, Bologna</div>
+            </div>
+            <span style="color:#94A3B8">›</span>
+          </div>
+          <div style="padding:14px 16px;border-bottom:1px solid #EEF5F1;display:flex;justify-content:space-between;align-items:center;min-height:52px;cursor:pointer" style-hover="background:#F7FAF8">
+            <div>
+              <div style="font-size:14px;font-weight:600">Fatturazione</div>
+              <div style="font-size:12px;color:#596B63">P. IVA, SDI, PEC</div>
+            </div>
+            <span style="color:#94A3B8">›</span>
+          </div>
+          <div style="padding:14px 16px;border-bottom:1px solid #EEF5F1;display:flex;justify-content:space-between;align-items:center;min-height:52px;cursor:pointer" style-hover="background:#F7FAF8">
+            <div style="font-size:14px;font-weight:600">Referente allergeni</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="font-size:13px;color:#596B63">Bruno Casadei</span><span style="color:#94A3B8">›</span></div>
+          </div>
+          <div style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center;min-height:52px;cursor:pointer" style-hover="background:#F7FAF8">
+            <div style="font-size:14px;font-weight:600">Termini e responsabilità</div>
+            <span style="color:#94A3B8">›</span>
+          </div>
+        </div>
+        <div style="background:#EEF5F1;border:1px solid #DDE8E2;border-radius:14px;padding:12px 14px;font-size:12px;color:#596B63;line-height:1.5">Le informazioni su allergeni e tracce pubblicate sono dichiarate sotto la responsabilità del locale.</div>
+        <button style="height:48px;background:transparent;color:#DC2626;border:1px solid #F5C6C6;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:auto">Esci dall'account</button>
+      </div>
+    </x-import>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.ALLERGENI = ['Glutine', 'Crostacei', 'Uova', 'Pesce', 'Arachidi', 'Soia', 'Latte', 'Frutta a guscio', 'Sedano', 'Senape', 'Sesamo', 'Solfiti', 'Lupini', 'Molluschi'];
+    this.DISHES = [
+      { name: 'Tagliere di salumi e giardiniera', price: '€ 12', contiene: [], tracce: ['Solfiti'] },
+      { name: 'Carpaccio di polpo', price: '€ 13', contiene: ['Molluschi'], tracce: ['Crostacei'] },
+      { name: 'Tagliatelle al ragù', price: '€ 13', contiene: ['Glutine', 'Uova', 'Sedano'], tracce: ['Latte'] },
+      { name: 'Risotto ai frutti di mare', price: '€ 16', contiene: ['Crostacei', 'Molluschi', 'Pesce'], tracce: [] },
+      { name: 'Tagliata di manzo con rucola', price: '€ 19', contiene: [], tracce: [] },
+      { name: 'Cotoletta alla bolognese', price: '€ 17', contiene: ['Glutine', 'Uova', 'Latte'], tracce: [] },
+      { name: 'Torta di riso', price: '€ 6', contiene: ['Uova', 'Latte'], tracce: ['Frutta a guscio'] }
+    ];
+    const editor = {};
+    this.ALLERGENI.forEach(a => {
+      const d = this.DISHES[2];
+      editor[a] = d.contiene.includes(a) ? 'contiene' : (d.tracce.includes(a) ? 'tracce' : 'assente');
+    });
+    this.state = { legal: false, editor };
+  }
+
+  renderVals() {
+    const s = this.state;
+
+    const dishRows = this.DISHES.map(d => ({
+      ...d,
+      contieneText: d.contiene.length ? 'Contiene: ' + d.contiene.join(', ') + (d.tracce.length ? ' · ' : '') : '',
+      tracceText: d.tracce.length ? 'Tracce: ' + d.tracce.join(', ') : '',
+      nessunoText: !d.contiene.length && !d.tracce.length ? 'Nessun allergene dichiarato' : ''
+    }));
+
+    const SEGS = [['assente', 'Assente', '#596B63', '#EEF5F1'], ['contiene', 'Contiene', '#FFFFFF', '#DC2626'], ['tracce', 'Tracce', '#FFFFFF', '#D97706']];
+    const editorRows = this.ALLERGENI.map(a => ({
+      name: a,
+      segs: SEGS.map(([key, label, fg, bg]) => {
+        const active = s.editor[a] === key;
+        return {
+          label,
+          onClick: () => this.setState(st => ({ editor: { ...st.editor, [a]: key } })),
+          style: {
+            height: '32px', padding: '0 9px', fontSize: '11px', fontWeight: 700,
+            cursor: 'pointer', fontFamily: 'inherit', border: 'none',
+            background: active ? bg : '#FFFFFF',
+            color: active ? fg : '#94A3B8'
+          }
+        };
+      })
+    }));
+    const nDecl = Object.values(s.editor).filter(v => v !== 'assente').length;
+
+    const tabs = [['Panoramica', true], ['Menu', false], ['QR', false], ['Account', false]];
+    const tabBar1x = tabs.map(([label, active]) => ({
+      label,
+      style: {
+        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+        fontSize: '11px', fontWeight: 600, paddingTop: '4px',
+        color: active ? '#0B5D4D' : '#94A3B8', cursor: 'pointer'
+      },
+      dotStyle: {
+        width: '22px', height: '22px', borderRadius: '7px',
+        background: active ? '#DDF8EA' : '#EEF5F1',
+        border: active ? '1px solid #BFE9D2' : '1px solid #DDE8E2'
+      }
+    }));
+
+    return {
+      dishRows, editorRows, tabBar1x, tabBar1: [],
+      saveLabel: 'Salva · ' + nDecl + ' allergeni dichiarati',
+      toggleLegal: () => this.setState(st => ({ legal: !st.legal })),
+      legalMark: s.legal ? '✓' : '',
+      legalBoxStyle: {
+        width: '22px', height: '22px', borderRadius: '7px', flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '13px', fontWeight: 800,
+        background: s.legal ? '#0F8A6A' : '#FFFFFF',
+        color: '#FFFFFF',
+        border: s.legal ? '1px solid #0F8A6A' : '1px solid #C9D8D0'
+      },
+      publishLabel: s.legal ? 'Pubblica menu' : 'Conferma per pubblicare',
+      publishBtnStyle: {
+        height: '50px', borderRadius: '12px', fontSize: '15px',
+        fontWeight: 700, fontFamily: 'inherit', border: 'none',
+        background: s.legal ? '#0F8A6A' : '#C9D8D0',
+        color: '#FFFFFF',
+        cursor: s.legal ? 'pointer' : 'not-allowed'
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

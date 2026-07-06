@@ -1,0 +1,32 @@
+# Segreti — mai committare
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+.expo/
+*.tsbuildinfo
+
+# File privati (storage locale: foto profilo, documenti medici)
+backend/private_storage/
+
+# Upload statici locali di test
+backend/static/uploads/
+
+# Screenshot / file con potenziali credenziali
+*.png
+*.jpg
+*.jpeg
+!app-mobile/assets/**
+!dashboard-web/public/**
+
+# macOS
+.DS_Store

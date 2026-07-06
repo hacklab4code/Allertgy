@@ -1,0 +1,6 @@
+"""Versioni dei testi legali usate da API, app mobile e dashboard."""
+
+LEGAL_TERMS_VERSION = "2026-07-06"
+PRIVACY_VERSION = "2026-07-06"
+SAFETY_DISCLAIMER_VERSION = "2026-07-06"
+MENU_CONFIRMATION_VERSION = "2026-07-06"

@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+@theme {
+  --color-slate-50: #F7FAF8;
+  --color-slate-100: #EEF5F1;
+  --color-slate-200: #DDE8E2;
+  --color-slate-350: #C9D8D0;
+  --color-slate-400: #94A3B8;
+  --color-slate-450: #596B63;
+  --color-slate-500: #596B63;
+  --color-slate-600: #596B63;
+  --color-slate-800: #10201B;
+  --color-slate-850: #10201B;
+  --color-slate-900: #0B5D4D;
+  --color-slate-950: #073B31;
+
+  --color-emerald-50: #DDF8EA;
+  --color-emerald-100: #BFE9D2;
+  --color-emerald-150: #DDF8EA;
+  --color-emerald-300: #BFE9D2;
+  --color-emerald-500: #0F8A6A;
+  --color-emerald-600: #0F8A6A;
+  --color-emerald-700: #0B5D4D;
+  --color-emerald-800: #0B5D4D;
+  --color-emerald-900: #0B5D4D;
+  --color-emerald-950: #073B31;
+
+  --color-rose-50: #FCECEC;
+  --color-rose-100: #FCECEC;
+  --color-rose-200: #F5C6C6;
+  --color-rose-250: #F5C6C6;
+  --color-rose-500: #DC2626;
+  --color-rose-550: #DC2626;
+  --color-rose-900: #DC2626;
+
+  --color-amber-50: #FBF3E6;
+  --color-amber-100: #FBF3E6;
+  --color-amber-200: #F0DCBA;
+  --color-amber-400: #D97706;
+  --color-amber-450: #B45309;
+  --color-amber-500: #D97706;
+  --color-amber-800: #B45309;
+
+  --color-blue-50: #EFF4FE;
+  --color-blue-100: #EFF4FE;
+  --color-blue-200: #C7D8FB;
+  --color-blue-500: #2563EB;
+  --color-blue-800: #2563EB;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #F7FAF8;
+  color: #10201B;
+  margin: 0;
+}
+
+@media print {
+  /* Di base, nascondi entrambi i contenitori speciali */
+  #printable-qr-card, #printable-allergen-registry {
+    display: none !important;
+  }
+
+  /* Nascondi gli elementi standard in stampa */
+  header, aside, button, a, .no-print {
+    display: none !important;
+  }
+  main, .max-w-5xl, .p-6, .bg-slate-50, .space-y-6 {
+    background: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* MODALITA' QR */
+  body.print-mode-qr #printable-qr-card {
+    display: block !important;
+    margin: 40px auto !important;
+    border: 2px solid #10b981 !important;
+    border-radius: 24px !important;
+    padding: 40px !important;
+    background-color: white !important;
+    width: 320px !important;
+    max-width: 100% !important;
+    text-align: center !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+  body.print-mode-qr #printable-qr-card img {
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  /* MODALITA' REGISTRO ALLERGENI */
+  body.print-mode-registry #printable-allergen-registry {
+    display: block !important;
+    background-color: white !important;
+    color: black !important;
+    padding: 20px !important;
+  }
+  /* In modalità registro nascondiamo il layout principale dell'app */
+  body.print-mode-registry #root > div {
+    display: none !important;
+  }
+}

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #F7FAF8; }
+    * { box-sizing: border-box; }
+    ::selection { background: #DDF8EA; }
+  </style>
+</helmet>
+<div style="min-height:100vh;background:#F7FAF8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#10201B;display:flex;flex-direction:column">
+
+  <!-- Header scuro sobrio -->
+  <header data-screen-label="Header admin" style="background:#10201B;color:#FFFFFF;padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="font-size:16px;font-weight:800;letter-spacing:0">AllerTgy</div>
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:#9DB5AC;border:1px solid #33443D;border-radius:6px;padding:3px 8px">Admin interno</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;font-size:12px;color:#9DB5AC">
+      <div>Aggiornato oggi, 10:52</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:24px;height:24px;border-radius:50%;background:#0F8A6A;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">A</div>
+        <span style="color:#E5EEE9"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="88e9ece5e1e6c8e9e4e4edfafceff1a6e1fc">[email&#160;protected]</a></span>
+      </div>
+    </div>
+  </header>
+
+  <div style="width:100%;max-width:1440px;margin:0 auto;padding:20px 24px;display:flex;flex-direction:column;gap:16px;flex:1">
+
+    <!-- KPI in riga -->
+    <div data-screen-label="KPI" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+      <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="5">
+        <div style="background:#FFFFFF;border:1px solid #DDE8E2;border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#596B63">{{ k.label }}</div>
+          <div style="font-size:22px;font-weight:800;color:#10201B;line-height:1.1">{{ k.value }}</div>
+          <div style="font-size:12px;color:{{ k.subColor }}">{{ k.sub }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- Toolbar -->
+    <div data-screen-label="Filtri" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <input value="{{ query }}" onChange="{{ setQuery }}" placeholder="Cerca locale, città o codice…" style="height:40px;width:280px;border:1px solid #DDE8E2;border-radius:12px;padding:0 12px;font-size:13px;background:#FFFFFF;color:#10201B;outline:none" style-focus="border:1px solid #0F8A6A;box-shadow:0 0 0 3px #DDF8EA" />
+      <div style="display:flex;gap:6px">
+        <sc-for list="{{ planChips }}" as="c" hint-placeholder-count="5">
+          <button onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}</button>
+        </sc-for>
+      </div>
+      <select value="{{ statusFilter }}" onChange="{{ setStatusFilter }}" style="height:40px;border:1px solid #DDE8E2;border-radius:12px;padding:0 10px;font-size:13px;background:#FFFFFF;color:#10201B;outline:none">
+        <option value="tutti">Stato: tutti</option>
+        <option value="attivo">Attivo</option>
+        <option value="prova">Prova</option>
+        <option value="pagamento_ko">Pagamento KO</option>
+        <option value="omaggio">Omaggio</option>
+      </select>
+      <div style="margin-left:auto;font-size:12px;color:#596B63">{{ resultCount }} locali</div>
+    </div>
+
+    <!-- Tabella + inspector -->
+    <div style="display:flex;gap:16px;align-items:flex-start;flex:1;min-height:0">
+
+      <div data-screen-label="Tabella locali" style="flex:1;background:#FFFFFF;border:1px solid #DDE8E2;border-radius:16px;overflow-x:auto;min-width:0">
+        <div style="min-width:876px;display:grid;grid-template-columns:minmax(200px,1.5fr) 90px 110px 140px 80px 150px 90px;gap:0;padding:10px 16px;border-bottom:1px solid #DDE8E2;background:#F7FAF8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#596B63">
+          <div>Locale</div>
+          <div>Codice</div>
+          <div>Piano</div>
+          <div>Abbonamento</div>
+          <div style="text-align:right">€/mese</div>
+          <div style="padding-left:16px">Menu</div>
+          <div style="text-align:right">Aggiornato</div>
+        </div>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="10">
+          <div onClick="{{ r.select }}" style="{{ r.rowStyle }}">
+            <div style="min-width:0">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-weight:600;font-size:13px;color:#10201B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+                <sc-if value="{{ r.verified }}" hint-placeholder-val="{{ false }}">
+                  <span title="Locale verificato" style="font-size:10px;font-weight:700;color:#2563EB;border:1px solid #C7D8FB;background:#EFF4FE;border-radius:5px;padding:1px 5px;flex-shrink:0">✓ Verificato</span>
+                </sc-if>
+              </div>
+              <div style="font-size:11.5px;color:#596B63">{{ r.city }}</div>
+            </div>
+            <div style="font-size:12px;color:#596B63;font-family:ui-monospace,'SF Mono',Menlo,monospace;align-self:center">{{ r.code }}</div>
+            <div style="align-self:center"><span style="{{ r.planBadge }}">{{ r.planLabel }}</span></div>
+            <div style="align-self:center"><span style="{{ r.statusBadge }}">{{ r.statusLabel }}</span></div>
+            <div style="align-self:center;text-align:right;font-size:13px;font-weight:600;color:#10201B">{{ r.price }}</div>
+            <div style="align-self:center;padding-left:16px;display:flex;align-items:center;gap:6px">
+              <span style="{{ r.menuDot }}"></span>
+              <span style="font-size:12px;color:#10201B">{{ r.menuLabel }}</span>
+            </div>
+            <div style="align-self:center;text-align:right;font-size:12px;color:#596B63">{{ r.updated }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- Inspector laterale -->
+      <aside data-screen-label="Inspector" style="width:340px;flex-shrink:0;background:#FFFFFF;border:1px solid #DDE8E2;border-radius:16px;overflow:hidden">
+        <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column">
+            <div style="padding:16px;border-bottom:1px solid #DDE8E2;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                <div>
+                  <div style="font-size:15px;font-weight:800;color:#10201B">{{ selName }}</div>
+                  <div style="font-size:12px;color:#596B63">{{ selCity }} · <span style="font-family:ui-monospace,'SF Mono',Menlo,monospace">{{ selCode }}</span></div>
+                </div>
+                <button onClick="{{ clearSelection }}" title="Chiudi" style="border:1px solid #DDE8E2;background:#FFFFFF;color:#596B63;border-radius:8px;width:28px;height:28px;font-size:13px;cursor:pointer;line-height:1" style-hover="background:#EEF5F1">✕</button>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <span style="{{ selPlanBadge }}">{{ selPlanLabel }}</span>
+                <span style="{{ selStatusBadge }}">{{ selStatusLabel }}</span>
+              </div>
+            </div>
+
+            <div style="padding:14px 16px;border-bottom:1px solid #DDE8E2;display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#596B63">Abbonamento</div>
+              <sc-for list="{{ selSubRows }}" as="f" hint-placeholder-count="3">
+                <div style="display:flex;justify-content:space-between;font-size:12.5px">
+                  <span style="color:#596B63">{{ f.k }}</span>
+                  <span style="color:#10201B;font-weight:600;text-align:right">{{ f.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="padding:14px 16px;border-bottom:1px solid #DDE8E2;display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#596B63">Fatturazione</div>
+              <sc-for list="{{ selBillRows }}" as="f" hint-placeholder-count="4">
+                <div style="display:flex;justify-content:space-between;font-size:12.5px;gap:12px">
+                  <span style="color:#596B63;flex-shrink:0">{{ f.k }}</span>
+                  <span style="color:#10201B;font-weight:600;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="padding:14px 16px;border-bottom:1px solid #DDE8E2;display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#596B63">Menu</div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="{{ selMenuDot }}"></span>
+                <span style="font-size:12.5px;font-weight:600;color:#10201B">{{ selMenuLabel }}</span>
+                <span style="font-size:12px;color:#596B63;margin-left:auto">{{ selDishes }} piatti</span>
+              </div>
+            </div>
+
+            <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#596B63">Note commerciali</div>
+              <textarea value="{{ selNotes }}" onChange="{{ setNotes }}" rows="4" placeholder="Nessuna nota. Aggiungi contesto commerciale…" style="border:1px solid #DDE8E2;border-radius:12px;padding:10px 12px;font-size:12.5px;font-family:inherit;color:#10201B;resize:vertical;outline:none;background:#FFFFFF;line-height:1.5" style-focus="border:1px solid #0F8A6A;box-shadow:0 0 0 3px #DDF8EA"></textarea>
+              <div style="display:flex;gap:8px">
+                <button style="height:36px;flex:1;background:#0F8A6A;color:#FFFFFF;border:none;border-radius:12px;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:#0B5D4D">Salva nota</button>
+                <button style="height:36px;flex:1;background:#FFFFFF;color:#0B5D4D;border:1px solid #DDE8E2;border-radius:12px;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:#EEF5F1">Apri locale</button>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noSelection }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:32px 20px;text-align:center;display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:13px;font-weight:600;color:#10201B">Nessun locale selezionato</div>
+            <div style="font-size:12px;color:#596B63;line-height:1.5">Seleziona una riga della tabella per vedere dettagli, fatturazione e note commerciali.</div>
+          </div>
+        </sc-if>
+      </aside>
+    </div>
+
+    <div style="font-size:11.5px;color:#94A3B8;padding-bottom:8px">Dati di fatturazione e note commerciali visibili solo allo staff AllerTgy. MRR calcolato sui piani con abbonamento attivo.</div>
+  </div>
+</div>
+</x-dc>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script type="text/x-dc" data-dc-script data-props="{&quot;densita&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;alta&quot;,&quot;comoda&quot;],&quot;default&quot;:&quot;alta&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Tabella&quot;},&quot;evidenziaRischio&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Tabella&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.PLANS = {
+      free: { label: 'Gratis', price: 0 },
+      verificato: { label: 'Verificato', price: 19 },
+      pro: { label: 'Pro', price: 49 },
+      premium: { label: 'Premium', price: 89 }
+    };
+    this.STATUS = {
+      attivo: 'Attivo',
+      prova: 'Prova',
+      pagamento_ko: 'Pagamento KO',
+      omaggio: 'Omaggio'
+    };
+    this.MENU = {
+      pubblicato: { label: 'Pubblicato', color: '#16A34A' },
+      da_verificare: { label: 'Da verificare', color: '#D97706' },
+      non_pubblicato: { label: 'Non pubblicato', color: '#94A3B8' }
+    };
+    this.DATA = [
+      { id: 1, name: 'Trattoria Da Bruno', city: 'Bologna', code: 'TDB-214', plan: 'pro', status: 'attivo', verified: true, menu: 'pubblicato', dishes: 42, updated: '2 lug', since: '14 gen 2026', trialEnds: null, billingEmail: 'amministrazione@dabruno.it', vat: 'IT02845190371', sdi: 'M5UXCR1', pec: 'dabruno@pec.it', notes: 'Cliente storico, molto attento alle tracce di frutta a guscio. Contatto: Bruno (titolare).' },
+      { id: 2, name: 'Osteria del Porto', city: 'Genova', code: 'ODP-102', plan: 'verificato', status: 'attivo', verified: true, menu: 'pubblicato', dishes: 28, updated: '30 giu', since: '3 mar 2026', trialEnds: null, billingEmail: 'info@osteriadelporto.it', vat: 'IT01734820996', sdi: 'KRRH6B9', pec: '', notes: '' },
+      { id: 3, name: 'Pizzeria La Lanterna', city: 'Napoli', code: 'PLL-330', plan: 'free', status: 'omaggio', verified: false, menu: 'da_verificare', dishes: 18, updated: '28 giu', since: '22 mag 2026', trialEnds: null, billingEmail: '', vat: '', sdi: '', pec: '', notes: 'Candidato upgrade a Verificato: menu quasi completo, manca conferma legale.' },
+      { id: 4, name: 'Ristorante Il Melograno', city: 'Firenze', code: 'RIM-077', plan: 'premium', status: 'attivo', verified: true, menu: 'pubblicato', dishes: 56, updated: '5 lug', since: '9 nov 2025', trialEnds: null, billingEmail: 'fatture@ilmelograno.com', vat: 'IT06412280485', sdi: 'SUBM70N', pec: 'ilmelograno@legalmail.it', notes: 'Premium con priorità in vetrina. Rinnovo annuale a novembre.' },
+      { id: 5, name: 'Agriturismo Le Vigne', city: 'Siena', code: 'ALV-451', plan: 'pro', status: 'prova', verified: false, menu: 'da_verificare', dishes: 22, updated: '4 lug', since: '24 giu 2026', trialEnds: '8 lug 2026', billingEmail: 'levigne@agriturismo.it', vat: 'IT01298450521', sdi: '', pec: '', notes: 'Prova Pro in scadenza: chiamare entro l\u20198 luglio per conversione.' },
+      { id: 6, name: 'Sushi Kaito', city: 'Milano', code: 'SKA-188', plan: 'pro', status: 'pagamento_ko', verified: true, menu: 'pubblicato', dishes: 64, updated: '1 lug', since: '17 feb 2026', trialEnds: null, billingEmail: 'admin@kaito.milano.it', vat: 'IT09876320158', sdi: 'W7YVJK9', pec: '', notes: 'Carta scaduta: 2 tentativi falliti. Sollecito inviato il 3 luglio.' },
+      { id: 7, name: 'Bistrot Ventuno', city: 'Torino', code: 'BVE-021', plan: 'verificato', status: 'attivo', verified: true, menu: 'pubblicato', dishes: 31, updated: '29 giu', since: '5 apr 2026', trialEnds: null, billingEmail: 'ventuno@bistrot21.it', vat: 'IT11542870019', sdi: 'USAL8PV', pec: '', notes: '' },
+      { id: 8, name: 'Locanda dei Sapori', city: 'Verona', code: 'LDS-263', plan: 'free', status: 'omaggio', verified: false, menu: 'non_pubblicato', dishes: 0, updated: '12 giu', since: '12 giu 2026', trialEnds: null, billingEmail: '', vat: '', sdi: '', pec: '', notes: 'Registrato ma mai attivato: nessun piatto inserito.' },
+      { id: 9, name: 'Osteria Fratelli Bassi', city: 'Parma', code: 'OFB-095', plan: 'pro', status: 'attivo', verified: true, menu: 'pubblicato', dishes: 38, updated: '3 lug', since: '28 gen 2026', trialEnds: null, billingEmail: 'contabilita@fratellibassi.it', vat: 'IT02655410345', sdi: 'M5UXCR1', pec: 'fratellibassi@pec.it', notes: '' },
+      { id: 10, name: 'Il Girasole', city: 'Bari', code: 'IGI-317', plan: 'verificato', status: 'prova', verified: false, menu: 'da_verificare', dishes: 15, updated: '2 lug', since: '26 giu 2026', trialEnds: '10 lug 2026', billingEmail: 'girasole.bari@gmail.com', vat: 'IT08123450722', sdi: '', pec: '', notes: '' },
+      { id: 11, name: 'La Corte Vegetale', city: 'Roma', code: 'LCV-129', plan: 'premium', status: 'omaggio', verified: true, menu: 'pubblicato', dishes: 47, updated: '27 giu', since: '2 dic 2025', trialEnds: null, billingEmail: 'corte@cortevegetale.roma.it', vat: 'IT14235670586', sdi: 'X2PH38J', pec: '', notes: 'Omaggio Premium 12 mesi: partner per lancio stampa Roma.' },
+      { id: 12, name: 'Antica Trattoria Rosati', city: 'Palermo', code: 'ATR-042', plan: 'pro', status: 'pagamento_ko', verified: true, menu: 'pubblicato', dishes: 35, updated: '25 giu', since: '11 mar 2026', trialEnds: null, billingEmail: 'rosati@anticatrattoria.pa.it', vat: 'IT06731240829', sdi: '', pec: 'rosati@pec.it', notes: 'IBAN cambiato, in attesa nuovo mandato SDD.' }
+    ];
+    this.state = {
+      query: '',
+      planFilter: 'tutti',
+      statusFilter: 'tutti',
+      selectedId: 6,
+      notes: Object.fromEntries(this.DATA.map(r => [r.id, r.notes]))
+    };
+  }
+
+  badgeStyle(fg, bg, border) {
+    return {
+      display: 'inline-block', fontSize: '11px', fontWeight: 700,
+      color: fg, background: bg, border: '1px solid ' + border,
+      borderRadius: '6px', padding: '2px 8px', whiteSpace: 'nowrap'
+    };
+  }
+
+  planBadge(plan) {
+    if (plan === 'free') return this.badgeStyle('#596B63', '#EEF5F1', '#DDE8E2');
+    if (plan === 'verificato') return this.badgeStyle('#2563EB', '#EFF4FE', '#C7D8FB');
+    if (plan === 'pro') return this.badgeStyle('#0B5D4D', '#DDF8EA', '#BFE9D2');
+    return this.badgeStyle('#FFFFFF', '#0B5D4D', '#0B5D4D');
+  }
+
+  statusBadge(status) {
+    if (status === 'attivo') return this.badgeStyle('#16713B', '#EAF7EE', '#C9E9D4');
+    if (status === 'prova') return this.badgeStyle('#B45309', '#FBF3E6', '#F0DCBA');
+    if (status === 'pagamento_ko') return this.badgeStyle('#DC2626', '#FCECEC', '#F5C6C6');
+    return this.badgeStyle('#596B63', '#EEF5F1', '#DDE8E2');
+  }
+
+  menuDot(menu) {
+    return {
+      display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%',
+      background: this.MENU[menu].color, flexShrink: 0
+    };
+  }
+
+  euro(n) {
+    return n === 0 ? '—' : '€ ' + n;
+  }
+
+  renderVals() {
+    const density = this.props.densita ?? 'alta';
+    const highlightRisk = this.props.evidenziaRischio ?? true;
+    const rowPad = density === 'alta' ? '8px 16px' : '13px 16px';
+    const q = this.state.query.trim().toLowerCase();
+
+    const filtered = this.DATA.filter(r => {
+      if (this.state.planFilter !== 'tutti' && r.plan !== this.state.planFilter) return false;
+      if (this.state.statusFilter !== 'tutti' && r.status !== this.state.statusFilter) return false;
+      if (q && !(r.name + ' ' + r.city + ' ' + r.code).toLowerCase().includes(q)) return false;
+      return true;
+    });
+
+    const rows = filtered.map(r => {
+      const selected = r.id === this.state.selectedId;
+      const risky = highlightRisk && r.status === 'pagamento_ko';
+      return {
+        ...r,
+        planLabel: this.PLANS[r.plan].label,
+        statusLabel: this.STATUS[r.status],
+        menuLabel: this.MENU[r.menu].label,
+        price: this.euro(this.PLANS[r.plan].price),
+        planBadge: this.planBadge(r.plan),
+        statusBadge: this.statusBadge(r.status),
+        menuDot: this.menuDot(r.menu),
+        select: () => this.setState({ selectedId: r.id }),
+        rowStyle: {
+          minWidth: '876px',
+          display: 'grid',
+          gridTemplateColumns: 'minmax(200px,1.5fr) 90px 110px 140px 80px 150px 90px',
+          padding: rowPad,
+          borderBottom: '1px solid #EEF5F1',
+          cursor: 'pointer',
+          background: selected ? '#DDF8EA' : (risky ? '#FDF6F6' : '#FFFFFF'),
+          boxShadow: selected ? 'inset 3px 0 0 #0F8A6A' : 'none'
+        }
+      };
+    });
+
+    const mrr = this.DATA.filter(r => r.status === 'attivo')
+      .reduce((s, r) => s + this.PLANS[r.plan].price, 0);
+    const nAttivi = this.DATA.filter(r => r.status === 'attivo').length;
+    const nProva = this.DATA.filter(r => r.status === 'prova').length;
+    const nKo = this.DATA.filter(r => r.status === 'pagamento_ko').length;
+    const nPub = this.DATA.filter(r => r.menu === 'pubblicato').length;
+
+    const kpis = [
+      { label: 'MRR', value: '€ ' + mrr, sub: 'abbonamenti attivi', subColor: '#596B63' },
+      { label: 'Locali', value: String(this.DATA.length), sub: nPub + ' con menu pubblicato', subColor: '#596B63' },
+      { label: 'Paganti attivi', value: String(nAttivi), sub: 'piani a pagamento', subColor: '#16A34A' },
+      { label: 'In prova', value: String(nProva), sub: 'scadenze entro 7 giorni', subColor: '#D97706' },
+      { label: 'Pagamenti KO', value: String(nKo), sub: 'richiedono sollecito', subColor: '#DC2626' }
+    ];
+
+    const chipBase = {
+      height: '40px', padding: '0 14px', borderRadius: '12px', fontSize: '13px',
+      fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit'
+    };
+    const planChips = [['tutti', 'Tutti'], ['free', 'Gratis'], ['verificato', 'Verificato'], ['pro', 'Pro'], ['premium', 'Premium']]
+      .map(([key, label]) => ({
+        label,
+        onClick: () => this.setState({ planFilter: key }),
+        style: this.state.planFilter === key
+          ? { ...chipBase, background: '#0B5D4D', color: '#FFFFFF', border: '1px solid #0B5D4D' }
+          : { ...chipBase, background: '#FFFFFF', color: '#10201B', border: '1px solid #DDE8E2' }
+      }));
+
+    const sel = this.DATA.find(r => r.id === this.state.selectedId) || null;
+    const selVals = sel ? {
+      selName: sel.name,
+      selCity: sel.city,
+      selCode: sel.code,
+      selPlanLabel: this.PLANS[sel.plan].label,
+      selStatusLabel: this.STATUS[sel.status],
+      selPlanBadge: this.planBadge(sel.plan),
+      selStatusBadge: this.statusBadge(sel.status),
+      selMenuLabel: this.MENU[sel.menu].label,
+      selMenuDot: this.menuDot(sel.menu),
+      selDishes: sel.dishes,
+      selNotes: this.state.notes[sel.id] || '',
+      selSubRows: [
+        { k: 'Piano', v: this.PLANS[sel.plan].label + ' · ' + this.euro(this.PLANS[sel.plan].price) + (this.PLANS[sel.plan].price ? '/mese' : '') },
+        { k: 'Stato', v: this.STATUS[sel.status] },
+        { k: 'Attivo dal', v: sel.since },
+        ...(sel.trialEnds ? [{ k: 'Prova fino al', v: sel.trialEnds }] : [])
+      ],
+      selBillRows: [
+        { k: 'Email fatturazione', v: sel.billingEmail || '—' },
+        { k: 'P. IVA', v: sel.vat || '—' },
+        { k: 'Codice SDI', v: sel.sdi || '—' },
+        { k: 'PEC', v: sel.pec || '—' }
+      ]
+    } : {};
+
+    return {
+      query: this.state.query,
+      setQuery: (e) => this.setState({ query: e.target.value }),
+      statusFilter: this.state.statusFilter,
+      setStatusFilter: (e) => this.setState({ statusFilter: e.target.value }),
+      planChips,
+      kpis,
+      rows,
+      resultCount: rows.length,
+      hasSelection: !!sel,
+      noSelection: !sel,
+      clearSelection: () => this.setState({ selectedId: null }),
+      setNotes: (e) => {
+        const id = this.state.selectedId;
+        this.setState(s => ({ notes: { ...s.notes, [id]: e.target.value } }));
+      },
+      ...selVals
+    };
+  }
+}
+</script>
+</body>
+</html>

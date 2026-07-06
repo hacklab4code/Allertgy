@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "AllerTgy",
+    "slug": "allertgy",
+    "version": "0.1.0",
+    "scheme": "allertgy",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": { "supportsTablet": false, "bundleIdentifier": "com.allertgy.app" },
+    "android": { "package": "com.allertgy.app" },
+    "plugins": [
+      "expo-router",
+      ["expo-camera", { "cameraPermission": "AllerTgy usa la fotocamera solo per leggere il QR code sul tavolo del ristorante." }]
+    ]
+  }
+}
