@@ -8,7 +8,8 @@ interface LoginProps {
 }
 
 export default function Login({ defaultRole, onDone, onBack }: LoginProps) {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+  const [forgotSent, setForgotSent] = useState(false);
   const [role, setRole] = useState<'customer' | 'owner'>(defaultRole);
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -31,7 +32,17 @@ export default function Login({ defaultRole, onDone, onBack }: LoginProps) {
     (role === 'customer' ? acceptHealthData : acceptOwnerResponsibility)
   );
 
+  const submitForgot = async () => {
+    setBusy(true); setError('');
+    try {
+      await api.forgotPassword(email.trim());
+      setForgotSent(true);
+    } catch (e) { setError((e as Error).message); }
+    setBusy(false);
+  };
+
   const submit = async () => {
+    if (mode === 'forgot') { await submitForgot(); return; }
     setBusy(true); setError('');
     try {
       const res = mode === 'login'
@@ -59,7 +70,7 @@ export default function Login({ defaultRole, onDone, onBack }: LoginProps) {
           <span className="text-4xl">🥗</span>
           <h1 className="text-2xl font-black text-emerald-800 mt-2">AllerTgy</h1>
           <p className="text-xs text-slate-400 mt-1 uppercase font-bold tracking-wider">
-            {mode === 'login' ? 'Accedi al tuo Account' : 'Registra un nuovo Account'}
+            {mode === 'login' ? 'Accedi al tuo Account' : mode === 'forgot' ? 'Recupera la password' : 'Registra un nuovo Account'}
           </p>
         </div>
 
@@ -124,17 +135,42 @@ export default function Login({ defaultRole, onDone, onBack }: LoginProps) {
             />
           </div>
 
-          <div>
-            <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block mb-1">Password</label>
-            <input 
-              type="password" 
-              placeholder="Minimo 8 caratteri"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && submit()}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 transition-colors" 
-            />
-          </div>
+          {mode !== 'forgot' && (
+            <div>
+              <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block mb-1">Password</label>
+              <input
+                type="password"
+                placeholder="Minimo 8 caratteri"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submit()}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 transition-colors"
+              />
+              {mode === 'login' && (
+                <div className="text-right mt-1.5">
+                  <button
+                    onClick={() => { setMode('forgot'); setError(''); setForgotSent(false); }}
+                    className="text-[11px] text-slate-400 hover:text-emerald-700 font-semibold transition-colors"
+                  >
+                    Password dimenticata?
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {mode === 'forgot' && (
+            forgotSent ? (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 font-semibold leading-relaxed">
+                📧 Se l'indirizzo esiste, riceverai un'email con il link per reimpostare la password.
+                Il link scade tra 30 minuti.
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Inserisci l'email del tuo account: ti invieremo un link per scegliere una nuova password.
+              </p>
+            )
+          )}
         </div>
 
         {mode === 'register' && (
@@ -158,22 +194,32 @@ export default function Login({ defaultRole, onDone, onBack }: LoginProps) {
         )}
 
         {/* Submit */}
-        <button 
-          onClick={submit} 
-          disabled={busy || !email || password.length < 8 || (mode === 'register' && (!displayName || !legalOk))}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3.5 rounded-2xl text-sm transition-all shadow-md shadow-emerald-600/10 disabled:opacity-40"
-        >
-          {busy ? 'Caricamento...' : mode === 'login' ? 'Accedi' : 'Registra Account'}
-        </button>
+        {(mode !== 'forgot' || !forgotSent) && (
+          <button
+            onClick={submit}
+            disabled={busy || !email || (mode !== 'forgot' && password.length < 8) || (mode === 'register' && (!displayName || !legalOk))}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3.5 rounded-2xl text-sm transition-all shadow-md shadow-emerald-600/10 disabled:opacity-40"
+          >
+            {busy ? 'Caricamento...' : mode === 'login' ? 'Accedi' : mode === 'forgot' ? 'Invia link di recupero' : 'Registra Account'}
+          </button>
+        )}
 
         {/* Toggle Mode */}
         <div className="text-center pt-2">
-          <button 
-            onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+          <button
+            onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setForgotSent(false); }}
             className="text-xs text-slate-500 hover:text-emerald-700 underline transition-colors"
           >
-            {mode === 'login' ? 'Non hai ancora un account? Registrati' : 'Hai già un account? Accedi'}
+            {mode === 'login' ? 'Non hai ancora un account? Registrati'
+              : mode === 'forgot' ? '← Torna all\'accesso'
+              : 'Hai già un account? Accedi'}
           </button>
+        </div>
+
+        <div className="text-center text-[10px] text-slate-400 space-x-3">
+          <a href="/termini" target="_blank" className="hover:underline">Termini</a>
+          <a href="/privacy" target="_blank" className="hover:underline">Privacy</a>
+          <a href="/sicurezza" target="_blank" className="hover:underline">Sicurezza</a>
         </div>
 
         {onBack && (

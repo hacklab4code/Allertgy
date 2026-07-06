@@ -7,6 +7,7 @@ import {
   type BusinessPlan,
   type InternalRestaurant,
   type InternalRestaurantBusinessPatch,
+  type InternalReview,
   type InternalSummary,
   type InternalUser,
   type SubscriptionStatus,
@@ -52,6 +53,7 @@ export default function InternalAdmin() {
   const [summary, setSummary] = useState<InternalSummary | null>(null);
   const [restaurants, setRestaurants] = useState<InternalRestaurant[]>([]);
   const [users, setUsers] = useState<InternalUser[]>([]);
+  const [reviews, setReviews] = useState<InternalReview[]>([]);
   const [selected, setSelected] = useState<InternalRestaurant | null>(null);
   const [query, setQuery] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -90,14 +92,16 @@ export default function InternalAdmin() {
     setLoading(true);
     setError('');
     try {
-      const [nextSummary, nextRestaurants, nextUsers] = await Promise.all([
+      const [nextSummary, nextRestaurants, nextUsers, nextReviews] = await Promise.all([
         api.internalSummary(),
         api.internalRestaurants(),
         api.internalUsers(),
+        api.internalReviews().catch(() => [] as InternalReview[]),
       ]);
       setSummary(nextSummary);
       setRestaurants(nextRestaurants);
       setUsers(nextUsers);
+      setReviews(nextReviews);
       if (selected) {
         const updatedSelected = nextRestaurants.find((r) => r.id === selected.id) ?? null;
         setSelected(updatedSelected);
@@ -442,6 +446,72 @@ export default function InternalAdmin() {
               </div>
             </section>
           </aside>
+        </section>
+
+        {/* Moderazione recensioni */}
+        <section className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-black text-lg">Moderazione recensioni</h2>
+              <p className="text-xs text-slate-500">Le recensioni segnalate dagli utenti compaiono per prime. Nascondere una recensione la rimuove dalla pagina pubblica.</p>
+            </div>
+            <span className="text-xs font-black bg-slate-100 px-2 py-1 rounded-lg">{reviews.length}</span>
+          </div>
+          {reviews.length === 0 ? (
+            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-5 text-xs text-slate-500 font-semibold">
+              Nessuna recensione presente.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+              {reviews.map((rev) => (
+                <div key={rev.id} className="py-3 flex flex-col md:flex-row md:items-center gap-3 text-xs">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-black text-slate-800">{rev.restaurant_name}</span>
+                      <span className="text-amber-500">{'★'.repeat(rev.rating)}{'☆'.repeat(5 - rev.rating)}</span>
+                      {rev.reported_count > 0 && (
+                        <span className="bg-rose-50 text-rose-700 font-black px-2 py-0.5 rounded-lg">⚠️ {rev.reported_count} segnalazioni</span>
+                      )}
+                      {rev.is_hidden && (
+                        <span className="bg-slate-200 text-slate-600 font-black px-2 py-0.5 rounded-lg">Nascosta{rev.hidden_reason ? `: ${rev.hidden_reason}` : ''}</span>
+                      )}
+                    </div>
+                    <p className="text-slate-500 mt-1 truncate">{rev.comment || '(senza commento)'}</p>
+                    <p className="text-slate-400 mt-0.5">{rev.user_email} · {dateOnly(rev.created_at)}</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    {rev.is_hidden ? (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const updated = await api.moderateReview(rev.id, false);
+                            setReviews((items) => items.map((item) => (item.id === updated.id ? updated : item)));
+                          } catch (e) { setError((e as Error).message); }
+                        }}
+                        className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-800 font-black"
+                      >
+                        Ripubblica
+                      </button>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          const reason = window.prompt('Motivo per nascondere la recensione (visibile solo internamente):');
+                          if (reason === null) return;
+                          try {
+                            const updated = await api.moderateReview(rev.id, true, reason || 'Contenuto non conforme');
+                            setReviews((items) => items.map((item) => (item.id === updated.id ? updated : item)));
+                          } catch (e) { setError((e as Error).message); }
+                        }}
+                        className="px-3 py-2 rounded-xl bg-rose-50 text-rose-700 font-black"
+                      >
+                        Nascondi
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>

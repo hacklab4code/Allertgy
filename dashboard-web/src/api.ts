@@ -8,6 +8,7 @@ export interface DishIn {
 }
 export interface Restaurant {
   id: number; public_code: string; name: string; city: string | null;
+  slug?: string | null; website?: string | null; description?: string | null;
   is_active?: number;
   address?: string | null; phone?: string | null; email_contact?: string | null;
   opening_hours?: string | null; image_url?: string | null; menu_updated_at: string | null;
@@ -139,6 +140,36 @@ export interface MenuEvaluationOut extends MenuOut {
   evaluation: DishEvaluationOut[];
 }
 
+export interface Photo { id: number; url: string; is_cover: boolean; sort_order: number }
+
+export interface PublicRestaurant {
+  public_code: string; slug: string | null; name: string; city: string | null;
+  address: string | null; latitude: number | null; longitude: number | null;
+  phone: string | null; website: string | null; description: string | null;
+  opening_hours: string | null; image_url: string | null; photos: Photo[];
+  business_plan: BusinessPlan; is_verified: boolean;
+  rating_avg: number | null; rating_count: number;
+  menu_available: boolean; piatti: DishOut[]; safety_notice: string;
+}
+
+export interface Review {
+  id: number; restaurant_id: number; rating: number; comment: string | null;
+  author_name: string; is_mine: boolean; reply: string | null; created_at: string;
+}
+
+export interface InternalReview {
+  id: number; restaurant_id: number; restaurant_name: string; user_email: string;
+  rating: number; comment: string | null; is_hidden: boolean;
+  hidden_reason: string | null; reported_count: number; created_at: string;
+}
+
+export interface LegalDoc { doc: string; title: string; version: string; content_markdown: string }
+
+export interface InvoiceRow {
+  id: number; stripe_invoice_id: string; amount_cents: number; status: string;
+  pdf_url: string | null; created_at: string;
+}
+
 export const api = {
   listRestaurants: () => req<MenuOut[]>('/restaurants'),
   publicMenu: (code: string) => req<MenuOut>(`/restaurants/${code}/menu`),
@@ -226,6 +257,62 @@ export const api = {
       body: fd,
     });
   },
+  // --- Recupero password ---
+  forgotPassword: (email: string) =>
+    req<{ detail: string }>('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (resetToken: string, newPassword: string) =>
+    req<{ detail: string }>('/auth/reset-password', {
+      method: 'POST', body: JSON.stringify({ token: resetToken, new_password: newPassword }),
+    }),
+
+  // --- Pagina pubblica + recensioni ---
+  publicRestaurant: (codeOrSlug: string) => req<PublicRestaurant>(`/restaurants/${codeOrSlug}/public`),
+  listReviews: (code: string) => req<Review[]>(`/restaurants/${code}/reviews`),
+  upsertReview: (code: string, rating: number, comment: string) =>
+    req<Review>(`/restaurants/${code}/reviews`, { method: 'POST', body: JSON.stringify({ rating, comment }) }),
+  deleteMyReview: (code: string) =>
+    req<void>(`/restaurants/${code}/reviews/mine`, { method: 'DELETE' }),
+  reportReview: (id: number) => req<void>(`/reviews/${id}/report`, { method: 'POST' }),
+  replyToReview: (id: number, reply: string) =>
+    req<Review>(`/reviews/${id}/reply`, { method: 'POST', body: JSON.stringify({ reply }) }),
+
+  // --- Galleria foto locale ---
+  listRestaurantPhotos: (rid: number) => req<Photo[]>(`/admin/restaurants/${rid}/photos`),
+  uploadRestaurantPhoto: (rid: number, file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return req<Photo>(`/admin/restaurants/${rid}/photos`, { method: 'POST', body: fd });
+  },
+  setCoverPhoto: (rid: number, photoId: number) =>
+    req<Photo[]>(`/admin/restaurants/${rid}/photos/${photoId}/cover`, { method: 'POST' }),
+  deleteRestaurantPhoto: (rid: number, photoId: number) =>
+    req<void>(`/admin/restaurants/${rid}/photos/${photoId}`, { method: 'DELETE' }),
+
+  // --- Billing Stripe ---
+  billingCheckout: (restaurantId: number, plan: BusinessPlan) =>
+    req<{ checkout_url: string }>('/billing/checkout-session', {
+      method: 'POST', body: JSON.stringify({ restaurant_id: restaurantId, plan }),
+    }),
+  billingPortal: (restaurantId: number) =>
+    req<{ portal_url: string }>('/billing/portal-session', {
+      method: 'POST', body: JSON.stringify({ restaurant_id: restaurantId }),
+    }),
+  billingInvoices: (restaurantId: number) => req<InvoiceRow[]>(`/billing/invoices/${restaurantId}`),
+
+  // --- Documenti legali ---
+  legalDoc: (doc: string) => req<LegalDoc>(`/legal/${doc}`),
+
+  // --- Moderazione recensioni (admin interno) ---
+  internalReviews: () => req<InternalReview[]>('/internal-admin/reviews'),
+  moderateReview: (id: number, isHidden: boolean, reason?: string) =>
+    req<InternalReview>(`/internal-admin/reviews/${id}/moderate`, {
+      method: 'PATCH', body: JSON.stringify({ is_hidden: isHidden, hidden_reason: reason ?? null }),
+    }),
+  internalDocumentAccessLog: () =>
+    req<{ id: number; document_id: number; document_owner_user_id: number; accessed_by_user_id: number; accessed_at: string }[]>(
+      '/internal-admin/document-access-log',
+    ),
+
   internalPlans: () => req<PlanDefinition[]>('/internal-admin/plans'),
   internalSummary: () => req<InternalSummary>('/internal-admin/summary'),
   internalRestaurants: () => req<InternalRestaurant[]>('/internal-admin/restaurants'),

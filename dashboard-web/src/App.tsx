@@ -1,10 +1,21 @@
 import { useEffect, useState, useRef } from 'react';
-import { api, API, clearToken, hasToken, type Allergen, type DishIn, type Restaurant } from './api';
+import { api, API, clearToken, hasToken, type Allergen, type DishIn, type Photo, type Restaurant } from './api';
 import ClientArea from './components/ClientArea';
 import InternalAdmin from './components/InternalAdmin';
+import LegalPage from './components/LegalPage';
 import Login from './components/Login';
 import MenuEditor from './components/MenuEditor';
+import PublicRestaurant from './components/PublicRestaurant';
+import ResetPassword from './components/ResetPassword';
 import Landing from './Landing';
+
+// Rotte pubbliche gestite per pathname (nessun router: stesso pattern di /internal-admin)
+const LEGAL_ROUTES: Record<string, string> = {
+  '/termini': 'terms',
+  '/privacy': 'privacy',
+  '/cookie': 'cookies',
+  '/sicurezza': 'safety',
+};
 
 const PLAN_LABELS = {
   free: 'Gratis',
@@ -63,8 +74,18 @@ function restaurantCanUseMenu(r: Restaurant | null) {
 }
 
 export default function App() {
-  if (window.location.pathname === '/internal-admin') {
+  const path = window.location.pathname;
+  if (path === '/internal-admin') {
     return <InternalAdmin />;
+  }
+  if (path === '/reset-password') {
+    return <ResetPassword />;
+  }
+  if (path.startsWith('/r/') && path.length > 3) {
+    return <PublicRestaurant codeOrSlug={decodeURIComponent(path.slice(3).replace(/\/+$/, ''))} />;
+  }
+  if (LEGAL_ROUTES[path]) {
+    return <LegalPage doc={LEGAL_ROUTES[path]} />;
   }
 
   const [view, setView] = useState<'landing' | 'app' | 'client' | 'login'>('landing');
@@ -98,6 +119,9 @@ export default function App() {
   const [logoUrl, setLogoUrl] = useState('');
   const [latitude, setLatitude] = useState<number | ''>('');
   const [longitude, setLongitude] = useState<number | ''>('');
+  const [website, setWebsite] = useState('');
+  const [description, setDescription] = useState('');
+  const [photos, setPhotos] = useState<Photo[]>([]);
 
   const settingsMapRef = useRef<any>(null);
   const settingsMarkerRef = useRef<any>(null);
@@ -112,6 +136,9 @@ export default function App() {
       setLogoUrl(current.image_url || '');
       setLatitude(current.latitude ?? '');
       setLongitude(current.longitude ?? '');
+      setWebsite(current.website || '');
+      setDescription(current.description || '');
+      api.listRestaurantPhotos(current.id).then(setPhotos).catch(() => setPhotos([]));
     }
   }, [current]);
 
@@ -313,7 +340,9 @@ export default function App() {
         opening_hours: openingHours.trim(),
         image_url: logoUrl || null,
         latitude: latitude === '' ? null : Number(latitude),
-        longitude: longitude === '' ? null : Number(longitude)
+        longitude: longitude === '' ? null : Number(longitude),
+        website: website.trim() || null,
+        description: description.trim() || null,
       });
       setCurrent(res);
       setRestaurants(restaurants.map(r => r.id === res.id ? res : r));
@@ -937,6 +966,77 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Galleria foto (limite per piano) */}
+                  <div className="bg-slate-50 border border-slate-205 rounded-3xl p-5 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block">Galleria foto del locale</label>
+                        <p className="text-[10px] text-slate-405 mt-0.5">
+                          Le foto compaiono sulla pagina pubblica del locale. Limite del piano attuale:
+                          {' '}{{ free: 1, verified: 3, pro: 8, premium: 20 }[currentPlan]} foto.
+                        </p>
+                      </div>
+                      <label className="inline-block px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors shadow-sm shadow-emerald-600/10">
+                        + Aggiungi foto
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const f = e.target.files?.[0];
+                            if (!f || !current) return;
+                            setBusy(true); setError('');
+                            try {
+                              await api.uploadRestaurantPhoto(current.id, f);
+                              setPhotos(await api.listRestaurantPhotos(current.id));
+                            } catch (err) { setError((err as Error).message); }
+                            setBusy(false);
+                          }}
+                        />
+                      </label>
+                    </div>
+                    {photos.length === 0 ? (
+                      <p className="text-xs text-slate-400">Nessuna foto caricata: la scheda pubblica mostrerà solo il logo.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {photos.map((p) => (
+                          <div key={p.id} className="relative group">
+                            <img src={p.url} alt="Foto locale" className={`w-full h-24 object-cover rounded-2xl border ${p.is_cover ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-200'}`} />
+                            {p.is_cover && (
+                              <span className="absolute top-1 left-1 bg-emerald-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-lg">Copertina</span>
+                            )}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center gap-2">
+                              {!p.is_cover && (
+                                <button
+                                  onClick={async () => {
+                                    if (!current) return;
+                                    try { setPhotos(await api.setCoverPhoto(current.id, p.id)); }
+                                    catch (err) { setError((err as Error).message); }
+                                  }}
+                                  className="bg-white text-slate-800 text-[9px] font-black px-2 py-1 rounded-lg"
+                                >
+                                  Copertina
+                                </button>
+                              )}
+                              <button
+                                onClick={async () => {
+                                  if (!current) return;
+                                  try {
+                                    await api.deleteRestaurantPhoto(current.id, p.id);
+                                    setPhotos(await api.listRestaurantPhotos(current.id));
+                                  } catch (err) { setError((err as Error).message); }
+                                }}
+                                className="bg-rose-600 text-white text-[9px] font-black px-2 py-1 rounded-lg"
+                              >
+                                Elimina
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Geolocation Section */}
                   <div className="bg-slate-50 border border-slate-205 rounded-3xl p-5 space-y-4">
                     <div className="flex justify-between items-center">
@@ -1027,15 +1127,43 @@ export default function App() {
                     </div>
                     <div>
                       <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block mb-1">Orari di Apertura</label>
-                      <textarea 
-                        value={openingHours} 
+                      <textarea
+                        value={openingHours}
                         onChange={(e) => setOpeningHours(e.target.value)}
                         rows={4}
-                        placeholder="es. Lun - Ven: 12:30 - 14:30, 19:30 - 22:30&#10;Sab - Dom: 19:00 - 23:00" 
-                        className="w-full border border-slate-250 rounded-2xl px-4 py-3 text-sm bg-slate-50 focus:bg-white focus:outline-none resize-none leading-relaxed" 
+                        placeholder="es. Lun - Ven: 12:30 - 14:30, 19:30 - 22:30&#10;Sab - Dom: 19:00 - 23:00"
+                        className="w-full border border-slate-250 rounded-2xl px-4 py-3 text-sm bg-slate-50 focus:bg-white focus:outline-none resize-none leading-relaxed"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block mb-1">Sito Web</label>
+                      <input
+                        value={website}
+                        onChange={(e) => setWebsite(e.target.value)}
+                        placeholder="es. https://www.trattoriadamatteo.it"
+                        className="w-full border border-slate-250 rounded-2xl px-4 py-3 text-sm bg-slate-50 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block mb-1">Descrizione del Locale (pagina pubblica)</label>
+                      <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        rows={4}
+                        placeholder="es. Cucina tradizionale con menù dedicato a celiaci e allergici…"
+                        className="w-full border border-slate-250 rounded-2xl px-4 py-3 text-sm bg-slate-50 focus:bg-white focus:outline-none resize-none leading-relaxed"
                       />
                     </div>
                   </div>
+
+                  {current.slug && (
+                    <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 text-xs text-slate-600">
+                      🌐 Pagina pubblica del locale:{' '}
+                      <a href={`/r/${current.slug}`} target="_blank" rel="noopener noreferrer" className="text-emerald-700 font-bold hover:underline">
+                        {window.location.origin}/r/{current.slug}
+                      </a>
+                    </div>
+                  )}
 
                   <div className="pt-4 border-t border-slate-100 flex justify-end">
                     <button 
@@ -1060,8 +1188,26 @@ export default function App() {
                         Stato: <b>{current?.subscription_status ?? 'free'}</b> · Prezzo: <b>{centsToEuro(currentPlanPrice)} / mese</b>
                       </p>
                     </div>
-                    <div className={`px-4 py-2 rounded-2xl text-xs font-black ${canUseMenu ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
-                      {canUseMenu ? 'Menu digitale attivo' : 'Menu digitale non incluso'}
+                    <div className="flex items-center gap-3">
+                      <div className={`px-4 py-2 rounded-2xl text-xs font-black ${canUseMenu ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
+                        {canUseMenu ? 'Menu digitale attivo' : 'Menu digitale non incluso'}
+                      </div>
+                      {currentPlan !== 'free' && (
+                        <button
+                          onClick={async () => {
+                            if (!current) return;
+                            try {
+                              const res = await api.billingPortal(current.id);
+                              window.location.href = res.portal_url;
+                            } catch (e) {
+                              alert((e as Error).message);
+                            }
+                          }}
+                          className="px-4 py-2 rounded-2xl text-xs font-black border border-slate-250 text-slate-700 hover:bg-slate-50"
+                        >
+                          Gestisci abbonamento
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1087,12 +1233,28 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                          {isProPlan && (
+                          {plan.code !== 'free' && !isCurrent && (
                             <button
-                              onClick={() => alert("Richiesta salvata: in questa versione l'attivazione del piano si gestisce dalla dashboard interna admin.")}
-                              className="w-full bg-slate-900 hover:bg-slate-800 text-white px-4 py-3 rounded-2xl text-xs font-black"
+                              onClick={async () => {
+                                if (!current) return;
+                                setBusy(true); setError('');
+                                try {
+                                  const res = await api.billingCheckout(current.id, plan.code);
+                                  window.location.href = res.checkout_url;
+                                } catch (e) {
+                                  const msg = (e as Error).message;
+                                  if (/STRIPE|Pagamenti non ancora attivi/i.test(msg)) {
+                                    alert('I pagamenti online non sono ancora attivi. Contatta AllerTgy per attivare il piano manualmente.');
+                                  } else {
+                                    setError(msg);
+                                  }
+                                }
+                                setBusy(false);
+                              }}
+                              disabled={busy}
+                              className="w-full bg-slate-900 hover:bg-slate-800 text-white px-4 py-3 rounded-2xl text-xs font-black disabled:opacity-40"
                             >
-                              Richiedi attivazione
+                              {isProPlan ? 'Attiva con carta' : 'Passa a questo piano'}
                             </button>
                           )}
                         </div>

@@ -388,3 +388,17 @@ def _run_v5_migrations(db) -> None:
           FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """)
+
+    # Backfill slug per i locali creati prima della v5
+    try:
+        from .models import Restaurant
+        from .services.slugs import ensure_slug
+        missing = db.query(Restaurant).filter(Restaurant.slug.is_(None)).all()
+        for r in missing:
+            ensure_slug(db, r)
+        if missing:
+            db.commit()
+            print(f"🚀 Database Migrazione v5: Slug generati per {len(missing)} locali")
+    except Exception as e:
+        print(f"❌ Errore backfill slug: {e}")
+        db.rollback()
