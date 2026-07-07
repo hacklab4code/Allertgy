@@ -1,7 +1,8 @@
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, TextInput
+  Alert, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, TextInput
 } from 'react-native';
 import { api, API } from '../../src/api/client';
 import { useSession } from '../../src/store/session';
@@ -15,6 +16,7 @@ export default function Account() {
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [emergencyDraft, setEmergencyDraft] = useState('');
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   const mie = all.filter((a) => allergie.includes(a.code));
 
@@ -26,9 +28,31 @@ export default function Account() {
       setEmergencyDraft(p.emergency_medicines ?? '');
       const docs = await api.getDocuments();
       setDocuments(docs);
+      const photo = await api.getProfilePhoto().catch(() => null);
+      setPhotoUrl(photo?.photo_url ?? null);
     } catch (e) {
       console.log('Errore caricamento profilo mobile:', e);
     }
+  };
+
+  const changePhoto = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    setLoading(true);
+    try {
+      const res = await api.uploadProfilePhoto(result.assets[0].uri, result.assets[0].mimeType ?? 'image/jpeg');
+      setPhotoUrl(res.photo_url);
+    } catch (e) {
+      Alert.alert(isIt ? 'Errore' : 'Error', (e as Error).message);
+    }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -74,9 +98,14 @@ export default function Account() {
     <ScrollView contentContainerStyle={styles.container}>
       {/* Intestazione profilo */}
       <View style={styles.header}>
-        <View style={styles.avatar}><Text style={styles.avatarText}>
-          {(email ?? 'A')[0].toUpperCase()}
-        </Text></View>
+        <TouchableOpacity style={styles.avatar} onPress={changePhoto}>
+          {photoUrl ? (
+            <Image source={{ uri: photoUrl }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarText}>{(email ?? 'A')[0].toUpperCase()}</Text>
+          )}
+          <View style={styles.avatarBadge}><Text style={styles.avatarBadgeText}>📷</Text></View>
+        </TouchableOpacity>
         <Text style={styles.email}>{profile?.display_name || email || (isIt ? 'Utente' : 'User')}</Text>
         {email && <Text style={styles.emailSub}>{email}</Text>}
         <Text style={styles.roleBadge}>{isIt ? '🙋 Account Cliente' : '🙋 Customer Account'}</Text>
@@ -187,40 +216,23 @@ export default function Account() {
         </View>
       </View>
 
-      {/* Sezione 2: Documenti Certificati */}
+      {/* Sezione 2: Documenti medici (nuovo flusso con AI e conferma manuale) */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionLabel}>{isIt ? 'DOCUMENTI SANITARI' : 'MEDICAL DOCUMENTS'}</Text>
       </View>
       <View style={styles.card}>
-        {documents.length === 0 ? (
-          <View style={{ padding: 16, alignItems: 'center' }}>
-            <Text style={styles.emptyText}>{isIt ? 'Nessun certificato medico caricato.' : 'No medical certificates uploaded.'}</Text>
-            <Text style={styles.emptyNote}>
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/documenti')}>
+          <Text style={styles.itemIcon}>📄</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.itemTitle}>{isIt ? 'Documenti medici' : 'Medical documents'}</Text>
+            <Text style={styles.itemSub}>
               {isIt
-                ? 'Il caricamento documenti da mobile arriverà in una prossima versione. Tieni sempre con te certificati e farmaci prescritti.'
-                : 'Mobile document upload will arrive in a future version. Always keep certificates and prescribed medicines with you.'}
+                ? 'Carica referti allergologici (privati e cancellabili). Con il tuo consenso, l\'AI può suggerire gli allergeni da confermare.'
+                : 'Upload allergy reports (private and deletable). With your consent, AI can suggest allergens for you to confirm.'}
             </Text>
           </View>
-        ) : (
-          documents.map((d, index) => (
-            <View key={d.id}>
-              {index > 0 && <View style={styles.separator} />}
-              <View style={styles.docRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.docName}>📄 {d.filename}</Text>
-                  <Text style={styles.docDate}>{isIt ? 'Caricato' : 'Uploaded'}: {d.created_at.substring(0, 10)}</Text>
-                </View>
-                <View style={[styles.statusBadge, d.status === 'verified' ? styles.badgeGreen : styles.badgeAmber]}>
-                  <Text style={[styles.badgeText, d.status === 'verified' ? styles.badgeTextGreen : styles.badgeTextAmber]}>
-                    {d.status === 'verified' 
-                      ? (isIt ? 'Verificato' : 'Verified') 
-                      : (isIt ? 'In attesa' : 'Pending')}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          ))
-        )}
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Sezione 3: Assistenza e Info */}
@@ -236,11 +248,20 @@ export default function Account() {
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
         <View style={styles.separator} />
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/legal-docs')}>
+          <Text style={styles.itemIcon}>📜</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.itemTitle}>{isIt ? 'Termini, privacy e sicurezza' : 'Terms, privacy & safety'}</Text>
+            <Text style={styles.itemSub}>{isIt ? 'Testi legali completi e versioni' : 'Full legal texts and versions'}</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.separator} />
         <View style={styles.item}>
           <Text style={styles.itemIcon}>ℹ️</Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.itemTitle}>{isIt ? 'Informazioni app' : 'App info'}</Text>
-            <Text style={styles.itemSub}>AllerTgy v0.4 · server: {API}</Text>
+            <Text style={styles.itemSub}>AllerTgy v0.5 · server: {API}</Text>
           </View>
         </View>
       </View>
@@ -260,6 +281,13 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   avatarText: { color: '#fff', fontSize: 26, fontWeight: '800' },
+  avatarImage: { width: 64, height: 64, borderRadius: 32 },
+  avatarBadge: {
+    position: 'absolute', bottom: -2, right: -2, backgroundColor: '#fff',
+    borderRadius: 999, width: 24, height: 24, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: '#e2e8f0',
+  },
+  avatarBadgeText: { fontSize: 12 },
   email: { fontWeight: '800', fontSize: 16, color: '#1e293b', marginTop: 8 },
   emailSub: { color: '#64748b', fontSize: 12, marginTop: 1 },
   roleBadge: {

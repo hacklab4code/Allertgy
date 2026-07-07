@@ -7,6 +7,31 @@ Decisioni prese come base di questo piano:
 
 ---
 
+## ✅ Stato di avanzamento (aggiornato 2026-07-07)
+
+| Fase | Stato | Note |
+|---|---|---|
+| 0 — Sicurezza base | ✅ (parziale) | git init + `.gitignore`, `JWT_SECRET` reale generato. **Restano a carico tuo**: rotazione password DB su hPanel, verifica backup Hostinger, VPS, account R2/Stripe/Resend |
+| 1 — Recupero password + foto profilo | ✅ | Backend + dashboard web + app mobile (schermate `forgot`/`reset-password`, avatar con `expo-image-picker`) |
+| 2 — Pagine pubbliche + SEO | ✅ | `GET /restaurants/{code}/public`, slug auto-generati (con backfill), rotta web `/r/{slug}`, meta tag dinamici, `sitemap.xml` |
+| 3 — Documenti medici + AI | ✅ | Storage privato con URL firmati 5 min, consenso AI per-documento, estrazione Gemini (stub senza API key), conferma manuale obbligatoria, limite 5/mese, access log, cancellazione reale, schermata mobile `documenti.tsx` |
+| 4 — Recensioni + moderazione | ✅ | Upsert 1-per-utente, risposta ristoratore (piano Verificato+), segnalazioni, moderazione in InternalAdmin, UI web e mobile |
+| 5 — Stripe end-to-end | ✅ (codice) | Checkout/Portal/webhook/fatture implementati; si attivano inserendo le chiavi `STRIPE_*` in `backend/.env` (senza chiavi: 503 con messaggio chiaro) |
+| 6 — Notifiche | ✅ (parziale) | Tabelle + push Expo su "menù aggiornato" (preferiti server-side) e "risposta a recensione"; email transazionali via Resend (fallback log). Manca il wiring `expo-notifications` nell'app (richiede dev build) |
+| 7 — Hardening + beta | ⏳ | Smoke test end-to-end backend superato (25/25). Restano: deploy VPS+HTTPS, Stripe live, revisione legale, beta con ristoranti reali |
+
+Testi legali (§8): integrali in `backend/app/legal.py`, serviti da `GET /legal/{doc}`, pubblicati su web (`/termini`, `/privacy`, `/cookie`, `/sicurezza`) e in app (`legal-docs.tsx`). **Da far rivedere a un legale prima del lancio.**
+
+### Cosa serve da te per "accendere" i servizi esterni
+1. **Hostinger**: ruota la password del DB su hPanel e aggiorna `backend/.env`; verifica i backup automatici.
+2. **Cloudflare R2**: crea un bucket privato e compila `R2_*` in `.env` (senza: fallback locale già funzionante in `backend/private_storage/`).
+3. **Resend**: crea l'account, verifica il dominio, compila `RESEND_API_KEY` (senza: le email finiscono nel log del server).
+4. **Stripe**: crea i 3 prodotti/prezzi mensili, il webhook verso `{API}/billing/webhook`, compila `STRIPE_*`.
+5. **Gemini**: `GEMINI_API_KEY` per menù + referti (senza: stub dimostrativo).
+6. **VPS**: deploy del backend con HTTPS (Docker + Nginx + Certbot) e `PUBLIC_WEB_URL`/`PUBLIC_API_URL` reali.
+
+---
+
 ## 0. Executive summary
 
 Il progetto ha già basi solide (auth JWT, semaforo testato, piani commerciali, dashboard admin, audit log menù). Mancano le funzioni che rendono l'app "finita e lanciabile": recupero password, foto profilo, pagine pubbliche ristorante, upload documenti medici con AI, recensioni, pagamenti reali (oggi i piani esistono a DB ma non c'è un flusso di pagamento end-to-end), notifiche, hardening di sicurezza, e testi legali completi. Questo documento specifica ogni funzione nel dettaglio (endpoint, tabelle, schermate, edge case), la nuova struttura dati, i costi attesi, i testi legali integrali e una roadmap a fasi.

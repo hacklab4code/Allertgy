@@ -1,20 +1,34 @@
-# 🥗 AllerTgy — MVP
+# 🥗 AllerTgy
 
 Piattaforma per mangiare fuori casa in sicurezza con allergie e intolleranze.
 Tre componenti: **backend API**, **dashboard ristoratore (B2B)**, **app mobile (B2C)**.
 
 ```
 allerTgy/
-├── database/        schema.sql + schema_v2.sql + schema_v3.sql + schema_v4.sql + seed_demo.sql
-├── backend/         FastAPI (Python) — API REST, auth JWT, stub AI Vision
-├── dashboard-web/   React + Vite + Tailwind — area ristoratori
+├── database/        schema.sql … schema_v5.sql + seed_demo.sql
+├── backend/         FastAPI (Python) — API REST, auth JWT, AI Vision, Stripe, storage privato
+├── dashboard-web/   React + Vite + Tailwind — landing, area ristoratori, pagine pubbliche /r/{slug}
 └── app-mobile/      Expo / React Native — app utenti col semaforo
 ```
+
+> Lo stato di avanzamento del piano di lancio e le istruzioni per attivare i
+> servizi esterni (R2, Resend, Stripe, Gemini) sono in **PIANO_LANCIO.md**.
+
+## Funzioni principali
+
+- Recupero password via email (token 30 min, anti-enumeration)
+- Foto profilo e galleria locale su **storage privato** (R2 o fallback locale) con URL firmati a scadenza — mai su `/static`
+- Pagina pubblica ristorante `/r/{slug}` con SEO, orari, galleria, rating e anteprima menù (gating piano Pro)
+- Documenti medici con **consenso AI per-documento**, estrazione allergeni Gemini, **conferma manuale obbligatoria**, limite 5 analisi/mese, log accessi, cancellazione reale (GDPR)
+- Recensioni (una per utente/locale), risposta del ristoratore (piano Verificato+), moderazione da admin interno
+- Abbonamenti **Stripe** end-to-end (Checkout, Customer Portal, webhook, fatture) — attivi con le chiavi in `.env`
+- Notifiche push Expo (menù aggiornato dei preferiti, risposte alle recensioni) ed email transazionali (Resend)
+- Testi legali completi serviti da `GET /legal/{doc}` e pubblicati su web e app
 
 ## 1. Database (una tantum, su Hostinger)
 
 1. hPanel → **phpMyAdmin** → database `u490938806_allerYgy` → tab *SQL*
-2. Esegui in ordine: `database/schema.sql`, `database/schema_v2.sql`, `database/schema_v3.sql`, `database/schema_v4.sql`, `database/seed_demo.sql` (opzionale, ristorante di prova codice **100001**)
+2. Esegui in ordine: `database/schema.sql` → `schema_v5.sql`, poi `database/seed_demo.sql` (opzionale, ristorante di prova codice **100001**). In alternativa il backend applica le stesse migrazioni automaticamente all'avvio.
 3. hPanel → Database → **Remote MySQL** → aggiungi l'IP del computer dove gira il backend (o `%` per test)
 4. ⚠️ La password del DB era in uno screenshot: **cambiala** e aggiorna `backend/.env`
 
@@ -29,6 +43,11 @@ uvicorn app.main:app --reload --host 0.0.0.0
 ```
 
 API su `http://localhost:8000` — documentazione interattiva su `/docs`.
+
+Configurazione in `backend/.env` (vedi `backend/.env.example`): DB, `JWT_SECRET`,
+e le chiavi opzionali `GEMINI_API_KEY`, `R2_*` (storage privato), `RESEND_API_KEY`
+(email), `STRIPE_*` (abbonamenti). Ogni servizio esterno ha un fallback locale:
+senza chiavi l'app funziona comunque in modalità sviluppo.
 
 ### Account demo (creati da `seed_demo.py`)
 

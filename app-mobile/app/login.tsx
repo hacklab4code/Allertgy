@@ -8,7 +8,8 @@ import { api } from '../src/api/client';
 import { useSession, type Role } from '../src/store/session';
 
 export default function Login() {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+  const [forgotSent, setForgotSent] = useState(false);
   const [role, setRole] = useState<Role>('customer');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -21,16 +22,28 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const session = useSession();
 
-  const legalOk = mode === 'login' || (
+  const legalOk = mode !== 'register' || (
     acceptTerms &&
     acceptPrivacy &&
     (role === 'customer' ? acceptHealthData : acceptOwnerResponsibility)
   );
-  const formOk = !!email.trim() && password.length >= 8 && legalOk && (mode === 'login' || !!displayName.trim());
+  const formOk = mode === 'forgot'
+    ? !!email.trim()
+    : !!email.trim() && password.length >= 8 && legalOk && (mode === 'login' || !!displayName.trim());
 
   const submit = async () => {
     setBusy(true);
     setError('');
+    if (mode === 'forgot') {
+      try {
+        await api.forgotPassword(email.trim());
+        setForgotSent(true);
+      } catch (e) {
+        setError((e as Error).message);
+      }
+      setBusy(false);
+      return;
+    }
     try {
       const res = mode === 'login'
         ? await api.login(email.trim(), password)
@@ -70,10 +83,16 @@ export default function Login() {
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.logo}>AllerTgy</Text>
         <View style={styles.heading}>
-          <Text style={styles.title}>{mode === 'login' ? 'Accedi al tuo account' : 'Crea il tuo account'}</Text>
+          <Text style={styles.title}>
+            {mode === 'login' ? 'Accedi al tuo account'
+              : mode === 'forgot' ? 'Recupera la password'
+              : 'Crea il tuo account'}
+          </Text>
           <Text style={styles.tagline}>
             {mode === 'login'
               ? 'Riapri il tuo profilo allergie e continua dal tuo ultimo locale.'
+              : mode === 'forgot'
+              ? 'Ti invieremo un link via email per scegliere una nuova password.'
               : 'Il profilo allergie resta sul tuo dispositivo e nel tuo account.'}
           </Text>
         </View>
@@ -117,13 +136,29 @@ export default function Login() {
             keyboardType="email-address" value={email} onChangeText={setEmail}
           />
         </View>
-        <View style={styles.field}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input} placeholder="Minimo 8 caratteri"
-            secureTextEntry value={password} onChangeText={setPassword}
-          />
-        </View>
+        {mode !== 'forgot' && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              style={styles.input} placeholder="Minimo 8 caratteri"
+              secureTextEntry value={password} onChangeText={setPassword}
+            />
+            {mode === 'login' && (
+              <TouchableOpacity onPress={() => { setMode('forgot'); setError(''); setForgotSent(false); }}>
+                <Text style={styles.forgotLink}>Password dimenticata?</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {mode === 'forgot' && forgotSent && (
+          <View style={styles.legalBox}>
+            <Text style={styles.checkText}>
+              📧 Se l'indirizzo esiste, riceverai un'email con il link per reimpostare la password.
+              Il link scade tra 30 minuti.
+            </Text>
+          </View>
+        )}
 
         {mode === 'register' && (
           <View style={styles.legalBox}>
@@ -160,12 +195,19 @@ export default function Login() {
         >
           {busy
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.buttonText}>{mode === 'login' ? 'Accedi' : 'Crea account'}</Text>}
+            : <Text style={styles.buttonText}>
+                {mode === 'login' ? 'Accedi' : mode === 'forgot' ? 'Invia link di recupero' : 'Crea account'}
+              </Text>}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.switchButton} onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>
+        <TouchableOpacity
+          style={styles.switchButton}
+          onPress={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setForgotSent(false); }}
+        >
           <Text style={styles.switch}>
-            {mode === 'login' ? 'Non hai un account? Registrati' : 'Hai già un account? Accedi'}
+            {mode === 'login' ? 'Non hai un account? Registrati'
+              : mode === 'forgot' ? '← Torna all\'accesso'
+              : 'Hai già un account? Accedi'}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -216,6 +258,7 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.4 },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   switchButton: { height: 48, alignItems: 'center', justifyContent: 'center' },
+  forgotLink: { color: '#0B5D4D', fontWeight: '600', fontSize: 12.5, textAlign: 'right', marginTop: 4 },
   switch: { textAlign: 'center', color: '#0B5D4D', fontWeight: '600' },
   error: { color: '#dc2626', marginBottom: 12, fontWeight: '700' },
   legalBox: {

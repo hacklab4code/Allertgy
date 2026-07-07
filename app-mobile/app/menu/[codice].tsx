@@ -2,9 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { api } from '../../src/api/client';
+import { api, type Review } from '../../src/api/client';
 import DishCard from '../../src/components/DishCard';
 import { calcolaSemaforo, type EsitoSemaforo } from '../../src/engine/semaforo';
 import { useSession } from '../../src/store/session';
@@ -51,9 +51,24 @@ export default function MenuScreen() {
   const [error, setError] = useState('');
   const [filtro, setFiltro] = useState<Filtro>('tutti');
   const [isOffline, setIsOffline] = useState(false);
-  const { allergie, addRecent, toggleFavorite, favorites, language, ingredientiEsclusi } = useSession();
+  const { allergie, addRecent, toggleFavorite, favorites, language, ingredientiEsclusi, token, role } = useSession();
   const isFav = !!codice && favorites.some((f) => f.code === codice);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [myRating, setMyRating] = useState(0);
+  const [myComment, setMyComment] = useState('');
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const canReview = !!token && role === 'customer';
+
+  const onToggleFavorite = () => {
+    if (!codice || !menu) return;
+    const wasFav = isFav;
+    toggleFavorite(codice, menu.nome_ristorante);
+    // Sincronizza col server (best-effort): abilita le notifiche "menù aggiornato"
+    if (token) {
+      (wasFav ? api.removeFavorite(codice) : api.addFavorite(codice)).catch(() => {});
+    }
+  };
 
   useEffect(() => {
     if (!codice) return;
@@ -79,6 +94,36 @@ export default function MenuScreen() {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codice]);
+
+  useEffect(() => {
+    if (!codice) return;
+    api.listReviews(codice)
+      .then((rs) => {
+        setReviews(rs);
+        const mine = rs.find((r) => r.is_mine);
+        if (mine) {
+          setMyRating(mine.rating);
+          setMyComment(mine.comment ?? '');
+        }
+      })
+      .catch(() => {});
+  }, [codice]);
+
+  const submitReview = async () => {
+    if (!codice || myRating === 0) return;
+    setReviewBusy(true);
+    try {
+      await api.upsertReview(codice, myRating, myComment.trim());
+      setReviews(await api.listReviews(codice));
+      Alert.alert(
+        language === 'it' ? 'Grazie!' : 'Thank you!',
+        language === 'it' ? 'La tua recensione è stata pubblicata.' : 'Your review has been published.',
+      );
+    } catch (e) {
+      Alert.alert(language === 'it' ? 'Errore' : 'Error', (e as Error).message);
+    }
+    setReviewBusy(false);
+  };
 
   const valutati: Valutato[] = useMemo(() => {
     if (!menu) return [];
@@ -138,7 +183,7 @@ export default function MenuScreen() {
         <View style={styles.summary}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryTitle}>{menu.nome_ristorante}{menu.citta ? ` · ${menu.citta}` : ''}</Text>
-            <TouchableOpacity onPress={() => codice && toggleFavorite(codice, menu.nome_ristorante)}>
+            <TouchableOpacity onPress={onToggleFavorite}>
               <Text style={{ fontSize: 22 }}>{isFav ? '⭐️' : '☆'}</Text>
             </TouchableOpacity>
           </View>
@@ -212,12 +257,108 @@ export default function MenuScreen() {
         {valutatiFiltrati.length === 0 && (
           <Text style={styles.empty}>{t('empty_menu', language)}</Text>
         )}
+
+        {/* Recensioni */}
+        <View style={styles.reviewsBox}>
+          <Text style={styles.reviewsTitle}>
+            ⭐ {language === 'it' ? 'Recensioni' : 'Reviews'} ({reviews.length})
+          </Text>
+
+          {reviews.slice(0, 5).map((r) => (
+            <View key={r.id} style={styles.reviewCard}>
+              <View style={styles.reviewHead}>
+                <Text style={styles.reviewAuthor}>{r.author_name}{r.is_mine ? (language === 'it' ? ' (tu)' : ' (you)') : ''}</Text>
+                <Text style={styles.reviewStars}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</Text>
+              </View>
+              {r.comment ? <Text style={styles.reviewComment}>{r.comment}</Text> : null}
+              {r.reply ? (
+                <View style={styles.replyBox}>
+                  <Text style={styles.replyLabel}>{language === 'it' ? 'Risposta del locale' : 'Reply from the restaurant'}</Text>
+                  <Text style={styles.reviewComment}>{r.reply}</Text>
+                </View>
+              ) : null}
+            </View>
+          ))}
+          {reviews.length === 0 && (
+            <Text style={styles.reviewEmpty}>
+              {language === 'it' ? 'Ancora nessuna recensione per questo locale.' : 'No reviews yet for this place.'}
+            </Text>
+          )}
+
+          {canReview && (
+            <View style={styles.reviewForm}>
+              <Text style={styles.reviewFormLabel}>
+                {language === 'it' ? 'La tua recensione' : 'Your review'}
+              </Text>
+              <View style={styles.starsRow}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <TouchableOpacity key={n} onPress={() => setMyRating(n)}>
+                    <Text style={[styles.starBtn, n > myRating && styles.starOff]}>⭐</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                style={styles.reviewInput}
+                value={myComment}
+                onChangeText={setMyComment}
+                multiline
+                placeholder={language === 'it'
+                  ? 'Il locale è stato attento alle tue allergie?'
+                  : 'Was the restaurant careful about your allergies?'}
+              />
+              <TouchableOpacity
+                style={[styles.reviewSubmit, (reviewBusy || myRating === 0) && { opacity: 0.4 }]}
+                disabled={reviewBusy || myRating === 0}
+                onPress={submitReview}
+              >
+                {reviewBusy
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={styles.reviewSubmitText}>
+                      {language === 'it' ? 'Pubblica recensione' : 'Publish review'}
+                    </Text>}
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </ScrollView>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  reviewsBox: { marginTop: 20, gap: 10 },
+  reviewsTitle: { fontSize: 17, fontWeight: '800', color: '#10201B' },
+  reviewCard: {
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0',
+    borderRadius: 14, padding: 12, gap: 4,
+  },
+  reviewHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  reviewAuthor: { fontWeight: '700', fontSize: 13, color: '#1e293b' },
+  reviewStars: { color: '#f59e0b', fontSize: 13 },
+  reviewComment: { color: '#475569', fontSize: 13, lineHeight: 19 },
+  replyBox: {
+    marginTop: 6, marginLeft: 8, padding: 8, backgroundColor: '#f0fdf4',
+    borderRadius: 10, borderWidth: 1, borderColor: '#bbf7d0', gap: 2,
+  },
+  replyLabel: { fontSize: 10, fontWeight: '800', color: '#047857', textTransform: 'uppercase' },
+  reviewEmpty: { color: '#94a3b8', fontSize: 13, fontWeight: '600' },
+  reviewForm: {
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0',
+    borderRadius: 14, padding: 14, gap: 10, marginTop: 4,
+  },
+  reviewFormLabel: { fontWeight: '800', fontSize: 13, color: '#1e293b' },
+  starsRow: { flexDirection: 'row', gap: 6 },
+  starBtn: { fontSize: 26 },
+  starOff: { opacity: 0.25 },
+  reviewInput: {
+    minHeight: 70, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0',
+    borderRadius: 12, padding: 10, fontSize: 14, color: '#10201B', textAlignVertical: 'top',
+  },
+  reviewSubmit: {
+    height: 44, backgroundColor: '#0F8A6A', borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  reviewSubmitText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   offlineBanner: {
     backgroundColor: '#fef3c7',
     borderBottomWidth: 1,
