@@ -68,6 +68,7 @@ def upsert_review(
             Review.restaurant_id == r.id, Review.user_id == user.id
         )
     )
+    is_new = rev is None
     if rev:
         rev.rating = data.rating
         rev.comment = data.comment
@@ -81,6 +82,19 @@ def upsert_review(
             comment=data.comment,
         )
         db.add(rev)
+        db.flush()  # popola rev.id per il payload della notifica
+
+    # Notifica "ad hoc" al ristoratore solo alla PRIMA recensione (non sulle modifiche)
+    if is_new and r.owner_user_id:
+        author = user.display_name or "Un cliente"
+        notify_users(
+            db,
+            [r.owner_user_id],
+            "review_received",
+            f"Nuova recensione — {r.name}",
+            f"{author} ha lasciato {data.rating}★ al tuo locale.",
+            {"public_code": r.public_code, "review_id": rev.id, "rating": data.rating},
+        )
     db.commit()
     db.refresh(rev)
     return _review_to_out(rev, user.id)

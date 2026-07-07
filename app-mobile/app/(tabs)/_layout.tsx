@@ -1,5 +1,6 @@
 import { Tabs, router } from 'expo-router';
-import { Text, TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
+import NotificationBell from '../../src/components/NotificationBell';
 
 const icon = (emoji: string) =>
   ({ focused }: { focused: boolean }) => (
@@ -19,25 +20,27 @@ export default function TabsLayout() {
         tabBarStyle: { height: 84, paddingTop: 6 },
         sceneStyle: { backgroundColor: '#f8fafc' },
         headerRight: () => (
-          <TouchableOpacity 
-            onPress={() => router.push('/emergency')}
-            style={{
-              marginRight: 16,
-              backgroundColor: '#fee2e2',
-              borderRadius: 12,
-              borderWidth: 1.5,
-              borderColor: '#fca5a5',
-              paddingVertical: 5,
-              paddingHorizontal: 10,
-              shadowColor: '#dc2626',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.08,
-              shadowRadius: 4,
-              elevation: 1,
-            }}
-          >
-            <Text style={{ color: '#b91c1c', fontWeight: '900', fontSize: 11, letterSpacing: 0.2 }}>🚨 SOS</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
+            <NotificationBell />
+            <TouchableOpacity
+              onPress={() => router.push('/emergency')}
+              style={{
+                backgroundColor: '#fee2e2',
+                borderRadius: 12,
+                borderWidth: 1.5,
+                borderColor: '#fca5a5',
+                paddingVertical: 5,
+                paddingHorizontal: 10,
+                shadowColor: '#dc2626',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.08,
+                shadowRadius: 4,
+                elevation: 1,
+              }}
+            >
+              <Text style={{ color: '#b91c1c', fontWeight: '900', fontSize: 11, letterSpacing: 0.2 }}>🚨 SOS</Text>
+            </TouchableOpacity>
+          </View>
         ),
       }}
     >

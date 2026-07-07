@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { api } from '../src/api/client';
 import { useSession, type Role } from '../src/store/session';
+import { useNotifStore } from '../src/store/notifications';
 
 export default function Login() {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
@@ -65,6 +66,7 @@ export default function Login() {
         // recupera il profilo salvato sul server
         const mine = mode === 'login' ? await api.myAllergens().catch(() => []) : [];
         session.setAllergie(mine.map((a) => a.code));
+        useNotifStore.getState().refresh();
       } else {
         session.setLegalStatus(true, false);
       }

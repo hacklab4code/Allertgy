@@ -68,6 +68,14 @@ export interface Review {
   created_at: string;
 }
 
+export interface AppNotification {
+  id: number;
+  type: string;
+  payload_json: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = useSession.getState().token;
   const headers: Record<string, string> = {
@@ -224,6 +232,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ expo_token: expoToken }),
     }),
+  listNotifications: () => req<AppNotification[]>('/profile/notifications'),
+  markNotificationRead: (id: number) =>
+    req<void>(`/profile/notifications/${id}/read`, { method: 'POST' }),
 
   /* ---------- documenti legali ---------- */
   legalDoc: (doc: string) =>

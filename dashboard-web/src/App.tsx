@@ -5,6 +5,7 @@ import InternalAdmin from './components/InternalAdmin';
 import LegalPage from './components/LegalPage';
 import Login from './components/Login';
 import MenuEditor from './components/MenuEditor';
+import NotificationsPanel from './components/NotificationsPanel';
 import PublicRestaurant from './components/PublicRestaurant';
 import ResetPassword from './components/ResetPassword';
 import Landing from './Landing';
@@ -415,14 +416,15 @@ export default function App() {
             <span className="text-2xl">🥗</span>
             <span className="text-lg font-black tracking-tight">AllerTgy <span className="text-emerald-300 font-light text-xs uppercase tracking-widest ml-2">Dashboard Ristoratori</span></span>
           </button>
-          <div className="flex items-center gap-6">
-            <button 
+          <div className="flex items-center gap-4">
+            <button
               onClick={() => setShowGuide(!showGuide)}
               className="text-xs font-bold text-emerald-200 hover:text-white transition-colors"
             >
               ❓ Come Funziona
             </button>
-            <button 
+            <NotificationsPanel />
+            <button
               onClick={handleLogout}
               className="bg-emerald-800/60 hover:bg-emerald-800 border border-emerald-700/50 text-emerald-100 font-bold px-3 py-1.5 rounded-xl text-xs transition-all"
             >

@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     db_password: str
     jwt_secret: str
     jwt_expire_minutes: int = 43200  # 30 giorni
-    cors_origins: str = "http://localhost:5173"
+    cors_origins: str = "http://localhost:5173,http://localhost:8081,http://localhost:8085,http://localhost:19006"
     gemini_api_key: str = ""
     internal_admin_key: str = "dev-admin"
 

@@ -165,6 +165,10 @@ export interface InternalReview {
 
 export interface LegalDoc { doc: string; title: string; version: string; content_markdown: string }
 
+export interface OwnerNotification {
+  id: number; type: string; payload_json: string | null; read_at: string | null; created_at: string;
+}
+
 export interface InvoiceRow {
   id: number; stripe_invoice_id: string; amount_cents: number; status: string;
   pdf_url: string | null; created_at: string;
@@ -298,6 +302,11 @@ export const api = {
       method: 'POST', body: JSON.stringify({ restaurant_id: restaurantId }),
     }),
   billingInvoices: (restaurantId: number) => req<InvoiceRow[]>(`/billing/invoices/${restaurantId}`),
+
+  // --- Notifiche ristoratore (stesso account/JWT) ---
+  notifications: () => req<OwnerNotification[]>('/profile/notifications'),
+  markNotificationRead: (id: number) =>
+    req<void>(`/profile/notifications/${id}/read`, { method: 'POST' }),
 
   // --- Documenti legali ---
   legalDoc: (doc: string) => req<LegalDoc>(`/legal/${doc}`),
