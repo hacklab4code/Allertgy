@@ -8,6 +8,14 @@
       "runtimeArgs": ["run", "dev"],
       "port": 5173,
       "autoPort": false
+    },
+    {
+      "name": "mobile-web",
+      "cwd": "app-mobile",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--web", "--port", "8081"],
+      "port": 8081,
+      "autoPort": false
     }
   ]
 }

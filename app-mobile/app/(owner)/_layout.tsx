@@ -22,6 +22,7 @@ export default function OwnerLayout() {
     >
       <Tabs.Screen name="locali" options={{ title: 'Il mio locale', tabBarLabel: 'Locale', tabBarIcon: icon('🏪') }} />
       <Tabs.Screen name="menu" options={{ title: 'Gestione menù', tabBarLabel: 'Menù', tabBarIcon: icon('📋') }} />
+      <Tabs.Screen name="piano" options={{ title: 'Piano e prezzi', tabBarLabel: 'Piano', tabBarIcon: icon('💳') }} />
       <Tabs.Screen name="qr" options={{ title: 'QR per i tavoli', tabBarLabel: 'QR Code', tabBarIcon: icon('🖨️') }} />
       <Tabs.Screen name="account" options={{ title: 'Account', tabBarLabel: 'Account', tabBarIcon: icon('👤') }} />
     </Tabs>

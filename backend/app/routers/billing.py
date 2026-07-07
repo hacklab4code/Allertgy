@@ -12,7 +12,7 @@ Configurazione Stripe attesa (dashboard.stripe.com):
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
@@ -21,20 +21,30 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..database import get_db
 from ..models import Invoice, Restaurant, User
+from ..plans import PLAN_DEFINITIONS, PLAN_PRICES, TRIAL_DAYS
 from ..schemas import (
     CheckoutSessionIn,
     CheckoutSessionOut,
     InvoiceOut,
+    PlanDefinitionOut,
     PortalSessionIn,
     PortalSessionOut,
+    RestaurantOut,
+    StartTrialIn,
 )
 from ..security import require_owner
 from ..services.emailer import send_payment_confirmation, send_payment_failed
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
-PLAN_PRICE_CENTS = {"verified": 990, "pro": 1990, "premium": 3990}
-PLAN_NAMES = {"verified": "Verificato", "pro": "Pro", "premium": "Premium"}
+PLAN_PRICE_CENTS = {k: v for k, v in PLAN_PRICES.items() if k != "free"}
+PLAN_NAMES = {p["code"]: p["name"] for p in PLAN_DEFINITIONS}
+
+
+@router.get("/plans", response_model=list[PlanDefinitionOut])
+def list_plans():
+    """Elenco pubblico dei piani con specifiche: usato da app e sito."""
+    return [PlanDefinitionOut(**p) for p in PLAN_DEFINITIONS]
 
 
 def _stripe():
@@ -75,6 +85,36 @@ def _my_restaurant(rid: int, user: User, db: Session) -> Restaurant:
     r = db.get(Restaurant, rid)
     if not r or r.owner_user_id != user.id:
         raise HTTPException(404, "Ristorante non trovato")
+    return r
+
+
+@router.post("/start-trial", response_model=RestaurantOut)
+def start_trial(
+    data: StartTrialIn,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Avvia la prova gratuita di 14 giorni senza pagamento.
+
+    Non richiede Stripe: sblocca subito le funzioni del piano scelto. Alla
+    scadenza il locale resta in prova finché non attiva un abbonamento reale
+    (il declassamento automatico avviene solo tramite Stripe/dunning).
+    """
+    r = _my_restaurant(data.restaurant_id, user, db)
+    if (r.subscription_status or "free") in {"trialing", "active", "comped"}:
+        raise HTTPException(400, "Questo locale ha già un piano attivo o una prova in corso.")
+    if r.plan_started_at:
+        raise HTTPException(400, "La prova gratuita è già stata utilizzata per questo locale.")
+
+    now = datetime.now(timezone.utc)
+    r.business_plan = data.plan
+    r.subscription_status = "trialing"
+    r.plan_price_cents = PLAN_PRICES.get(data.plan, 0)
+    r.is_verified = 1
+    r.plan_started_at = now
+    r.trial_ends_at = now + timedelta(days=TRIAL_DAYS)
+    db.commit()
+    db.refresh(r)
     return r
 
 

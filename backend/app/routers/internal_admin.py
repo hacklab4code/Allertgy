@@ -18,6 +18,7 @@ from ..schemas import (
     PlanDefinitionOut,
 )
 from ..security import require_internal_admin
+from ..plans import PLAN_DEFINITIONS, PLAN_PRICES
 
 router = APIRouter(
     prefix="/internal-admin",
@@ -25,56 +26,6 @@ router = APIRouter(
     dependencies=[Depends(require_internal_admin)],
 )
 
-PLAN_DEFINITIONS = [
-    {
-        "code": "free",
-        "name": "Gratis",
-        "price_cents": 0,
-        "tagline": "Scheda base per popolare la mappa.",
-        "features": [
-            "Scheda locale base",
-            "Nome, indirizzo, telefono e orari",
-            "Presenza in elenco clienti",
-        ],
-    },
-    {
-        "code": "verified",
-        "name": "Verificato",
-        "price_cents": 990,
-        "tagline": "Badge e profilo locale più affidabile.",
-        "features": [
-            "Tutto del piano Gratis",
-            "Badge locale verificato",
-            "Dati attività e allergeni generali aggiornati",
-        ],
-    },
-    {
-        "code": "pro",
-        "name": "Pro",
-        "price_cents": 1990,
-        "tagline": "Menu digitale con allergeni per piatto.",
-        "features": [
-            "Tutto del piano Verificato",
-            "Editor menu digitale",
-            "Allergeni e tracce per ogni piatto",
-            "QR code per tavoli e banco",
-        ],
-    },
-    {
-        "code": "premium",
-        "name": "Premium",
-        "price_cents": 3990,
-        "tagline": "Visibilità superiore e gestione avanzata.",
-        "features": [
-            "Tutto del piano Pro",
-            "Priorità nei risultati",
-            "Gestione multi-sede",
-            "Statistiche e supporto prioritario",
-        ],
-    },
-]
-
-PLAN_PRICES = {p["code"]: int(p["price_cents"]) for p in PLAN_DEFINITIONS}
 REVENUE_STATUSES = {"trialing", "active"}
 
 

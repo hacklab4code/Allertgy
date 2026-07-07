@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSession } from '../store/session';
-import type { Allergen, Menu, MenuValutato, PiattoIn, Restaurant } from '../types';
+import type { Allergen, BusinessPlan, Menu, MenuValutato, PiattoIn, Plan, Restaurant } from '../types';
 
 // Su dispositivo fisico imposta EXPO_PUBLIC_API_URL=http://<IP-del-tuo-Mac>:8000
 export const API = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
@@ -137,10 +137,13 @@ export const api = {
   listRestaurants: () => req<Menu[]>('/restaurants'),
   allergens: () => req<Allergen[]>('/allergens'),
   myAllergens: () => req<Allergen[]>('/profile/allergens'),
-  saveAllergens: (codes: string[]) =>
+  saveAllergens: (codes: string[], intensities: Record<string, 'lieve'|'moderata'|'grave'> = {}) =>
     req<Allergen[]>('/profile/allergens', {
       method: 'PUT',
-      body: JSON.stringify({ allergen_codes: codes }),
+      body: JSON.stringify({
+        allergen_codes: codes,
+        allergens: codes.map(c => ({ code: c, intensity: intensities[c] || 'moderata' }))
+      }),
     }),
   acceptLegalConsents: (acceptHealthData = true) =>
     req<UserProfile>('/profile/legal-consents', {
@@ -249,6 +252,24 @@ export const api = {
     req<Restaurant>('/admin/restaurants', {
       method: 'POST',
       body: JSON.stringify({ name, city }),
+    }),
+
+  /* ---------- piani / abbonamento ristoratore ---------- */
+  getPlans: () => req<Plan[]>('/billing/plans'),
+  startTrial: (restaurantId: number, plan: BusinessPlan) =>
+    req<Restaurant>('/billing/start-trial', {
+      method: 'POST',
+      body: JSON.stringify({ restaurant_id: restaurantId, plan }),
+    }),
+  billingCheckout: (restaurantId: number, plan: BusinessPlan) =>
+    req<{ checkout_url: string }>('/billing/checkout-session', {
+      method: 'POST',
+      body: JSON.stringify({ restaurant_id: restaurantId, plan }),
+    }),
+  billingPortal: (restaurantId: number) =>
+    req<{ portal_url: string }>('/billing/portal-session', {
+      method: 'POST',
+      body: JSON.stringify({ restaurant_id: restaurantId }),
     }),
   saveMenu: (rid: number, piatti: PiattoIn[]) =>
     req<unknown>(`/admin/restaurants/${rid}/menu`, {

@@ -44,13 +44,20 @@ class AllergenOut(BaseModel):
     name_it: str
     emoji: Optional[str]
     is_diet: int
+    intensity: Optional[str] = None
 
     class Config:
         from_attributes = True
 
 
+class ProfileAllergenItem(BaseModel):
+    code: str
+    intensity: str = "moderata"
+
+
 class ProfileAllergensIn(BaseModel):
-    allergen_codes: list[str]
+    allergen_codes: list[str] = []
+    allergens: list[ProfileAllergenItem] = []
 
 
 class LegalConsentIn(BaseModel):
@@ -172,6 +179,10 @@ class PlanDefinitionOut(BaseModel):
     price_cents: int
     tagline: str
     features: list[str]
+    photo_limit: int = 1
+    has_menu: bool = False
+    has_review_reply: bool = False
+    has_priority: bool = False
 
 
 class InternalSummaryOut(BaseModel):
@@ -460,6 +471,11 @@ class PortalSessionIn(BaseModel):
 
 class PortalSessionOut(BaseModel):
     portal_url: str
+
+
+class StartTrialIn(BaseModel):
+    restaurant_id: int
+    plan: str = Field(default="pro", pattern="^(verified|pro|premium)$")
 
 
 class InvoiceOut(BaseModel):

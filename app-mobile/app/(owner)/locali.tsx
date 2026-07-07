@@ -30,10 +30,12 @@ export default function Locali() {
     setBusy(true); setError('');
     try {
       const r = await api.createRestaurant(name.trim(), city.trim());
+      const firstLocale = restaurants.length === 0;
       setRestaurants([...restaurants, r]);
       setCurrent(r);
       setName(''); setCity('');
-      router.push('/(owner)/menu');
+      // Il menù digitale richiede un piano: al primo locale porta alla prova gratuita
+      router.push(firstLocale ? '/(owner)/piano' : '/(owner)/menu');
     } catch (e) { setError((e as Error).message); }
     setBusy(false);
   };

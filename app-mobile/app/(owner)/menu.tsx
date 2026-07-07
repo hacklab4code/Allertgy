@@ -48,6 +48,30 @@ export default function MenuEditor() {
     );
   }
 
+  const status = current.subscription_status ?? 'free';
+  const plan = current.business_plan ?? 'free';
+  const hasMenuAccess = status === 'comped'
+    || ((plan === 'pro' || plan === 'premium') && (status === 'trialing' || status === 'active'));
+
+  if (!hasMenuAccess) {
+    return (
+      <ScrollView contentContainerStyle={styles.lockWrap}>
+        <View style={styles.lockCard}>
+          <Text style={styles.lockEmoji}>🔒</Text>
+          <Text style={styles.lockTitle}>Il menù digitale è nel piano Pro</Text>
+          <Text style={styles.lockText}>
+            Con il piano Pro crei il menù con allergeni e tracce per ogni piatto, generi il QR per i
+            tavoli e stampi il registro allergeni. Provalo <Text style={{ fontWeight: '800' }}>14 giorni gratis</Text>,
+            senza carta.
+          </Text>
+          <TouchableOpacity style={styles.button} onPress={() => router.push('/(owner)/piano')}>
+            <Text style={styles.buttonText}>Attiva la prova gratuita</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  }
+
   const update = (i: number, patch: Partial<PiattoIn>) =>
     setPiatti(piatti.map((p, j) => (j === i ? { ...p, ...patch } : p)));
 
@@ -208,6 +232,14 @@ const styles = StyleSheet.create({
   container: { padding: 16 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 16 },
   mutedBig: { color: '#64748b', fontSize: 16, textAlign: 'center' },
+  lockWrap: { flexGrow: 1, justifyContent: 'center', padding: 20, backgroundColor: '#f6f8fa' },
+  lockCard: {
+    backgroundColor: '#fff', borderRadius: 18, padding: 24, alignItems: 'center', gap: 12,
+    borderWidth: 1, borderColor: '#e2e8f0',
+  },
+  lockEmoji: { fontSize: 40 },
+  lockTitle: { fontSize: 19, fontWeight: '800', color: '#0f172a', textAlign: 'center' },
+  lockText: { color: '#475569', fontSize: 14, lineHeight: 21, textAlign: 'center' },
   header: { fontSize: 18, fontWeight: '800', color: '#1e293b', marginBottom: 10 },
   headerCode: { color: '#94a3b8', fontWeight: '600', fontSize: 14 },
   error: { color: '#dc2626', marginBottom: 10 },
