@@ -1,14 +1,16 @@
-"""Abbonamenti reali via Stripe Billing: Checkout, Customer Portal, webhook.
+"""Abbonamenti reali via Stripe Billing + add-on Boost Visibilità + notifiche push.
 
 Se STRIPE_SECRET_KEY non è configurata gli endpoint rispondono 503 con un
 messaggio chiaro: il resto dell'app continua a funzionare (i piani possono
 essere gestiti a mano dall'admin interno come oggi).
 
 Configurazione Stripe attesa (dashboard.stripe.com):
-- 3 Price ricorrenti mensili → STRIPE_PRICE_VERIFIED / _PRO / _PREMIUM
+- 2 Price ricorrenti mensili → STRIPE_PRICE_BASE / _PRO_NOTIFY
+- 1 Price one-time           → STRIPE_PRICE_BOOST  (€9,90 / 30 gg)
 - un webhook endpoint → POST {PUBLIC_API_URL}/billing/webhook con eventi:
   checkout.session.completed, customer.subscription.updated,
-  customer.subscription.deleted, invoice.paid, invoice.payment_failed
+  customer.subscription.deleted, invoice.paid, invoice.payment_failed,
+  payment_intent.succeeded
 """
 from __future__ import annotations
 
@@ -20,9 +22,10 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..database import get_db
-from ..models import Invoice, Restaurant, User
-from ..plans import PLAN_DEFINITIONS, PLAN_PRICES, TRIAL_DAYS
+from ..models import DeviceToken, Invoice, Restaurant, User, UserFavorite, VisibilityBoost
+from ..plans import BOOST_VISIBILITY, NOTIFY_PLANS, PLAN_DEFINITIONS, PLAN_PRICES, TRIAL_DAYS
 from ..schemas import (
+    BoostSessionOut,
     CheckoutSessionIn,
     CheckoutSessionOut,
     InvoiceOut,
@@ -30,7 +33,11 @@ from ..schemas import (
     PortalSessionIn,
     PortalSessionOut,
     RestaurantOut,
+    SendNotificationIn,
+    SendNotificationOut,
+    StartBoostIn,
     StartTrialIn,
+    VisibilityBoostOut,
 )
 from ..security import require_owner
 from ..services.emailer import send_payment_confirmation, send_payment_failed
@@ -41,12 +48,18 @@ PLAN_PRICE_CENTS = {k: v for k, v in PLAN_PRICES.items() if k != "free"}
 PLAN_NAMES = {p["code"]: p["name"] for p in PLAN_DEFINITIONS}
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Endpoint pubblico – piani disponibili
+# ──────────────────────────────────────────────────────────────────────────────
 @router.get("/plans", response_model=list[PlanDefinitionOut])
 def list_plans():
     """Elenco pubblico dei piani con specifiche: usato da app e sito."""
     return [PlanDefinitionOut(**p) for p in PLAN_DEFINITIONS]
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Helpers Stripe
+# ──────────────────────────────────────────────────────────────────────────────
 def _stripe():
     if not settings.stripe_configured:
         raise HTTPException(
@@ -63,9 +76,8 @@ def _stripe():
 
 def _price_id_for_plan(plan: str) -> str:
     price_id = {
-        "verified": settings.stripe_price_verified,
-        "pro": settings.stripe_price_pro,
-        "premium": settings.stripe_price_premium,
+        "base": settings.stripe_price_base,
+        "pro_notify": settings.stripe_price_pro_notify,
     }.get(plan, "")
     if not price_id:
         raise HTTPException(503, f"Prezzo Stripe non configurato per il piano '{plan}'")
@@ -74,9 +86,8 @@ def _price_id_for_plan(plan: str) -> str:
 
 def _plan_for_price_id(price_id: str) -> str | None:
     mapping = {
-        settings.stripe_price_verified: "verified",
-        settings.stripe_price_pro: "pro",
-        settings.stripe_price_premium: "premium",
+        settings.stripe_price_base: "base",
+        settings.stripe_price_pro_notify: "pro_notify",
     }
     return mapping.get(price_id)
 
@@ -88,13 +99,16 @@ def _my_restaurant(rid: int, user: User, db: Session) -> Restaurant:
     return r
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Trial gratuito 30 giorni
+# ──────────────────────────────────────────────────────────────────────────────
 @router.post("/start-trial", response_model=RestaurantOut)
 def start_trial(
     data: StartTrialIn,
     user: User = Depends(require_owner),
     db: Session = Depends(get_db),
 ):
-    """Avvia la prova gratuita di 14 giorni senza pagamento.
+    """Avvia la prova gratuita di 30 giorni senza pagamento.
 
     Non richiede Stripe: sblocca subito le funzioni del piano scelto. Alla
     scadenza il locale resta in prova finché non attiva un abbonamento reale
@@ -118,6 +132,9 @@ def start_trial(
     return r
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Checkout abbonamento mensile
+# ──────────────────────────────────────────────────────────────────────────────
 @router.post("/checkout-session", response_model=CheckoutSessionOut)
 def create_checkout_session(
     data: CheckoutSessionIn,
@@ -151,6 +168,153 @@ def create_checkout_session(
     return CheckoutSessionOut(checkout_url=session.url)
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Boost Visibilità – pagamento one-time
+# ──────────────────────────────────────────────────────────────────────────────
+@router.post("/boost", response_model=BoostSessionOut)
+def create_boost_session(
+    data: StartBoostIn,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Crea un checkout Stripe one-time per il Boost Visibilità (€9,90 / 30 giorni).
+
+    Disponibile per tutti i piani (anche Free). Il boost è attivato
+    automaticamente al webhook payment_intent.succeeded.
+    """
+    stripe = _stripe()
+    r = _my_restaurant(data.restaurant_id, user, db)
+
+    if not settings.stripe_price_boost:
+        raise HTTPException(503, "Prezzo Stripe Boost non configurato (STRIPE_PRICE_BOOST)")
+
+    if not r.stripe_customer_id:
+        customer = stripe.Customer.create(
+            email=r.billing_email or user.email,
+            name=r.name,
+            metadata={"restaurant_id": str(r.id)},
+        )
+        r.stripe_customer_id = customer.id
+        db.commit()
+
+    session = stripe.checkout.Session.create(
+        customer=r.stripe_customer_id,
+        mode="payment",
+        line_items=[{"price": settings.stripe_price_boost, "quantity": 1}],
+        success_url=f"{settings.public_web_url}/dashboard?boost=success",
+        cancel_url=f"{settings.public_web_url}/dashboard?boost=cancel",
+        metadata={
+            "restaurant_id": str(r.id),
+            "type": "visibility_boost",
+        },
+        payment_intent_data={
+            "metadata": {
+                "restaurant_id": str(r.id),
+                "type": "visibility_boost",
+            }
+        },
+    )
+    return BoostSessionOut(checkout_url=session.url)
+
+
+@router.get("/boosts/{restaurant_id}", response_model=list[VisibilityBoostOut])
+def list_boosts(
+    restaurant_id: int,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Lista dei boost acquistati per un ristorante (attivi e scaduti)."""
+    r = _my_restaurant(restaurant_id, user, db)
+    return db.scalars(
+        select(VisibilityBoost)
+        .where(VisibilityBoost.restaurant_id == r.id)
+        .order_by(VisibilityBoost.created_at.desc())
+    ).all()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Notifiche push ai preferiti (solo piano Pro Notifiche)
+# ──────────────────────────────────────────────────────────────────────────────
+@router.post("/send-notification", response_model=SendNotificationOut)
+def send_push_notification(
+    data: SendNotificationIn,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Invia una notifica push agli utenti che hanno aggiunto il locale ai preferiti.
+
+    Disponibile solo per il piano Pro Notifiche (business_plan = 'pro_notify').
+    Usa le Expo Push Notifications API.
+    """
+    r = _my_restaurant(data.restaurant_id, user, db)
+
+    # Verifica piano
+    if r.business_plan not in NOTIFY_PLANS or r.subscription_status not in {"trialing", "active", "comped"}:
+        raise HTTPException(
+            403,
+            "Il piano Pro Notifiche è richiesto per inviare notifiche push. "
+            "Passa al piano Pro Notifiche (€19/mese)."
+        )
+
+    # Recupera tutti i device token degli utenti che hanno messo il locale nei preferiti
+    favorite_user_ids = db.scalars(
+        select(UserFavorite.user_id).where(UserFavorite.restaurant_id == r.id)
+    ).all()
+
+    if not favorite_user_ids:
+        return SendNotificationOut(sent_count=0, message="Nessun utente ha salvato questo locale nei preferiti.")
+
+    tokens = db.scalars(
+        select(DeviceToken.expo_token).where(DeviceToken.user_id.in_(favorite_user_ids))
+    ).all()
+
+    if not tokens:
+        return SendNotificationOut(sent_count=0, message="Nessun dispositivo registrato tra i tuoi clienti fedeli.")
+
+    # Invia via Expo Push API
+    sent = _send_expo_push(list(tokens), data.title, data.body, r.name)
+    return SendNotificationOut(
+        sent_count=sent,
+        message=f"Notifica inviata a {sent} dispositivi.",
+    )
+
+
+def _send_expo_push(tokens: list[str], title: str, body: str, restaurant_name: str) -> int:
+    """Invia notifiche push tramite Expo Push API."""
+    import urllib.request
+    import json
+
+    messages = [
+        {
+            "to": token,
+            "sound": "default",
+            "title": title,
+            "body": body,
+            "data": {"restaurant_name": restaurant_name},
+        }
+        for token in tokens
+        if token.startswith("ExponentPushToken[") or token.startswith("ExpoPushToken[")
+    ]
+
+    if not messages:
+        return 0
+
+    try:
+        payload = json.dumps(messages).encode()
+        req = urllib.request.Request(
+            "https://exp.host/--/api/v2/push/send",
+            data=payload,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+        )
+        urllib.request.urlopen(req, timeout=10)
+        return len(messages)
+    except Exception:
+        return 0
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Customer Portal (gestione abbonamento, disdetta)
+# ──────────────────────────────────────────────────────────────────────────────
 @router.post("/portal-session", response_model=PortalSessionOut)
 def create_portal_session(
     data: PortalSessionIn,
@@ -169,6 +333,9 @@ def create_portal_session(
     return PortalSessionOut(portal_url=session.url)
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Fatture
+# ──────────────────────────────────────────────────────────────────────────────
 @router.get("/invoices/{restaurant_id}", response_model=list[InvoiceOut])
 def list_invoices(
     restaurant_id: int,
@@ -183,6 +350,9 @@ def list_invoices(
     ).all()
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Helpers webhook
+# ──────────────────────────────────────────────────────────────────────────────
 def _restaurant_by_customer(customer_id: str, db: Session) -> Restaurant | None:
     return db.scalar(
         select(Restaurant).where(Restaurant.stripe_customer_id == customer_id)
@@ -229,6 +399,9 @@ def _apply_subscription_state(r: Restaurant, subscription, db: Session) -> None:
     db.commit()
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Webhook Stripe
+# ──────────────────────────────────────────────────────────────────────────────
 @router.post("/webhook", include_in_schema=False)
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     stripe = _stripe()
@@ -291,5 +464,34 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                     email,
                     PLAN_NAMES.get(r.business_plan or "", r.business_plan or ""),
                 )
+
+    elif event["type"] == "payment_intent.succeeded":
+        # Gestisce il pagamento one-time del Boost Visibilità
+        meta = obj.get("metadata", {})
+        if meta.get("type") == "visibility_boost":
+            restaurant_id = int(meta.get("restaurant_id", 0))
+            pi_id = obj.get("id", "")
+            if restaurant_id and pi_id:
+                existing = db.scalar(
+                    select(VisibilityBoost).where(
+                        VisibilityBoost.stripe_payment_intent_id == pi_id
+                    )
+                )
+                if not existing:
+                    now = datetime.now(timezone.utc)
+                    duration = BOOST_VISIBILITY["duration_days"]
+                    db.add(VisibilityBoost(
+                        restaurant_id=restaurant_id,
+                        stripe_payment_intent_id=pi_id,
+                        amount_cents=BOOST_VISIBILITY["price_cents"],
+                        duration_days=duration,
+                        activated_at=now,
+                        expires_at=now + timedelta(days=duration),
+                    ))
+                    # Aggiorna featured_priority del ristorante
+                    r = db.get(Restaurant, restaurant_id)
+                    if r:
+                        r.featured_priority = max(r.featured_priority or 0, 10)
+                    db.commit()
 
     return {"received": True}

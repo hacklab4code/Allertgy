@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { api, type Allergen, type DishIn } from '../api';
+import { api, type Allergen, type DishIn, type Photo } from '../api';
 
 interface Props {
   piatti: DishIn[];
   allergens: Allergen[];
   onChange: (p: DishIn[]) => void;
+  restaurantPhotos?: Photo[];
 }
 
 const STOCK_PHOTOS = [
@@ -19,10 +20,11 @@ const STOCK_PHOTOS = [
   { name: 'Pizza', url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80' },
 ];
 
-export default function MenuEditor({ piatti, allergens, onChange }: Props) {
+export default function MenuEditor({ piatti, allergens, onChange, restaurantPhotos }: Props) {
   const foodAllergens = allergens.filter((a) => !a.is_diet);
   const diets = allergens.filter((a) => a.is_diet);
   const [activeGalleryIndex, setActiveGalleryIndex] = useState<number | null>(null);
+  const [galleryTab, setGalleryTab] = useState<'stock' | 'restaurant'>('stock');
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
   const [activeAllergensIndex, setActiveAllergensIndex] = useState<number | null>(null);
 
@@ -155,35 +157,81 @@ export default function MenuEditor({ piatti, allergens, onChange }: Props) {
                 </div>
               </div>
 
-              {/* Galleria Stock a comparsa */}
+              {/* Galleria Stock / Ristorante a comparsa */}
               {activeGalleryIndex === i && (
                 <div className="absolute inset-x-0 top-0 bg-slate-900/98 backdrop-blur-lg p-4 text-white z-20 h-48 overflow-y-auto transition-all">
                   <div className="flex justify-between items-center mb-3">
-                    <span className="text-xs font-bold text-emerald-400">Scegli una foto dal catalogo:</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setGalleryTab('stock')}
+                        className={`text-xs px-2.5 py-1 rounded-lg transition-all font-bold ${galleryTab === 'stock' ? 'bg-emerald-600 text-white' : 'bg-white/10 text-slate-300 hover:bg-white/20'}`}
+                      >
+                        Foto Stock
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGalleryTab('restaurant')}
+                        className={`text-xs px-2.5 py-1 rounded-lg transition-all font-bold ${galleryTab === 'restaurant' ? 'bg-emerald-600 text-white' : 'bg-white/10 text-slate-300 hover:bg-white/20'}`}
+                      >
+                        Foto Locale
+                      </button>
+                    </div>
                     <button 
+                      type="button"
                       onClick={() => setActiveGalleryIndex(null)}
-                      className="text-xs bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded-lg transition-colors"
+                      className="text-[10px] bg-white/10 hover:bg-white/20 px-2 py-1 rounded-lg transition-colors font-bold"
                     >
                       Chiudi
                     </button>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {STOCK_PHOTOS.map((stock) => (
-                      <button
-                        key={stock.name}
-                        onClick={() => {
-                          update(i, { image_url: stock.url });
-                          setActiveGalleryIndex(null);
-                        }}
-                        className="relative h-14 rounded-xl overflow-hidden border border-white/10 hover:border-emerald-400 transition-all group/stock"
-                      >
-                        <img src={stock.url} className="w-full h-full object-cover group-hover/stock:scale-105 transition-transform" />
-                        <span className="absolute inset-x-0 bottom-0 bg-black/75 text-[9px] truncate text-center px-1 py-0.5">
-                          {stock.name}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                  {galleryTab === 'stock' ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {STOCK_PHOTOS.map((stock) => (
+                        <button
+                          key={stock.name}
+                          type="button"
+                          onClick={() => {
+                            update(i, { image_url: stock.url });
+                            setActiveGalleryIndex(null);
+                          }}
+                          className="relative h-14 rounded-xl overflow-hidden border border-white/10 hover:border-emerald-400 transition-all group/stock"
+                        >
+                          <img src={stock.url} className="w-full h-full object-cover group-hover/stock:scale-105 transition-transform" />
+                          <span className="absolute inset-x-0 bottom-0 bg-black/75 text-[9px] truncate text-center px-1 py-0.5">
+                            {stock.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2">
+                      {restaurantPhotos && restaurantPhotos.length > 0 ? (
+                        restaurantPhotos.map((photo) => (
+                          <button
+                            key={photo.id}
+                            type="button"
+                            onClick={() => {
+                              update(i, { image_url: photo.url });
+                              setActiveGalleryIndex(null);
+                            }}
+                            className="relative h-14 rounded-xl overflow-hidden border border-white/10 hover:border-emerald-400 transition-all group/restaurant"
+                          >
+                            <img src={photo.url} className="w-full h-full object-cover group-hover/restaurant:scale-105 transition-transform" />
+                            {photo.is_cover && (
+                              <span className="absolute top-1 left-1 bg-emerald-650 text-white text-[7px] font-extrabold px-1 rounded">Copertina</span>
+                            )}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="col-span-3 text-center py-4 text-xs text-slate-400">
+                          Nessuna foto caricata nel tuo locale.
+                          <br />
+                          Caricale in <span className="underline cursor-pointer text-emerald-450 font-bold">Impostazioni Locale</span>.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

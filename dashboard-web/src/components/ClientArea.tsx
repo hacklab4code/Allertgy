@@ -74,6 +74,7 @@ export default function ClientArea({ onBack, onLogout }: { onBack: () => void; o
   const [documents, setDocuments] = useState<any[]>([]);
   const [emergencyDraft, setEmergencyDraft] = useState('');
   const [showAllergenPicker, setShowAllergenPicker] = useState(false);
+  const [allergenSearch, setAllergenSearch] = useState('');
 
   const slides = [
     {
@@ -188,6 +189,18 @@ export default function ClientArea({ onBack, onLogout }: { onBack: () => void; o
     setSelected(s);
     setProfileSaved(false);
   };
+
+  // Allergeni filtrati dalla ricerca nel picker
+  const filteredAllergens = useMemo(() => {
+    if (!allergenSearch.trim()) return allergens;
+    const q = allergenSearch.toLowerCase().trim();
+    return allergens.filter(
+      (a) =>
+        a.name_it.toLowerCase().includes(q) ||
+        a.code.toLowerCase().includes(q) ||
+        (a.emoji && a.emoji.includes(q))
+    );
+  }, [allergens, allergenSearch]);
 
   const saveProfile = async () => {
     setBusy(true); setError('');
@@ -855,19 +868,64 @@ export default function ClientArea({ onBack, onLogout }: { onBack: () => void; o
                   
                   {/* Allergen Picker Modal Overlay */}
                   {showAllergenPicker && (
-                    <div className="absolute inset-0 bg-white z-55 flex flex-col py-4 px-4 overflow-y-auto">
-                      <div className="flex items-center justify-between pb-3 border-b border-slate-150 mb-3">
-                        <h4 className="font-extrabold text-sm text-slate-800">Seleziona Allergeni</h4>
+                    <div className="absolute inset-0 bg-white z-55 flex flex-col py-4 px-4 overflow-hidden">
+                      {/* Header */}
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-150 mb-3 flex-shrink-0">
+                        <div>
+                          <h4 className="font-extrabold text-sm text-slate-800">Seleziona Allergeni</h4>
+                          <p className="text-[9px] text-slate-400 mt-0.5">{selected.size} selezionati · {allergens.length} disponibili</p>
+                        </div>
                         <button 
-                          onClick={() => { saveProfile(); setShowAllergenPicker(false); }}
+                          onClick={() => { saveProfile(); setShowAllergenPicker(false); setAllergenSearch(''); }}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-xl text-[10px] font-black"
                         >
                           Fatto
                         </button>
                       </div>
 
-                      <div className="flex flex-wrap gap-1.5 pr-1 flex-grow">
-                        {allergens.map((a) => {
+                      {/* Search bar */}
+                      <div className="relative mb-3 flex-shrink-0">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] pointer-events-none">🔍</span>
+                        <input
+                          type="text"
+                          value={allergenSearch}
+                          onChange={(e) => setAllergenSearch(e.target.value)}
+                          placeholder="Cerca allergene (es. latte, glut…)"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-[11px] font-semibold text-slate-700 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:bg-white transition-colors"
+                        />
+                        {allergenSearch && (
+                          <button
+                            onClick={() => setAllergenSearch('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-slate-300 hover:bg-slate-400 flex items-center justify-center text-[8px] text-white font-black transition-colors"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Risultati counter */}
+                      {allergenSearch && (
+                        <p className="text-[10px] text-slate-500 font-semibold mb-2 flex-shrink-0">
+                          {filteredAllergens.length > 0
+                            ? `${filteredAllergens.length} risultati per "${allergenSearch}"`
+                            : `Nessun risultato per "${allergenSearch}"`}
+                        </p>
+                      )}
+
+                      {/* Lista allergeni filtrati */}
+                      <div className="flex flex-wrap gap-1.5 pr-1 flex-grow overflow-y-auto">
+                        {filteredAllergens.length === 0 && allergenSearch ? (
+                          <div className="w-full text-center py-8">
+                            <span className="text-2xl block mb-2">🔍</span>
+                            <p className="text-[11px] text-slate-400 font-semibold">Nessun allergene trovato</p>
+                            <button
+                              onClick={() => setAllergenSearch('')}
+                              className="mt-2 text-[10px] text-emerald-600 font-bold underline"
+                            >
+                              Cancella ricerca
+                            </button>
+                          </div>
+                        ) : filteredAllergens.map((a) => {
                           const isSelected = selected.has(a.code);
                           return (
                             <button
@@ -876,7 +934,7 @@ export default function ClientArea({ onBack, onLogout }: { onBack: () => void; o
                               className={`px-2.5 py-1.5 border rounded-full text-[11px] font-bold transition-all flex items-center gap-1
                                 ${isSelected 
                                   ? 'bg-emerald-600 border-emerald-600 text-white shadow' 
-                                  : 'bg-slate-50 border-slate-200 text-slate-600'}`}
+                                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-emerald-300'}`}
                             >
                               <span>{a.emoji}</span>
                               <span>{a.name_it}</span>

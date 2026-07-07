@@ -20,16 +20,14 @@ const LEGAL_ROUTES: Record<string, string> = {
 
 const PLAN_LABELS = {
   free: 'Gratis',
-  verified: 'Verificato',
-  pro: 'Pro',
-  premium: 'Premium',
+  base: 'Base',
+  pro_notify: 'Pro Notifiche',
 } as const;
 
 const PLAN_PRICES = {
   free: 0,
-  verified: 990,
-  pro: 1990,
-  premium: 3990,
+  base: 900,
+  pro_notify: 1900,
 } as const;
 
 const PLAN_FEATURES = [
@@ -38,28 +36,38 @@ const PLAN_FEATURES = [
     name: 'Gratis',
     price: '€0',
     description: 'Scheda base sulla mappa per essere trovato dai clienti.',
-    features: ['Nome, città, indirizzo e contatti', 'Presenza nell’elenco clienti', 'Scheda non verificata'],
+    features: ['Nome, città, indirizzo e contatti', 'Presenza nell’elenco clienti'],
+    highlight: false,
   },
   {
-    code: 'verified',
-    name: 'Verificato',
-    price: '€9,90/mese',
-    description: 'Badge e profilo più affidabile per chi cerca locali attenti.',
-    features: ['Tutto del piano Gratis', 'Badge locale verificato', 'Dati attività aggiornati'],
+    code: 'base',
+    name: 'Base',
+    price: '€9/mese',
+    description: 'Carica il tuo menù e gestisci il locale con tutti gli strumenti.',
+    trial: '30 giorni gratis',
+    features: [
+      'Menù digitale con allergeni e tracce',
+      'Badge "Locale verificato"',
+      'Fino a 10 foto in galleria',
+      'QR code per tavoli e banco',
+      'Registro allergeni PDF stampabile',
+      'Rispondi alle recensioni',
+    ],
+    highlight: false,
   },
   {
-    code: 'pro',
-    name: 'Pro',
-    price: '€19,90/mese',
-    description: 'Menu digitale con allergeni e tracce per ogni piatto.',
-    features: ['Editor menu digitale', 'QR code per tavoli e banco', 'Registro allergeni stampabile'],
-  },
-  {
-    code: 'premium',
-    name: 'Premium',
-    price: '€39,90/mese',
-    description: 'Più visibilità e strumenti per locali con maggiore volume.',
-    features: ['Tutto del piano Pro', 'Priorità nei risultati', 'Supporto e statistiche avanzate'],
+    code: 'pro_notify',
+    name: 'Pro Notifiche',
+    price: '€19/mese',
+    description: 'Come Base, più la possibilità di inviare notifiche push ai clienti fedeli.',
+    trial: '30 giorni gratis',
+    features: [
+      'Tutto del piano Base',
+      'Notifiche push agli utenti che ti hanno preferito',
+      'Promuovi sconti, novità e offerte speciali',
+      'Fino a 20 foto in galleria',
+    ],
+    highlight: true,
   },
 ] as const;
 
@@ -71,7 +79,13 @@ function restaurantCanUseMenu(r: Restaurant | null) {
   if (!r) return false;
   const plan = r.business_plan ?? 'free';
   const status = r.subscription_status ?? 'free';
-  return status === 'comped' || ((plan === 'pro' || plan === 'premium') && ['trialing', 'active'].includes(status));
+  return status === 'comped' || ((plan === 'base' || plan === 'pro_notify') && ['trialing', 'active'].includes(status));
+}
+
+function restaurantCanPushNotify(r: Restaurant | null) {
+  if (!r) return false;
+  const status = r.subscription_status ?? 'free';
+  return r.business_plan === 'pro_notify' && ['trialing', 'active', 'comped'].includes(status);
 }
 
 export default function App() {
@@ -243,7 +257,15 @@ export default function App() {
     try {
       const m = await api.publicMenu(r.public_code);
       setHasPublished(m.piatti.length > 0);
-    } catch { setHasPublished(false); }
+      if (m.piatti.length > 0) {
+        setPiatti(m.piatti.map(({ id, ...p }) => p));
+      } else {
+        setPiatti(null);
+      }
+    } catch { 
+      setHasPublished(false);
+      setPiatti(null);
+    }
   };
 
   const loadExisting = async () => {
@@ -270,7 +292,7 @@ export default function App() {
   const save = async () => {
     if (!current || !piatti) return;
     if (!restaurantCanUseMenu(current)) {
-      setError('Il menu digitale con allergeni per piatto è incluso nel piano Pro o Premium.');
+      setError('Il menu digitale con allergeni per piatto è incluso nel piano Base (€9/mese) o superiore.');
       setActiveSubTab('plan');
       return;
     }
@@ -592,7 +614,132 @@ export default function App() {
               {/* TAB 1: PANORAMICA */}
               {activeSubTab === 'overview' && (
                 <div className="space-y-6">
-                  
+
+                  {/* Guida al Completamento Profilo (Onboarding Wizard) */}
+                  {(() => {
+                    if (!current) return null;
+                    const step1 = !!(current.address && current.phone && current.email_contact);
+                    const step2 = !!current.opening_hours;
+                    const step3 = !!(current.image_url || photos.length > 0);
+                    const step4 = !!(piatti && piatti.length > 0);
+                    const step5 = !!(menuLegalAck || hasPublished);
+
+                    const completedCount = [step1, step2, step3, step4, step5].filter(Boolean).length;
+                    const percentage = completedCount * 20;
+
+                    return (
+                      <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white rounded-3xl p-6 shadow-xl space-y-5 border border-emerald-950/20">
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                          <div>
+                            <span className="text-[10px] tracking-wider uppercase text-emerald-400 font-black">Guida commerciante</span>
+                            <h3 className="text-lg font-black mt-1">Completa il profilo del tuo locale</h3>
+                            <p className="text-xs text-slate-350 mt-1 leading-relaxed">
+                              Segui questi passaggi per completare i dati del locale e del menù, così da permettere ai tuoi clienti di consultarlo in sicurezza.
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="relative w-16 h-16 flex items-center justify-center rounded-full bg-slate-800 border-4 border-slate-700/50">
+                              <span className="text-sm font-black text-emerald-400">{percentage}%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Barra di avanzamento */}
+                        <div className="w-full bg-slate-850 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                          <div 
+                            className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-full rounded-full transition-all duration-500" 
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+
+                        {/* Elenco dei passi */}
+                        <div className="grid sm:grid-cols-2 md:grid-cols-5 gap-3.5 pt-1">
+                          {/* Passo 1: Informazioni Locale */}
+                          <div className={`p-3.5 rounded-2xl border transition-all ${step1 ? 'bg-emerald-950/25 border-emerald-900/40 text-emerald-350' : 'bg-slate-900/60 border-slate-800/80 text-slate-400'}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-lg">{step1 ? '✅' : '📍'}</span>
+                              <button 
+                                onClick={() => setActiveSubTab('settings')}
+                                className="text-[9px] uppercase tracking-wider font-extrabold hover:text-white transition-colors bg-white/5 px-2 py-0.5 rounded-md cursor-pointer"
+                              >
+                                Configura
+                              </button>
+                            </div>
+                            <h5 className="text-[11px] font-black leading-snug">Dati Principali</h5>
+                            <p className="text-[9px] text-slate-450 mt-1 leading-relaxed">Indirizzo, telefono e recapito email.</p>
+                          </div>
+
+                          {/* Passo 2: Orari di Apertura */}
+                          <div className={`p-3.5 rounded-2xl border transition-all ${step2 ? 'bg-emerald-950/25 border-emerald-900/40 text-emerald-350' : 'bg-slate-900/60 border-slate-800/80 text-slate-400'}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-lg">{step2 ? '✅' : '🕐'}</span>
+                              <button 
+                                onClick={() => setActiveSubTab('settings')}
+                                className="text-[9px] uppercase tracking-wider font-extrabold hover:text-white transition-colors bg-white/5 px-2 py-0.5 rounded-md cursor-pointer"
+                              >
+                                Configura
+                              </button>
+                            </div>
+                            <h5 className="text-[11px] font-black leading-snug">Orari di Apertura</h5>
+                            <p className="text-[9px] text-slate-450 mt-1 leading-relaxed">Inserisci i turni settimanali.</p>
+                          </div>
+
+                          {/* Passo 3: Logo e Foto */}
+                          <div className={`p-3.5 rounded-2xl border transition-all ${step3 ? 'bg-emerald-950/25 border-emerald-900/40 text-emerald-350' : 'bg-slate-900/60 border-slate-800/80 text-slate-400'}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-lg">{step3 ? '✅' : '📸'}</span>
+                              <button 
+                                onClick={() => setActiveSubTab('settings')}
+                                className="text-[9px] uppercase tracking-wider font-extrabold hover:text-white transition-colors bg-white/5 px-2 py-0.5 rounded-md cursor-pointer"
+                              >
+                                Galleria
+                              </button>
+                            </div>
+                            <h5 className="text-[11px] font-black leading-snug">Immagini Locale</h5>
+                            <p className="text-[9px] text-slate-450 mt-1 leading-relaxed">Logo e foto del ristorante.</p>
+                          </div>
+
+                          {/* Passo 4: Menù e Allergeni */}
+                          <div className={`p-3.5 rounded-2xl border transition-all ${step4 ? 'bg-emerald-950/25 border-emerald-900/40 text-emerald-350' : 'bg-slate-900/60 border-slate-800/80 text-slate-400'}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-lg">{step4 ? '✅' : '🍲'}</span>
+                              <button 
+                                onClick={() => setActiveSubTab('menu')}
+                                className="text-[9px] uppercase tracking-wider font-extrabold hover:text-white transition-colors bg-white/5 px-2 py-0.5 rounded-md cursor-pointer"
+                              >
+                                Gestisci
+                              </button>
+                            </div>
+                            <h5 className="text-[11px] font-black leading-snug">Piatti e Allergeni</h5>
+                            <p className="text-[9px] text-slate-450 mt-1 leading-relaxed">Aggiungi piatti al tuo menù digitale.</p>
+                          </div>
+
+                          {/* Passo 5: Scheda Allergeni stampata/verificata */}
+                          <div className={`p-3.5 rounded-2xl border transition-all ${step5 ? 'bg-emerald-950/25 border-emerald-900/40 text-emerald-350' : 'bg-slate-900/60 border-slate-800/80 text-slate-400'}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-lg">{step5 ? '✅' : '📋'}</span>
+                              <button 
+                                onClick={() => {
+                                  if (step4) {
+                                    setPrintMode('registry');
+                                  } else {
+                                    alert("Devi prima aggiungere almeno un piatto al menù per poter stampare la scheda allergeni!");
+                                    setActiveSubTab('menu');
+                                  }
+                                }}
+                                className="text-[9px] uppercase tracking-wider font-extrabold hover:text-white transition-colors bg-white/5 px-2 py-0.5 rounded-md cursor-pointer"
+                              >
+                                Stampa
+                              </button>
+                            </div>
+                            <h5 className="text-[11px] font-black leading-snug">Scheda Allergeni</h5>
+                            <p className="text-[9px] text-slate-450 mt-1 leading-relaxed">Stampa o scarica il registro ufficiale.</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Header summary card */}
                   <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="space-y-1">
@@ -641,7 +788,7 @@ export default function App() {
                       <p className="text-xs text-slate-500 mt-1">
                         {canUseMenu
                           ? 'Menu digitale, QR code e registro allergeni sono attivi per questo locale.'
-                          : 'La scheda locale è attiva; il menu digitale si sblocca con il piano Pro.'}
+                          : 'La scheda locale è attiva; il menu digitale si sblocca con il piano Base (€9/mese).'}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -729,13 +876,91 @@ export default function App() {
                         </div>
                         <button 
                           onClick={() => setActiveSubTab('menu')} 
-                          className="bg-emerald-600 text-white font-extrabold px-4 py-2 rounded-xl text-xs"
+                          className="bg-emerald-600 text-white font-extrabold px-4 py-2 rounded-xl text-xs cursor-pointer hover:bg-emerald-700 transition-colors"
                         >
                           Compila Ora
                         </button>
                       </div>
                     )}
                   </div>
+
+                  {/* Scheda Allergeni Card */}
+                  <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-5">
+                    <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+                      <div>
+                        <h4 className="font-black text-base text-slate-800 flex items-center gap-2">
+                          <span>📋</span> Registro e Scheda Allergeni
+                        </h4>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Regolamento UE 1169/2011 - Informazione obbligatoria per i consumatori</p>
+                      </div>
+                      <span className="bg-emerald-50 text-emerald-800 text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider border border-emerald-100">Obbligatorio</span>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                      <div className="space-y-1 md:max-w-[70%]">
+                        <p className="text-xs text-slate-600 leading-relaxed font-semibold">
+                          Genera il Registro degli Allergeni del tuo menù aggiornato in tempo reale. È obbligatorio per legge esporre o rendere consultabile questo registro ai clienti nel tuo locale.
+                        </p>
+                        <p className="text-[10px] text-slate-400 leading-relaxed">
+                          La scheda viene compilata automaticamente utilizzando le associazioni degli allergeni impostate sui piatti nel menù digitale.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 w-full md:w-auto shrink-0">
+                        <button
+                          onClick={async () => {
+                            if (!piatti) {
+                              setBusy(true);
+                              try {
+                                const m = await api.publicMenu(current.public_code);
+                                setPiatti(m.piatti.map(({ id, ...p }) => p));
+                              } catch (e) {
+                                setError((e as Error).message);
+                              }
+                              setBusy(false);
+                            }
+                            setPrintMode('registry');
+                          }}
+                          disabled={!piatti || piatti.length === 0}
+                          className={`flex-1 md:flex-initial text-center bg-white border border-slate-250 hover:bg-slate-50 text-slate-700 font-extrabold px-4 py-2.5 rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer ${(!piatti || piatti.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <span>🖨️</span> Stampa Scheda
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!current) return;
+                            setBusy(true);
+                            setError('');
+                            try {
+                              const blob = await api.downloadRegistryPdf(current.id);
+                              const url = window.URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `registro_allergeni_${current.slug || 'locale'}.pdf`;
+                              document.body.appendChild(a);
+                              a.click();
+                              a.remove();
+                              window.URL.revokeObjectURL(url);
+                            } catch (err) {
+                              setError((err as Error).message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                          disabled={!piatti || piatti.length === 0}
+                          className={`flex-1 md:flex-initial text-center bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer ${(!piatti || piatti.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <span>📥</span> Scarica PDF
+                        </button>
+                      </div>
+                    </div>
+                    {(!piatti || piatti.length === 0) && (
+                      <p className="text-[10px] text-rose-600 font-bold bg-rose-50/50 p-2 rounded-xl border border-rose-100/50 text-center">
+                        ⚠️ Aggiungi almeno un piatto al menù per poter stampare o scaricare il registro degli allergeni.
+                      </p>
+                    )}
+                  </div>
+
                 </div>
               )}
 
@@ -749,7 +974,7 @@ export default function App() {
                         <h2 className="text-2xl font-black text-slate-850 mt-2">Menu digitale con allergeni per piatto</h2>
                         <p className="text-sm text-slate-500 mt-2 leading-relaxed">
                           Il piano attuale consente la scheda base del locale. Per creare il menu, associare allergeni/tracce,
-                          pubblicare il QR e stampare il registro serve il piano Pro o Premium.
+                          pubblicare il QR e stampare il registro serve il piano Base (€9/mese) o superiore.
                         </p>
                       </div>
 
@@ -768,7 +993,7 @@ export default function App() {
 
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl bg-emerald-50 border border-emerald-100 p-5">
                         <div>
-                          <div className="font-black text-emerald-900">Pro da €19,90/mese</div>
+                          <div className="font-black text-emerald-900">A partire da €9/mese (piano Base)</div>
                           <p className="text-xs text-emerald-800/80 mt-1">
                             Per attivarlo in questa versione, contatta l'amministratore AllerTgy.
                           </p>
@@ -857,7 +1082,7 @@ export default function App() {
                         </div>
                       )}
                       
-                      <MenuEditor piatti={piatti} allergens={allergens} onChange={setPiatti} />
+                      <MenuEditor piatti={piatti} allergens={allergens} onChange={setPiatti} restaurantPhotos={photos} />
                       
                       <button
                         type="button"
@@ -1182,6 +1407,7 @@ export default function App() {
               {/* TAB 4: PIANO E FUNZIONI */}
               {activeSubTab === 'plan' && (
                 <section className="space-y-6">
+                  {/* Stato abbonamento attuale */}
                   <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                       <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Piano attuale</span>
@@ -1190,10 +1416,15 @@ export default function App() {
                         Stato: <b>{current?.subscription_status ?? 'free'}</b> · Prezzo: <b>{centsToEuro(currentPlanPrice)} / mese</b>
                       </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <div className={`px-4 py-2 rounded-2xl text-xs font-black ${canUseMenu ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
                         {canUseMenu ? 'Menu digitale attivo' : 'Menu digitale non incluso'}
                       </div>
+                      {restaurantCanPushNotify(current) && (
+                        <div className="px-4 py-2 rounded-2xl text-xs font-black bg-violet-50 text-violet-800">
+                          🔔 Notifiche push attive
+                        </div>
+                      )}
                       {currentPlan !== 'free' && (
                         <button
                           onClick={async () => {
@@ -1213,18 +1444,29 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
+                  {/* Griglia piani */}
+                  <div className="grid md:grid-cols-3 gap-4">
                     {PLAN_FEATURES.map((plan) => {
                       const isCurrent = plan.code === currentPlan;
-                      const isProPlan = plan.code === 'pro' || plan.code === 'premium';
+                      const isPaidPlan = plan.code === 'base' || plan.code === 'pro_notify';
                       return (
-                        <div key={plan.code} className={`bg-white rounded-3xl border p-5 shadow-sm space-y-4 ${isCurrent ? 'border-emerald-500 ring-2 ring-emerald-500/10' : 'border-slate-200'}`}>
+                        <div key={plan.code} className={`bg-white rounded-3xl border p-5 shadow-sm space-y-4 relative ${
+                          plan.highlight ? 'border-emerald-500 ring-2 ring-emerald-500/10' : isCurrent ? 'border-slate-400' : 'border-slate-200'
+                        }`}>
+                          {plan.highlight && !isCurrent && (
+                            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                              <span className="bg-emerald-600 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">⭐ Più scelto</span>
+                            </div>
+                          )}
                           <div>
                             <div className="flex items-center justify-between gap-2">
                               <h3 className="font-black text-lg text-slate-850">{plan.name}</h3>
                               {isCurrent && <span className="text-[10px] font-black bg-emerald-50 text-emerald-800 px-2 py-1 rounded-lg">Attuale</span>}
                             </div>
                             <div className="text-xl font-black text-emerald-800 mt-1">{plan.price}</div>
+                            {'trial' in plan && (
+                              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">{(plan as any).trial}</span>
+                            )}
                             <p className="text-xs text-slate-500 mt-2 leading-relaxed">{plan.description}</p>
                           </div>
                           <div className="space-y-2">
@@ -1235,7 +1477,7 @@ export default function App() {
                               </div>
                             ))}
                           </div>
-                          {plan.code !== 'free' && !isCurrent && (
+                          {isPaidPlan && !isCurrent && (
                             <button
                               onClick={async () => {
                                 if (!current) return;
@@ -1254,9 +1496,13 @@ export default function App() {
                                 setBusy(false);
                               }}
                               disabled={busy}
-                              className="w-full bg-slate-900 hover:bg-slate-800 text-white px-4 py-3 rounded-2xl text-xs font-black disabled:opacity-40"
+                              className={`w-full px-4 py-3 rounded-2xl text-xs font-black disabled:opacity-40 ${
+                                plan.highlight
+                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                  : 'bg-slate-900 hover:bg-slate-800 text-white'
+                              }`}
                             >
-                              {isProPlan ? 'Attiva con carta' : 'Passa a questo piano'}
+                              Inizia 30 giorni gratis
                             </button>
                           )}
                         </div>
@@ -1264,21 +1510,67 @@ export default function App() {
                     })}
                   </div>
 
-                  <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                      <h3 className="font-black text-lg">Il menu allergeni è la funzione Pro</h3>
-                      <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-                        La scheda gratuita serve a comparire nella mappa. Il valore a pagamento è creare un menu consultabile dai clienti,
-                        con allergeni per ogni piatto, QR code e registro stampabile.
+                  {/* Boost Visibilità — add-on one-time */}
+                  <div className="rounded-3xl border border-dashed border-amber-300 bg-amber-50/60 p-6 flex flex-col sm:flex-row items-start sm:items-center gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-100 flex items-center justify-center text-3xl shrink-0">🚀</div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-black text-lg text-slate-800">Boost Visibilità</h3>
+                        <span className="text-[10px] font-black bg-amber-200 text-amber-900 px-2.5 py-1 rounded-full uppercase">Add-on · Una tantum</span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                        Metti il tuo locale <strong>in cima ai risultati di ricerca per 30 giorni</strong>.
+                        Pagamento singolo senza abbonamento — attivabile quando vuoi, anche più volte.
                       </p>
                     </div>
-                    <button
-                      onClick={() => setActiveSubTab('menu')}
-                      className="bg-white text-slate-900 hover:bg-slate-100 px-5 py-3 rounded-2xl text-xs font-black"
-                    >
-                      Vai al menu
-                    </button>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <div className="text-2xl font-black text-amber-800">€9,90</div>
+                      <div className="text-[10px] text-amber-600 font-semibold">per 30 giorni</div>
+                      <button
+                        onClick={async () => {
+                          if (!current) return;
+                          setBusy(true);
+                          try {
+                            const res = await api.billingBoost(current.id);
+                            window.location.href = res.checkout_url;
+                          } catch (e) {
+                            const msg = (e as Error).message;
+                            if (/STRIPE|Pagamenti non ancora attivi/i.test(msg)) {
+                              alert('I pagamenti online non sono ancora attivi. Contatta AllerTgy.');
+                            } else {
+                              alert(msg);
+                            }
+                          }
+                          setBusy(false);
+                        }}
+                        disabled={busy}
+                        className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-2xl text-xs font-black disabled:opacity-40 whitespace-nowrap"
+                      >
+                        🚀 Attiva Boost
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Sezione Notifiche push (solo Pro Notifiche) */}
+                  {restaurantCanPushNotify(current) && (
+                    <PushNotificationPanel restaurantId={current!.id} />
+                  )}
+                  {!restaurantCanPushNotify(current) && (
+                    <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h3 className="font-black text-lg">🔔 Notifiche push ai clienti fedeli</h3>
+                        <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                          Invia promozioni, sconti e novità direttamente ai clienti che ti hanno salvato nei preferiti. Disponibile con il piano Pro Notifiche.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setActiveSubTab('plan')}
+                        className="bg-white text-slate-900 hover:bg-slate-100 px-5 py-3 rounded-2xl text-xs font-black whitespace-nowrap"
+                      >
+                        Passa a Pro Notifiche
+                      </button>
+                    </div>
+                  )}
                 </section>
               )}
 

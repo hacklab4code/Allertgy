@@ -1,14 +1,15 @@
-import { router } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { api } from '../src/api/client';
+import { getFlagEmoji } from '../src/constants/languages';
 import { useSession } from '../src/store/session';
 
 export default function Disclaimer() {
   const [talkToStaff, setTalkToStaff] = useState(false);
   const [supportOnly, setSupportOnly] = useState(false);
   const [busy, setBusy] = useState(false);
-  const { setDisclaimer } = useSession();
+  const { setDisclaimer, language } = useSession();
 
   const accept = async () => {
     setBusy(true);
@@ -26,8 +27,16 @@ export default function Disclaimer() {
   const ready = talkToStaff && supportOnly;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.icon}>⚠️</Text>
+    <>
+      <Stack.Screen options={{ 
+        headerRight: () => (
+          <TouchableOpacity onPress={() => router.push('/language')} style={{ marginRight: 4 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F8A6A' }}>{getFlagEmoji(language)} {(language || 'it').toUpperCase()}</Text>
+          </TouchableOpacity>
+        ) 
+      }} />
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.icon}>⚠️</Text>
       <Text style={styles.title}>La tua sicurezza prima di tutto</Text>
       <Text style={styles.text}>
         AllerTgy ti aiuta a orientarti nel menù, ma non sostituisce la comunicazione
@@ -48,6 +57,7 @@ export default function Disclaimer() {
         {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Confermo e continuo</Text>}
       </TouchableOpacity>
     </ScrollView>
+    </>
   );
 }
 

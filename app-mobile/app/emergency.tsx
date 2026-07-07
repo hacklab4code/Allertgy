@@ -1,10 +1,10 @@
 import { Stack, router } from 'expo-router';
 import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSession } from '../src/store/session';
-import { getAllergenName } from '../src/engine/translations';
+import { getAllergenName, t } from '../src/engine/translations';
 
 export default function EmergencyScreen() {
-  const { allergie, emergencyMedicines, language } = useSession();
+  const { allergie, emergencyMedicines, language, emergencyContactName, emergencyContactPhone } = useSession();
 
   const handleCall112 = () => {
     Linking.openURL('tel:112').catch(() => {
@@ -12,53 +12,58 @@ export default function EmergencyScreen() {
     });
   };
 
+  const handleCallContact = () => {
+    if (!emergencyContactPhone) return;
+    Linking.openURL(`tel:${emergencyContactPhone}`).catch(() => {
+      alert("Chiamata telefonica non supportata su questo dispositivo.");
+    });
+  };
+
   const handleSendSMS = () => {
     const listAllergie = allergie.map((a) => getAllergenName(a, language)).join(', ');
-    const listMedicines = emergencyMedicines || (language === 'en' ? 'None declared' : 'Nessuno dichiarato');
-    
-    const bodyText = language === 'en' 
-      ? `AllerTgy SOS! I am having a severe allergic reaction. Allergies: ${listAllergie}. Emergency medicines: ${listMedicines}.`
-      : `AllerTgy SOS! Sto avendo una reazione allergica grave. Allergie: ${listAllergie}. Farmaci salvavita: ${listMedicines}.`;
-      
-    Linking.openURL(`sms:?body=${encodeURIComponent(bodyText)}`).catch(() => {
+    const listMedicines = emergencyMedicines || t('none_declared', language);
+
+    const bodyText = `${t('sos_message_prefix', language)} ${listAllergie}. ${t('sos_medicines_label', language)} ${listMedicines}.`;
+
+    const smsUrl = emergencyContactPhone
+      ? `sms:${emergencyContactPhone}?body=${encodeURIComponent(bodyText)}`
+      : `sms:?body=${encodeURIComponent(bodyText)}`;
+
+    Linking.openURL(smsUrl).catch(() => {
       alert("Invio SMS non supportato su questo dispositivo.");
     });
   };
 
-  const isIt = language === 'it';
-
   return (
     <>
-      <Stack.Screen 
-        options={{ 
-          title: isIt ? 'Emergenza Medica' : 'Medical Emergency',
+      <Stack.Screen
+        options={{
+          title: t('emergency_title', language),
           headerStyle: { backgroundColor: '#b91c1c' },
           headerTintColor: '#ffffff',
           headerTitleStyle: { fontWeight: '900' }
-        }} 
+        }}
       />
       <ScrollView contentContainerStyle={styles.container}>
         {/* Banner principale di allarme */}
         <View style={styles.alertCard}>
           <Text style={styles.alertEmoji}>🚨</Text>
           <Text style={styles.alertTitle}>
-            {isIt ? 'SCHERMATA SALVAVITA' : 'LIFESAVING INFO'}
+            {t('emergency_banner', language)}
           </Text>
           <Text style={styles.alertSubtitle}>
-            {isIt 
-              ? 'Mostra questa schermata al personale medico o a chi ti presta soccorso' 
-              : 'Show this screen to medical staff or first responders'}
+            {t('emergency_show', language)}
           </Text>
         </View>
 
         {/* Informazioni sulle allergie */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionHeader}>
-            {isIt ? '🛡️ ALLERGIE E INTOLLERANZE:' : '🛡️ ALLERGIES & INTOLERANCES:'}
+            {t('allergies_section', language)}
           </Text>
           {allergie.length === 0 ? (
             <Text style={styles.emptyText}>
-              {isIt ? 'Nessuna allergia selezionata nel profilo.' : 'No allergies selected in profile.'}
+              {t('no_allergies', language)}
             </Text>
           ) : (
             <View style={styles.badgeContainer}>
@@ -77,31 +82,44 @@ export default function EmergencyScreen() {
         {/* Farmaci Salvavita */}
         <View style={[styles.sectionCard, { borderColor: '#fca5a5', backgroundColor: '#fef2f2' }]}>
           <Text style={[styles.sectionHeader, { color: '#991b1b' }]}>
-            {isIt ? '💊 FARMACI SALVAVITA ASSOCIATI:' : '💊 PERSONAL EMERGENCY DRUGS:'}
+            {t('emergency_drugs_section', language)}
           </Text>
           <Text style={styles.medicineText}>
-            {emergencyMedicines || (isIt ? 'Nessun farmaco dichiarato' : 'No emergency drugs declared')}
+            {emergencyMedicines || t('no_drugs', language)}
           </Text>
           {emergencyMedicines && (
             <Text style={styles.medicineWarning}>
-              {isIt 
-                ? '⚠️ Se necessario, autosomministra immediatamente il farmaco (es. adrenalina autoiniettabile).' 
-                : '⚠️ If needed, immediately self-administer the medication (e.g. epinephrine autoinjector).'}
+              {t('drug_warning', language)}
             </Text>
           )}
         </View>
 
         {/* Azioni Rapide */}
         <View style={{ gap: 14, marginTop: 10 }}>
+          {/* Pulsante Chiamata Contatto di Emergenza (se configurato) */}
+          {emergencyContactPhone && (
+            <TouchableOpacity style={[styles.sosButton, { backgroundColor: '#059669', shadowColor: '#059669' }]} onPress={handleCallContact}>
+              <Text style={styles.sosButtonEmoji}>📞</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sosButtonText}>
+                  {t('call_contact', language)} {emergencyContactName?.toUpperCase() || ''}
+                </Text>
+                <Text style={[styles.sosButtonSub, { color: '#d1fae5' }]}>
+                  {emergencyContactPhone}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
           {/* Pulsante Chiamata 112 */}
           <TouchableOpacity style={styles.sosButton} onPress={handleCall112}>
-            <Text style={styles.sosButtonEmoji}>📞</Text>
+            <Text style={styles.sosButtonEmoji}>🚑</Text>
             <View>
               <Text style={styles.sosButtonText}>
-                {isIt ? 'CHIAMA SOCCORSI (112)' : 'CALL EMERGENCY SERVICES (112)'}
+                {t('call_emergency', language)}
               </Text>
               <Text style={styles.sosButtonSub}>
-                {isIt ? 'Avvia chiamata telefonica di emergenza' : 'Start emergency phone call'}
+                {t('call_emergency_sub', language)}
               </Text>
             </View>
           </TouchableOpacity>
@@ -111,12 +129,10 @@ export default function EmergencyScreen() {
             <Text style={styles.smsButtonEmoji}>💬</Text>
             <View>
               <Text style={styles.smsButtonText}>
-                {isIt ? 'INVIA SMS DI SOS' : 'SEND SOS TEXT MESSAGE'}
+                {t('send_sos', language)}
               </Text>
               <Text style={styles.smsButtonSub}>
-                {isIt 
-                  ? 'Invia SMS di aiuto con la lista delle tue allergie' 
-                  : 'Send help text with your active allergy list'}
+                {t('send_sos_sub', language)}
               </Text>
             </View>
           </TouchableOpacity>
@@ -125,7 +141,7 @@ export default function EmergencyScreen() {
         {/* Chiusura */}
         <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
           <Text style={styles.closeButtonText}>
-            {isIt ? 'Chiudi e Torna Indietro' : 'Close and Go Back'}
+            {t('close_back', language)}
           </Text>
         </TouchableOpacity>
       </ScrollView>

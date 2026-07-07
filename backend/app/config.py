@@ -30,9 +30,11 @@ class Settings(BaseSettings):
     # Stripe Billing; se vuoto: endpoint /billing rispondono 503
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
-    stripe_price_verified: str = ""
-    stripe_price_pro: str = ""
-    stripe_price_premium: str = ""
+    # Abbonamenti mensili
+    stripe_price_base: str = ""        # piano Base €9/mese
+    stripe_price_pro_notify: str = ""  # piano Pro Notifiche €19/mese
+    # Add-on one-time
+    stripe_price_boost: str = ""       # Boost Visibilità €9,90 / 30 giorni
 
     class Config:
         env_file = ".env"

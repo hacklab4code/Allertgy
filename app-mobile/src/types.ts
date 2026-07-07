@@ -4,6 +4,7 @@ export interface Allergen {
   name_it: string;
   emoji: string | null;
   is_diet: number;
+  category: string;
   intensity?: 'lieve' | 'moderata' | 'grave' | null;
 }
 

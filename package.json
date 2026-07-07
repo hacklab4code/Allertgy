@@ -1,0 +1,15 @@
+{
+  "name": "allertgy-workspace",
+  "version": "1.0.0",
+  "description": "Workspace radice per AllerTgy con avvio centralizzato",
+  "private": true,
+  "scripts": {
+    "dev:backend": "cd backend && .venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:web": "cd dashboard-web && npm run dev",
+    "dev:mobile": "cd app-mobile && EXPO_PUBLIC_API_URL=http://$(ipconfig getifaddr en0 || ipconfig getifaddr en1 || ifconfig | grep 'inet ' | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1):8000 npm run start",
+    "dev": "concurrently --names \"BACKEND,WEB,MOBILE\" -c \"magenta.bold,cyan.bold,green.bold\" \"npm run dev:backend\" \"npm run dev:web\" \"npm run dev:mobile\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

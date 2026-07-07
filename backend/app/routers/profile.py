@@ -75,7 +75,17 @@ def get_profile(user: User = Depends(get_current_user)):
 
 @router.get("/allergens", response_model=list[AllergenOut])
 def get_my_allergens(user: User = Depends(get_current_user)):
-    return user.allergens
+    return [
+        AllergenOut(
+            id=ua.allergen.id,
+            code=ua.allergen.code,
+            name_it=ua.allergen.name_it,
+            emoji=ua.allergen.emoji,
+            is_diet=ua.allergen.is_diet,
+            intensity=ua.intensity,
+        )
+        for ua in user.user_allergens
+    ]
 
 
 @router.put("/allergens", response_model=list[AllergenOut])
@@ -84,21 +94,40 @@ def set_my_allergens(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    codes = data.allergen_codes
+    intensity_map = {}
+    if data.allergens:
+        codes = [a.code for a in data.allergens]
+        intensity_map = {a.code: a.intensity for a in data.allergens}
+
     allergens = db.scalars(
-        select(Allergen).where(Allergen.code.in_(data.allergen_codes))
+        select(Allergen).where(Allergen.code.in_(codes))
     ).all()
-    if len(allergens) != len(set(data.allergen_codes)):
+    if len(allergens) != len(set(codes)):
         raise HTTPException(400, "Uno o più codici allergene non validi")
+
     db.execute(delete(UserAllergen).where(UserAllergen.user_id == user.id))
     now = datetime.now(timezone.utc)
     for a in allergens:
+        intensity = intensity_map.get(a.code, "moderata")
         db.add(UserAllergen(
-            user_id=user.id, allergen_id=a.id, source="manual", confirmed_at=now
+            user_id=user.id, allergen_id=a.id, source="manual", confirmed_at=now, intensity=intensity
         ))
     user.onboarding_completed_at = now
     db.commit()
     db.refresh(user)
-    return user.allergens
+
+    return [
+        AllergenOut(
+            id=ua.allergen.id,
+            code=ua.allergen.code,
+            name_it=ua.allergen.name_it,
+            emoji=ua.allergen.emoji,
+            is_diet=ua.allergen.is_diet,
+            intensity=ua.intensity,
+        )
+        for ua in user.user_allergens
+    ]
 
 
 @router.post("/legal-consents", response_model=UserProfileOut)
@@ -142,6 +171,8 @@ def update_apple_health(
     """Aggiorna lo stato di connessione con Apple Salute e l'elenco dei farmaci salvavita/medicinali."""
     user.apple_health_connected = data.apple_health_connected
     user.emergency_medicines = data.emergency_medicines
+    user.emergency_contact_name = data.emergency_contact_name
+    user.emergency_contact_phone = data.emergency_contact_phone
     db.commit()
     db.refresh(user)
     return user
@@ -403,7 +434,17 @@ def confirm_extraction(
             e.applied = 1
     db.commit()
     db.refresh(user)
-    return user.allergens
+    return [
+        AllergenOut(
+            id=ua.allergen.id,
+            code=ua.allergen.code,
+            name_it=ua.allergen.name_it,
+            emoji=ua.allergen.emoji,
+            is_diet=ua.allergen.is_diet,
+            intensity=ua.intensity,
+        )
+        for ua in user.user_allergens
+    ]
 
 
 @router.delete("/medical-documents/{doc_id}", status_code=204)

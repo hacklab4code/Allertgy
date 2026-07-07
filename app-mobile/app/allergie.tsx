@@ -1,24 +1,65 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Stack, router } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, ScrollView, StyleProp, StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle,
+  ActivityIndicator, Alert, ScrollView, StyleProp, StyleSheet, Text,
+  TextInput, TextStyle, TouchableOpacity, View, ViewStyle,
 } from 'react-native';
 import { api } from '../src/api/client';
 import { useSession } from '../src/store/session';
+import { getSectionTitle, groupAllergensBySection, getLang } from '../src/engine/translations';
 import type { Allergen } from '../src/types';
+
+const getFlagEmoji = (lang: string | null) => {
+  switch (lang?.toLowerCase()) {
+    case 'it': return '🇮🇹';
+    case 'en': return '🇬🇧';
+    case 'es': return '🇪🇸';
+    case 'fr': return '🇫🇷';
+    case 'de': return '🇩🇪';
+    default: return '🌐';
+  }
+};
 
 export default function Allergie() {
   const [all, setAll] = useState<Allergen[]>([]);
   const [selected, setSelected] = useState<Set<string>>(
     new Set(useSession.getState().allergie),
   );
+  const [intensities, setIntensities] = useState<Record<string, 'lieve' | 'moderata' | 'grave'>>(
+    useSession.getState().allergyIntensities || {}
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const { setAllergie, setProfileCompleted } = useSession();
+  const [search, setSearch] = useState('');
+  const { setAllergie, setProfileCompleted, language } = useSession();
+  const lang = getLang(language);
 
   useEffect(() => {
     api.allergens().then(setAll).catch((e) => setError(e.message));
   }, []);
+
+  // Filtra le sezioni in base alla ricerca
+  const sections = useMemo(() => {
+    const base = groupAllergensBySection(all);
+    if (!search.trim()) return base;
+    const q = search.toLowerCase().trim();
+    return base
+      .map((s) => ({
+        ...s,
+        items: s.items.filter(
+          (a) =>
+            a.name_it.toLowerCase().includes(q) ||
+            (a.code && a.code.toLowerCase().includes(q)) ||
+            (a.emoji && a.emoji.includes(q))
+        ),
+      }))
+      .filter((s) => s.items.length > 0);
+  }, [all, search]);
+
+  const totalFiltered = useMemo(
+    () => sections.reduce((acc, s) => acc + s.items.length, 0),
+    [sections]
+  );
 
   const toggle = (code: string) => {
     const next = new Set(selected);
@@ -26,13 +67,35 @@ export default function Allergie() {
     setSelected(next);
   };
 
+  const updateIntensity = (code: string, level: 'lieve' | 'moderata' | 'grave') => {
+    if (!selected.has(code)) {
+      const next = new Set(selected);
+      next.add(code);
+      setSelected(next);
+    }
+    setIntensities((prev) => ({ ...prev, [code]: level }));
+  };
+
+  const onLongPress = (code: string, name: string) => {
+    Alert.alert(
+      `Intensità: ${name}`,
+      `Imposta quanto è grave questa allergia:`,
+      [
+        { text: 'Lieve', onPress: () => updateIntensity(code, 'lieve') },
+        { text: 'Moderata', onPress: () => updateIntensity(code, 'moderata') },
+        { text: 'Grave/Anafilassi', onPress: () => updateIntensity(code, 'grave'), style: 'destructive' },
+        { text: 'Annulla', style: 'cancel' },
+      ]
+    );
+  };
+
   const save = async () => {
     setBusy(true);
     setError('');
     try {
       const codes = [...selected];
-      await api.saveAllergens(codes); // salvataggio nel database remoto
-      setAllergie(codes);
+      await api.saveAllergens(codes, intensities);
+      setAllergie(codes, intensities);
       setProfileCompleted(true);
       router.replace('/');
     } catch (e) {
@@ -41,16 +104,13 @@ export default function Allergie() {
     setBusy(false);
   };
 
-  const food = all.filter((a) => !a.is_diet);
-  const diets = all.filter((a) => a.is_diet);
-
   const Chip = ({ a }: { a: Allergen }) => {
     const on = selected.has(a.code);
     const isDiet = a.is_diet;
-    
+
     let btnStyle: StyleProp<ViewStyle> = styles.chip;
     let textStyle: StyleProp<TextStyle> = styles.chipText;
-    
+
     if (on) {
       if (isDiet) {
         btnStyle = [styles.chip, styles.chipOnDiet];
@@ -65,9 +125,14 @@ export default function Allergie() {
       <TouchableOpacity
         style={btnStyle}
         onPress={() => toggle(a.code)}
+        onLongPress={() => onLongPress(a.code, a.name_it)}
+        delayLongPress={300}
       >
         <Text style={textStyle}>
           {a.emoji} {a.name_it}
+          {on && intensities[a.code] === 'lieve' && ' (Lieve)'}
+          {on && (!intensities[a.code] || intensities[a.code] === 'moderata') && ' (Mod.)'}
+          {on && intensities[a.code] === 'grave' && ' (Grave)'}
         </Text>
       </TouchableOpacity>
     );
@@ -75,23 +140,66 @@ export default function Allergie() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      <Stack.Screen options={{
+        headerRight: () => (
+          <TouchableOpacity onPress={() => router.push('/language')} style={{ marginRight: 4 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F8A6A' }}>{getFlagEmoji(language)} {(language || 'it').toUpperCase()}</Text>
+          </TouchableOpacity>
+        )
+      }} />
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Seleziona le tue allergie e intolleranze</Text>
         <Text style={styles.subtitle}>
-          Puoi selezionare i 14 allergeni previsti dal Reg. UE 1169/2011, preferenze alimentari,
-          oppure continuare senza selezioni.
+          Scegli tra oltre 100 allergeni e intolleranze organizzati per categoria.
+          Tieni premuto un chip per impostare l'intensità. Puoi anche continuare senza selezioni.
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {all.length === 0 && !error ? <ActivityIndicator style={{ marginTop: 40 }} /> : null}
 
-        <View style={styles.grid}>{food.map((a) => <Chip key={a.code} a={a} />)}</View>
-
-        {diets.length > 0 && (
-          <>
-            <Text style={styles.section}>Preferenze alimentari</Text>
-            <View style={styles.grid}>{diets.map((a) => <Chip key={a.code} a={a} />)}</View>
-          </>
+        {/* Barra di ricerca */}
+        {all.length > 0 && (
+          <View style={styles.searchBox}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Cerca allergene (es. latte, glutine…)"
+              placeholderTextColor="#94a3b8"
+              value={search}
+              onChangeText={setSearch}
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')} style={styles.searchClear}>
+                <Text style={styles.searchClearText}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
+
+        {/* Counter risultati ricerca */}
+        {search.trim() !== '' && (
+          <Text style={styles.searchCount}>
+            {totalFiltered > 0
+              ? `${totalFiltered} risultati per "${search}"`
+              : `Nessun risultato per "${search}"`}
+          </Text>
+        )}
+
+        {sections.map((section) => (
+          <View key={section.key} style={styles.sectionBlock}>
+            <Text style={[
+              styles.section,
+              section.key === 'preferenze' && styles.sectionDiet,
+            ]}>
+              {getSectionTitle(section.key, lang)}
+            </Text>
+            <View style={styles.grid}>
+              {section.items.map((a) => <Chip key={a.code} a={a} />)}
+            </View>
+          </View>
+        ))}
       </ScrollView>
 
       <TouchableOpacity
@@ -102,7 +210,7 @@ export default function Allergie() {
         {busy
           ? <ActivityIndicator color="#fff" />
           : <Text style={styles.saveText}>
-              {selected.size === 0 ? 'Continua senza allergie' : `Salva profilo (${selected.size})`}
+              {selected.size === 0 ? 'Continua senza allergie' : `Salva profilo (${selected.size} selezionati)`}
             </Text>}
       </TouchableOpacity>
     </View>
@@ -112,8 +220,53 @@ export default function Allergie() {
 const styles = StyleSheet.create({
   container: { padding: 20, paddingBottom: 110 },
   title: { fontSize: 21, fontWeight: '900', color: '#0f172a', letterSpacing: -0.4 },
-  subtitle: { color: '#64748b', fontSize: 13, marginTop: 4, marginBottom: 20 },
-  section: { fontSize: 16, fontWeight: '800', color: '#0f172a', marginTop: 24, marginBottom: 10, letterSpacing: -0.2 },
+  subtitle: { color: '#64748b', fontSize: 13, marginTop: 4, marginBottom: 12, lineHeight: 19 },
+  // --- Search bar ---
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 8,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  searchIcon: { fontSize: 16, marginRight: 8 },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#0f172a',
+    fontWeight: '600',
+    padding: 0,
+  },
+  searchClear: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  searchClearText: { fontSize: 10, color: '#64748b', fontWeight: '900' },
+  searchCount: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '700',
+    marginBottom: 8,
+    marginLeft: 2,
+  },
+  // --- Sections ---
+  sectionBlock: { marginBottom: 8 },
+  section: { fontSize: 15, fontWeight: '800', color: '#0f172a', marginTop: 20, marginBottom: 10, letterSpacing: -0.2 },
+  sectionDiet: { color: '#16a34a' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     borderWidth: 1.5, borderColor: '#e2e8f0', backgroundColor: '#ffffff',

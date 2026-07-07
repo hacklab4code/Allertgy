@@ -10,6 +10,7 @@ export default function Index() {
     healthDataConsent,
     profileCompleted,
     disclaimerAccepted,
+    languageSelected,
   } = useSession();
 
   if (!token) return <Redirect href="/welcome" />;

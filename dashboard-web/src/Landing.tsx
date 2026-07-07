@@ -47,6 +47,15 @@ const ALLERGEN_INFO = [
   { code: 'uova', name: 'Uova', emoji: '🥚' },
   { code: 'pesce', name: 'Pesce', emoji: '🐟' },
   { code: 'crostacei', name: 'Crostacei', emoji: '🦐' },
+  { code: 'arachidi', name: 'Arachidi', emoji: '🥜' },
+  { code: 'soia', name: 'Soia', emoji: '🌱' },
+  { code: 'frutta_a_guscio', name: 'Frutta a guscio', emoji: '🌰' },
+  { code: 'sedano', name: 'Sedano', emoji: '🥬' },
+  { code: 'senape', name: 'Senape', emoji: '🟡' },
+  { code: 'sesamo', name: 'Sesamo', emoji: '⚪' },
+  { code: 'solfiti', name: 'Solfiti', emoji: '🍷' },
+  { code: 'lupini', name: 'Lupini', emoji: '🫘' },
+  { code: 'molluschi', name: 'Molluschi', emoji: '🦑' },
 ];
 
 export default function Landing({ onEnter, onClienti }: Props) {
@@ -271,22 +280,107 @@ export default function Landing({ onEnter, onClienti }: Props) {
           ))}
         </div>
 
-        <div className="mt-14 grid lg:grid-cols-4 gap-4">
-          {[
-            ['Gratis', '€0', 'Scheda base sulla mappa per farti trovare dai clienti.'],
-            ['Verificato', '€9,90/mese', 'Badge verificato e profilo locale più affidabile.'],
-            ['Pro', '€19,90/mese', 'Menu digitale, allergeni per piatto, QR code e registro stampabile.'],
-            ['Premium', '€39,90/mese', 'Più visibilità, priorità nei risultati e strumenti avanzati.'],
-          ].map(([name, price, body]) => (
-            <div key={name} className={`rounded-3xl border bg-white p-6 shadow-sm ${name === 'Pro' ? 'border-emerald-500 ring-2 ring-emerald-500/10' : 'border-slate-200/50'}`}>
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="font-black text-lg text-slate-850">{name}</h3>
-                {name === 'Pro' && <span className="text-[10px] font-black bg-emerald-50 text-emerald-800 px-2 py-1 rounded-lg">Menu</span>}
+        {/* Pricing grid — nuovi piani */}
+        <div className="mt-14 space-y-6">
+
+          {/* Badge intro */}
+          <div className="text-center">
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold uppercase tracking-wider">
+              🎁 30 giorni gratis su tutti i piani — nessuna carta richiesta
+            </span>
+          </div>
+
+          {/* Abbonamenti mensili */}
+          <div className="grid lg:grid-cols-2 gap-5">
+
+            {/* Piano Base */}
+            <div className="rounded-3xl border border-slate-200/70 bg-white p-7 shadow-sm flex flex-col gap-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-black text-xl text-slate-800">Base</h3>
+                  <p className="text-slate-500 text-xs mt-1 leading-relaxed">Carica il tuo menù e gestisci il locale con tutti gli strumenti.</p>
+                </div>
+                <span className="shrink-0 text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-100 px-2.5 py-1 rounded-xl ml-3">30 gg gratis</span>
               </div>
-              <div className="text-xl font-black text-emerald-800 mt-2">{price}</div>
-              <p className="text-xs text-slate-500 mt-3 leading-relaxed">{body}</p>
+              <div className="flex items-end gap-1">
+                <span className="text-4xl font-black text-slate-800">€9</span>
+                <span className="text-slate-400 text-sm font-semibold mb-1">/mese</span>
+              </div>
+              <ul className="space-y-2 flex-1">
+                {[
+                  '✅ Menù digitale con allergeni e tracce',
+                  '✅ Badge "Locale verificato"',
+                  '✅ Fino a 10 foto in galleria',
+                  '✅ QR code per tavoli e banco',
+                  '✅ Registro allergeni stampabile (PDF)',
+                  '✅ Rispondi alle recensioni',
+                ].map(f => (
+                  <li key={f} className="text-xs text-slate-600 font-medium">{f}</li>
+                ))}
+              </ul>
+              <button
+                onClick={onEnter}
+                className="mt-2 w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99] text-sm"
+              >
+                Prova gratis 30 giorni →
+              </button>
             </div>
-          ))}
+
+            {/* Piano Pro Notifiche */}
+            <div className="rounded-3xl border-2 border-emerald-500 bg-white p-7 shadow-lg shadow-emerald-500/10 flex flex-col gap-4 relative">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                <span className="bg-emerald-600 text-white text-[10px] font-black px-4 py-1.5 rounded-full shadow-md uppercase tracking-wider">
+                  ⭐ Più scelto
+                </span>
+              </div>
+              <div className="flex items-start justify-between pt-2">
+                <div>
+                  <h3 className="font-black text-xl text-slate-800">Pro Notifiche</h3>
+                  <p className="text-slate-500 text-xs mt-1 leading-relaxed">Come Base, più la possibilità di inviare push ai tuoi clienti fedeli.</p>
+                </div>
+                <span className="shrink-0 text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-100 px-2.5 py-1 rounded-xl ml-3">30 gg gratis</span>
+              </div>
+              <div className="flex items-end gap-1">
+                <span className="text-4xl font-black text-slate-800">€19</span>
+                <span className="text-slate-400 text-sm font-semibold mb-1">/mese</span>
+              </div>
+              <ul className="space-y-2 flex-1">
+                {[
+                  '✅ Tutto del piano Base',
+                  '🔔 Invia notifiche push ai clienti che ti hanno preferito',
+                  '📢 Promuovi sconti, novità e offerte speciali',
+                  '🖼️ Fino a 20 foto in galleria',
+                ].map(f => (
+                  <li key={f} className="text-xs text-slate-600 font-medium">{f}</li>
+                ))}
+              </ul>
+              <button
+                onClick={onEnter}
+                className="mt-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl shadow shadow-emerald-600/20 transition-all hover:scale-[1.01] active:scale-[0.99] text-sm"
+              >
+                Prova gratis 30 giorni →
+              </button>
+            </div>
+          </div>
+
+          {/* Add-on: Boost Visibilità */}
+          <div className="rounded-3xl border border-dashed border-amber-300 bg-amber-50/60 p-6 flex flex-col sm:flex-row items-start sm:items-center gap-5">
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 flex items-center justify-center text-3xl shrink-0">🚀</div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-black text-lg text-slate-800">Boost Visibilità</h3>
+                <span className="text-[10px] font-black bg-amber-200 text-amber-900 px-2.5 py-1 rounded-full uppercase">Add-on · Una tantum</span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                Metti il tuo locale <strong>in cima ai risultati di ricerca per 30 giorni</strong>.
+                Pagamento singolo senza abbonamento — attivabile quando vuoi, anche più volte.
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-2xl font-black text-amber-800">€9,90</div>
+              <div className="text-[10px] text-amber-600 font-semibold">per 30 giorni</div>
+            </div>
+          </div>
         </div>
         
         <div className="text-center mt-12">

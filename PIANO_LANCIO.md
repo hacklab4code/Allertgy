@@ -15,7 +15,7 @@ Decisioni prese come base di questo piano:
 | 1 — Recupero password + foto profilo | ✅ | Backend + dashboard web + app mobile (schermate `forgot`/`reset-password`, avatar con `expo-image-picker`) |
 | 2 — Pagine pubbliche + SEO | ✅ | `GET /restaurants/{code}/public`, slug auto-generati (con backfill), rotta web `/r/{slug}`, meta tag dinamici, `sitemap.xml` |
 | 3 — Documenti medici + AI | ✅ | Storage privato con URL firmati 5 min, consenso AI per-documento, estrazione Gemini (stub senza API key), conferma manuale obbligatoria, limite 5/mese, access log, cancellazione reale, schermata mobile `documenti.tsx` |
-| 4 — Recensioni + moderazione | ✅ | Upsert 1-per-utente, risposta ristoratore (piano Verificato+), segnalazioni, moderazione in InternalAdmin, UI web e mobile |
+| 4 — Recensioni + moderazione | ✅ | Upsert 1-per-utente, risposta ristoratore (piano Pro+), segnalazioni, moderazione in InternalAdmin, UI web e mobile |
 | 5 — Stripe end-to-end | ✅ (codice) | Checkout/Portal/webhook/fatture implementati; si attivano inserendo le chiavi `STRIPE_*` in `backend/.env` (senza chiavi: 503 con messaggio chiaro) |
 | 6 — Notifiche | ✅ (parziale) | Tabelle + push Expo su "menù aggiornato" (preferiti server-side) e "risposta a recensione"; email transazionali via Resend (fallback log). Manca il wiring `expo-notifications` nell'app (richiede dev build) |
 | 7 — Hardening + beta | ⏳ | Smoke test end-to-end backend superato (25/25). Restano: deploy VPS+HTTPS, Stripe live, revisione legale, beta con ristoranti reali |
@@ -236,7 +236,7 @@ CREATE TABLE invoices (
 ### 4.3 Pagine pubbliche ristorante
 
 - Nuova rotta pubblica **senza login**: `dashboard-web` → `/r/:slug` (fallback su `/r/:public_code` se lo slug non è ancora impostato).
-- Endpoint `GET /restaurants/{codice}/public`: nome, città, indirizzo, lat/lng, foto copertina + galleria, orari (`restaurant_hours`), badge piano, rating medio + numero recensioni, anteprima menù (dettaglio allergeni per piatto visibile solo se piano Pro/Premium attivo, coerente col gating già esistente).
+- Endpoint `GET /restaurants/{codice}/public`: nome, città, indirizzo, lat/lng, foto copertina + galleria, orari (`restaurant_hours`), badge piano, rating medio + numero recensioni, anteprima menù (dettaglio allergeni per piatto visibile se piano Verificato/Pro/Premium attivo, coerente col gating già esistente).
 - **SEO**: meta tag dinamici (title/description/OG image) via `react-helmet-async`, `sitemap.xml` generato lato backend, URL leggibile (`slug` generato da nome+città con fallback numerico se duplicato).
 - Bottone "Lascia una recensione" e "Aggiungi ai preferiti" visibili solo se loggato.
 
@@ -255,7 +255,7 @@ Punto più delicato del piano: si tratta di **dati sanitari (Art. 9 GDPR)**, va 
 
 - Un utente può lasciare **una sola recensione per ristorante** (vincolo `UNIQUE (restaurant_id, user_id)`), modificabile in seguito (upsert), niente recensioni anonime.
 - `POST /restaurants/{codice}/reviews`, `GET /restaurants/{codice}/reviews`, `PUT/DELETE` sulla propria.
-- **Risposta del ristoratore** (`review_replies`) riservata a piano Verificato in su (vedi §8).
+- **Risposta del ristoratore** (`review_replies`) riservata a piano Pro in su (vedi §7/§8).
 - **Moderazione**: pannello `InternalAdmin.tsx` → tab "Recensioni" per nascondere contenuti offensivi/falsi (`is_hidden` + motivo), più un endpoint `POST /reviews/{id}/report` per segnalazioni da altri utenti.
 
 ### 4.6 Notifiche
@@ -311,7 +311,7 @@ Numeri indicativi — Stripe/Gemini aggiornano i prezzi, da riverificare al mome
 | Piano | Prezzo | Foto galleria | Risposta recensioni | Menù digitale allergeni | Priorità ricerca |
 |---|---:|---:|:---:|:---:|:---:|
 | Free | €0 | 1 | ✗ | ✗ | ✗ |
-| Verificato | €9,90/mese | 3 | ✓ | ✗ | ✗ |
+| Verificato | €9,00/mese | 3 | ✗ | ✓ | ✗ |
 | Pro | €19,90/mese | 8 | ✓ | ✓ | ✗ |
 | Premium | €39,90/mese | 20 | ✓ | ✓ | ✓ (massima) |
 

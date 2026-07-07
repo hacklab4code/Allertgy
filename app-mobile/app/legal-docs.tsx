@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { api } from '../src/api/client';
@@ -9,6 +9,7 @@ const DOCS = ['terms', 'privacy', 'safety', 'cookies'] as const;
 
 /** Testi legali integrali, letti dall'API: stessa fonte della dashboard web. */
 export default function LegalDocs() {
+  const params = useLocalSearchParams<{ tab?: string }>();
   const [docs, setDocs] = useState<LegalDoc[]>([]);
   const [active, setActive] = useState<string>('terms');
   const [error, setError] = useState('');
@@ -18,6 +19,12 @@ export default function LegalDocs() {
       .then(setDocs)
       .catch((e) => setError(e.message));
   }, []);
+
+  useEffect(() => {
+    if (params.tab && DOCS.includes(params.tab as any)) {
+      setActive(params.tab);
+    }
+  }, [params.tab]);
 
   const current = docs.find((d) => d.doc === active);
 

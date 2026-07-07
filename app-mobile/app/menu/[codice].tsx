@@ -1,15 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Alert, Animated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { api, type Review } from '../../src/api/client';
 import DishCard from '../../src/components/DishCard';
+import { calcolaCompatibilita, compatibilitaColor } from '../../src/engine/compatibility';
 import { calcolaSemaforo, type EsitoSemaforo } from '../../src/engine/semaforo';
 import { useSession } from '../../src/store/session';
 import type { Menu, Piatto } from '../../src/types';
-import { t, tSummary } from '../../src/engine/translations';
+import { t, tSummary, tSection } from '../../src/engine/translations';
+import { getLocaleForLang } from '../../src/constants/languages';
+import { colors } from '../../src/theme';
 
 type Filtro = 'tutti' | 'verde' | 'giallo' | 'rosso';
 
@@ -20,30 +23,6 @@ const SEZIONI: { stato: 'verde' | 'giallo' | 'rosso' }[] = [
   { stato: 'giallo' },
   { stato: 'rosso' },
 ];
-
-const getSezioneTitolo = (stato: 'verde' | 'giallo' | 'rosso', lang: 'it' | 'en') => {
-  if (lang === 'it') {
-    return stato === 'verde' ? '✅ Puoi mangiare'
-         : stato === 'giallo' ? '⚠️ Con attenzione'
-         : '⛔ Non puoi mangiare';
-  } else {
-    return stato === 'verde' ? '✅ Safe to eat'
-         : stato === 'giallo' ? '⚠️ With caution'
-         : '⛔ Do not eat';
-  }
-};
-
-const getSezioneSotto = (stato: 'verde' | 'giallo' | 'rosso', lang: 'it' | 'en') => {
-  if (lang === 'it') {
-    return stato === 'verde' ? 'Nessuno dei tuoi allergeni in questi piatti'
-         : stato === 'giallo' ? 'Possibili tracce: chiedi conferma al personale'
-         : 'Contengono i tuoi allergeni: da evitare';
-  } else {
-    return stato === 'verde' ? 'None of your allergens in these dishes'
-         : stato === 'giallo' ? 'Possible traces: confirm with staff'
-         : 'Contains your allergens: avoid';
-  }
-};
 
 export default function MenuScreen() {
   const { codice } = useLocalSearchParams<{ codice: string }>();
@@ -116,11 +95,11 @@ export default function MenuScreen() {
       await api.upsertReview(codice, myRating, myComment.trim());
       setReviews(await api.listReviews(codice));
       Alert.alert(
-        language === 'it' ? 'Grazie!' : 'Thank you!',
-        language === 'it' ? 'La tua recensione è stata pubblicata.' : 'Your review has been published.',
+        t('thank_you', language),
+        t('review_published', language),
       );
     } catch (e) {
-      Alert.alert(language === 'it' ? 'Errore' : 'Error', (e as Error).message);
+      Alert.alert(t('error', language), (e as Error).message);
     }
     setReviewBusy(false);
   };
@@ -129,6 +108,22 @@ export default function MenuScreen() {
     if (!menu) return [];
     return menu.piatti.map((p) => ({ p, esito: calcolaSemaforo(allergie, p, ingredientiEsclusi) }));
   }, [menu, allergie, ingredientiEsclusi]);
+
+  // Calcolo percentuale compatibilità
+  const compat = useMemo(() => {
+    if (!menu || menu.piatti.length === 0) return null;
+    return calcolaCompatibilita(allergie, menu.piatti, ingredientiEsclusi);
+  }, [menu, allergie, ingredientiEsclusi]);
+
+  const compatColor = compat ? compatibilitaColor(compat.percentuale) : 'grigio';
+  const compatRingColor = compatColor === 'verde' ? colors.green
+    : compatColor === 'giallo' ? colors.amber
+    : compatColor === 'rosso' ? colors.red
+    : colors.textMuted;
+  const compatRingBg = compatColor === 'verde' ? colors.greenBg
+    : compatColor === 'giallo' ? colors.amberBg
+    : compatColor === 'rosso' ? colors.redBg
+    : colors.surfaceAlt;
 
   const menuGroups = useMemo(() => {
     if (!menu) return [];
@@ -179,7 +174,7 @@ export default function MenuScreen() {
         </View>
       )}
       <ScrollView contentContainerStyle={styles.container} stickyHeaderIndices={[menuGroups.length > 1 ? 2 : 1]}>
-        {/* Riepilogo */}
+        {/* Riepilogo con percentuale compatibilità */}
         <View style={styles.summary}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryTitle}>{menu.nome_ristorante}{menu.citta ? ` · ${menu.citta}` : ''}</Text>
@@ -187,6 +182,45 @@ export default function MenuScreen() {
               <Text style={{ fontSize: 22 }}>{isFav ? '⭐️' : '☆'}</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Indicatore % compatibilità */}
+          {compat && (
+            <View style={styles.compatSection}>
+              <View style={[styles.compatBadge, { backgroundColor: compatRingBg, borderColor: compatRingColor }]}>
+                <Text style={[styles.compatPct, { color: compatRingColor }]}>{compat.percentuale}%</Text>
+                <Text style={[styles.compatLabel, { color: compatRingColor }]}>
+                  {t('compatible', language)}
+                </Text>
+              </View>
+              {/* Barra proporzionale verde/giallo/rosso */}
+              <View style={styles.compatBar}>
+                {compat.verde > 0 && (
+                  <View style={[
+                    styles.compatBarSegment,
+                    { flex: compat.verde, backgroundColor: colors.green, borderTopLeftRadius: 6, borderBottomLeftRadius: 6, ...(compat.giallo === 0 && compat.rosso === 0 ? { borderTopRightRadius: 6, borderBottomRightRadius: 6 } : {}) },
+                  ]} />
+                )}
+                {compat.giallo > 0 && (
+                  <View style={[
+                    styles.compatBarSegment,
+                    { flex: compat.giallo, backgroundColor: colors.amber, ...(compat.verde === 0 ? { borderTopLeftRadius: 6, borderBottomLeftRadius: 6 } : {}), ...(compat.rosso === 0 ? { borderTopRightRadius: 6, borderBottomRightRadius: 6 } : {}) },
+                  ]} />
+                )}
+                {compat.rosso > 0 && (
+                  <View style={[
+                    styles.compatBarSegment,
+                    { flex: compat.rosso, backgroundColor: colors.red, borderTopRightRadius: 6, borderBottomRightRadius: 6, ...(compat.verde === 0 && compat.giallo === 0 ? { borderTopLeftRadius: 6, borderBottomLeftRadius: 6 } : {}) },
+                  ]} />
+                )}
+              </View>
+              <View style={styles.compatLegend}>
+                <Text style={styles.compatLegendItem}>🟢 {compat.verde} {t('safe_dishes', language)}</Text>
+                <Text style={styles.compatLegendItem}>🟡 {compat.giallo} {t('traces_dishes', language)}</Text>
+                <Text style={styles.compatLegendItem}>🔴 {compat.rosso} {t('avoid_dishes', language)}</Text>
+              </View>
+            </View>
+          )}
+
           <Text style={styles.summaryText}>
             {tSummary(language, conta('verde'), conta('giallo'), conta('rosso'))}
           </Text>
@@ -231,15 +265,15 @@ export default function MenuScreen() {
           // raggruppa per categoria (antipasti, primi, ...) mantenendo l'ordine del menù
           const categorie: { nome: string; piatti: Valutato[] }[] = [];
           for (const it of items) {
-            const nome = it.p.categoria?.trim() || (language === 'it' ? 'Altro' : 'Other');
+            const nome = it.p.categoria?.trim() || t('other', language);
             const g = categorie.find((c) => c.nome === nome);
             g ? g.piatti.push(it) : categorie.push({ nome, piatti: [it] });
           }
 
           return (
             <View key={sez.stato} style={styles.section}>
-              <Text style={styles.sectionTitle}>{getSezioneTitolo(sez.stato, language)} ({items.length})</Text>
-              <Text style={styles.sectionSub}>{getSezioneSotto(sez.stato, language)}</Text>
+              <Text style={styles.sectionTitle}>{tSection(sez.stato, 'title', language)} ({items.length})</Text>
+              <Text style={styles.sectionSub}>{tSection(sez.stato, 'sub', language)}</Text>
               {categorie.map((cat) => (
                 <View key={cat.nome}>
                   {(categorie.length > 1 || (cat.nome !== 'Altro' && cat.nome !== 'Other')) && (
@@ -258,37 +292,82 @@ export default function MenuScreen() {
           <Text style={styles.empty}>{t('empty_menu', language)}</Text>
         )}
 
-        {/* Recensioni */}
+        {/* Recensioni — sezione premium */}
         <View style={styles.reviewsBox}>
-          <Text style={styles.reviewsTitle}>
-            ⭐ {language === 'it' ? 'Recensioni' : 'Reviews'} ({reviews.length})
-          </Text>
+          <View style={styles.reviewsHeader}>
+            <Text style={styles.reviewsTitle}>
+              ⭐ {t('reviews', language)}
+            </Text>
+            <View style={styles.reviewsBadge}>
+              <Text style={styles.reviewsBadgeText}>{reviews.length}</Text>
+            </View>
+            {reviews.length > 0 && (
+              <View style={styles.reviewsAvg}>
+                <Text style={styles.reviewsAvgStar}>★</Text>
+                <Text style={styles.reviewsAvgText}>
+                  {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
+                </Text>
+              </View>
+            )}
+          </View>
 
           {reviews.slice(0, 5).map((r) => (
             <View key={r.id} style={styles.reviewCard}>
               <View style={styles.reviewHead}>
-                <Text style={styles.reviewAuthor}>{r.author_name}{r.is_mine ? (language === 'it' ? ' (tu)' : ' (you)') : ''}</Text>
-                <Text style={styles.reviewStars}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</Text>
+                <View style={styles.reviewAuthorWrap}>
+                  <View style={styles.reviewAvatar}>
+                    <Text style={styles.reviewAvatarText}>
+                      {(r.author_name || 'U').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View>
+                    <Text style={styles.reviewAuthor}>
+                      {r.author_name}{r.is_mine ? t('you', language) : ''}
+                    </Text>
+                    <Text style={styles.reviewDate}>
+                      {new Date(r.created_at).toLocaleDateString(getLocaleForLang(language), { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.reviewStarsWrap}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Text key={n} style={[styles.reviewStarIcon, n > r.rating && styles.reviewStarOff]}>★</Text>
+                  ))}
+                </View>
               </View>
               {r.comment ? <Text style={styles.reviewComment}>{r.comment}</Text> : null}
               {r.reply ? (
                 <View style={styles.replyBox}>
-                  <Text style={styles.replyLabel}>{language === 'it' ? 'Risposta del locale' : 'Reply from the restaurant'}</Text>
+                  <Text style={styles.replyLabel}>
+                    💬 {t('restaurant_reply', language)}
+                  </Text>
                   <Text style={styles.reviewComment}>{r.reply}</Text>
                 </View>
               ) : null}
             </View>
           ))}
           {reviews.length === 0 && (
-            <Text style={styles.reviewEmpty}>
-              {language === 'it' ? 'Ancora nessuna recensione per questo locale.' : 'No reviews yet for this place.'}
-            </Text>
+            <View style={styles.reviewEmptyBox}>
+              <Text style={styles.reviewEmptyEmoji}>💬</Text>
+              <Text style={styles.reviewEmpty}>
+                {t('no_reviews', language)}
+              </Text>
+              <Text style={styles.reviewEmptySub}>
+                {t('be_first_review', language)}
+              </Text>
+            </View>
           )}
 
           {canReview && (
             <View style={styles.reviewForm}>
-              <Text style={styles.reviewFormLabel}>
-                {language === 'it' ? 'La tua recensione' : 'Your review'}
+              <View style={styles.reviewFormHeader}>
+                <Text style={styles.reviewFormEmoji}>✍️</Text>
+                <Text style={styles.reviewFormLabel}>
+                  {t('your_review', language)}
+                </Text>
+              </View>
+              <Text style={styles.reviewFormSub}>
+                {t('review_help', language)}
               </Text>
               <View style={styles.starsRow}>
                 {[1, 2, 3, 4, 5].map((n) => (
@@ -302,9 +381,8 @@ export default function MenuScreen() {
                 value={myComment}
                 onChangeText={setMyComment}
                 multiline
-                placeholder={language === 'it'
-                  ? 'Il locale è stato attento alle tue allergie?'
-                  : 'Was the restaurant careful about your allergies?'}
+                placeholder={t('review_placeholder', language)}
+                placeholderTextColor="#94a3b8"
               />
               <TouchableOpacity
                 style={[styles.reviewSubmit, (reviewBusy || myRating === 0) && { opacity: 0.4 }]}
@@ -314,7 +392,7 @@ export default function MenuScreen() {
                 {reviewBusy
                   ? <ActivityIndicator color="#fff" size="small" />
                   : <Text style={styles.reviewSubmitText}>
-                      {language === 'it' ? 'Pubblica recensione' : 'Publish review'}
+                      {t('publish_review', language)}
                     </Text>}
               </TouchableOpacity>
             </View>
@@ -326,39 +404,118 @@ export default function MenuScreen() {
 }
 
 const styles = StyleSheet.create({
-  reviewsBox: { marginTop: 20, gap: 10 },
-  reviewsTitle: { fontSize: 17, fontWeight: '800', color: '#10201B' },
+  // Compatibilità
+  compatSection: {
+    marginTop: 12,
+    gap: 8,
+  },
+  compatBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    borderWidth: 1.5,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  compatPct: {
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+  },
+  compatLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  compatBar: {
+    flexDirection: 'row',
+    height: 8,
+    borderRadius: 6,
+    overflow: 'hidden',
+    backgroundColor: '#e2e8f0',
+  },
+  compatBarSegment: {
+    height: 8,
+  },
+  compatLegend: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  compatLegendItem: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+
+  // Recensioni
+  reviewsBox: { marginTop: 24, gap: 10 },
+  reviewsHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  reviewsTitle: { fontSize: 18, fontWeight: '900', color: '#10201B', letterSpacing: -0.3 },
+  reviewsBadge: {
+    backgroundColor: '#f0fdf4', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2,
+    borderWidth: 1, borderColor: '#bbf7d0',
+  },
+  reviewsBadgeText: { fontSize: 12, fontWeight: '800', color: '#047857' },
+  reviewsAvg: {
+    flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 'auto',
+  },
+  reviewsAvgStar: { fontSize: 14, color: '#f59e0b' },
+  reviewsAvgText: { fontSize: 14, fontWeight: '800', color: '#1e293b' },
   reviewCard: {
     backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0',
-    borderRadius: 14, padding: 12, gap: 4,
+    borderRadius: 16, padding: 14, gap: 8,
   },
-  reviewHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  reviewHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  reviewAuthorWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  reviewAvatar: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: '#ecfdf5',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: '#a7f3d0',
+  },
+  reviewAvatarText: { fontSize: 15, fontWeight: '800', color: '#047857' },
   reviewAuthor: { fontWeight: '700', fontSize: 13, color: '#1e293b' },
-  reviewStars: { color: '#f59e0b', fontSize: 13 },
+  reviewDate: { fontSize: 11, color: '#94a3b8', marginTop: 1 },
+  reviewStarsWrap: { flexDirection: 'row', gap: 1 },
+  reviewStarIcon: { fontSize: 14, color: '#f59e0b' },
+  reviewStarOff: { color: '#e2e8f0' },
   reviewComment: { color: '#475569', fontSize: 13, lineHeight: 19 },
   replyBox: {
-    marginTop: 6, marginLeft: 8, padding: 8, backgroundColor: '#f0fdf4',
-    borderRadius: 10, borderWidth: 1, borderColor: '#bbf7d0', gap: 2,
+    marginTop: 4, marginLeft: 8, padding: 10, backgroundColor: '#f0fdf4',
+    borderRadius: 12, borderWidth: 1, borderColor: '#bbf7d0', gap: 4,
   },
   replyLabel: { fontSize: 10, fontWeight: '800', color: '#047857', textTransform: 'uppercase' },
-  reviewEmpty: { color: '#94a3b8', fontSize: 13, fontWeight: '600' },
+  reviewEmptyBox: {
+    alignItems: 'center', padding: 24, gap: 6,
+    backgroundColor: '#f8fafc', borderRadius: 16,
+    borderWidth: 1, borderColor: '#e2e8f0', borderStyle: 'dashed',
+  },
+  reviewEmptyEmoji: { fontSize: 28 },
+  reviewEmpty: { color: '#64748b', fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  reviewEmptySub: { color: '#94a3b8', fontSize: 12, fontWeight: '500', textAlign: 'center' },
   reviewForm: {
     backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0',
-    borderRadius: 14, padding: 14, gap: 10, marginTop: 4,
+    borderRadius: 16, padding: 16, gap: 10, marginTop: 6,
   },
-  reviewFormLabel: { fontWeight: '800', fontSize: 13, color: '#1e293b' },
+  reviewFormHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  reviewFormEmoji: { fontSize: 18 },
+  reviewFormLabel: { fontWeight: '800', fontSize: 15, color: '#1e293b' },
+  reviewFormSub: { fontSize: 12, color: '#94a3b8', fontWeight: '500', marginTop: -4 },
   starsRow: { flexDirection: 'row', gap: 6 },
-  starBtn: { fontSize: 26 },
-  starOff: { opacity: 0.25 },
+  starBtn: { fontSize: 28 },
+  starOff: { opacity: 0.2 },
   reviewInput: {
-    minHeight: 70, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0',
-    borderRadius: 12, padding: 10, fontSize: 14, color: '#10201B', textAlignVertical: 'top',
+    minHeight: 80, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0',
+    borderRadius: 14, padding: 12, fontSize: 14, color: '#10201B', textAlignVertical: 'top',
+    lineHeight: 20,
   },
   reviewSubmit: {
-    height: 44, backgroundColor: '#0F8A6A', borderRadius: 12,
+    height: 48, backgroundColor: '#059669', borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#059669', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2, shadowRadius: 8, elevation: 3,
   },
-  reviewSubmitText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  reviewSubmitText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   offlineBanner: {
     backgroundColor: '#fef3c7',
     borderBottomWidth: 1,

@@ -110,6 +110,8 @@ def run_migrations():
             ("privacy_version", "VARCHAR(40) NULL"),
             ("safety_disclaimer_version", "VARCHAR(40) NULL"),
             ("onboarding_completed_at", "DATETIME NULL"),
+            ("emergency_contact_name", "VARCHAR(255) NULL"),
+            ("emergency_contact_phone", "VARCHAR(100) NULL"),
         ]:
             try:
                 db.execute(text(f"SELECT {col} FROM users LIMIT 1"))
@@ -212,6 +214,7 @@ def run_migrations():
 
         # ---- Migrazione v5 (piano di lancio) ----
         _run_v5_migrations(db)
+        _seed_allergens(db)
     finally:
         db.close()
 
@@ -402,3 +405,56 @@ def _run_v5_migrations(db) -> None:
     except Exception as e:
         print(f"❌ Errore backfill slug: {e}")
         db.rollback()
+
+
+def _seed_allergens(db) -> None:
+    """Aggiunge colonna category e popola/aggiorna l'elenco esteso degli allergeni."""
+    from sqlalchemy import text
+    from .allergens_seed import ALLERGENS
+
+    _add_column_if_missing(db, "allergens", "category", "VARCHAR(30) NOT NULL DEFAULT 'ue'")
+
+    inserted = 0
+    updated = 0
+    for code, name_it, emoji, is_diet, sort_order, category in ALLERGENS:
+        row = db.execute(
+            text("SELECT id FROM allergens WHERE code = :code"),
+            {"code": code},
+        ).first()
+        if row:
+            db.execute(
+                text("""
+                    UPDATE allergens
+                    SET name_it = :name_it, emoji = :emoji, is_diet = :is_diet,
+                        sort_order = :sort_order, category = :category
+                    WHERE code = :code
+                """),
+                {
+                    "code": code,
+                    "name_it": name_it,
+                    "emoji": emoji,
+                    "is_diet": is_diet,
+                    "sort_order": sort_order,
+                    "category": category,
+                },
+            )
+            updated += 1
+        else:
+            db.execute(
+                text("""
+                    INSERT INTO allergens (code, name_it, emoji, is_diet, sort_order, category)
+                    VALUES (:code, :name_it, :emoji, :is_diet, :sort_order, :category)
+                """),
+                {
+                    "code": code,
+                    "name_it": name_it,
+                    "emoji": emoji,
+                    "is_diet": is_diet,
+                    "sort_order": sort_order,
+                    "category": category,
+                },
+            )
+            inserted += 1
+    if inserted or updated:
+        db.commit()
+        print(f"🚀 Database: allergeni sincronizzati (+{inserted} nuovi, {updated} aggiornati)")

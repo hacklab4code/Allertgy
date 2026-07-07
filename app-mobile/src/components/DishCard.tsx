@@ -1,4 +1,4 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { API } from '../api/client';
 import type { EsitoSemaforo } from '../engine/semaforo';
 import type { Piatto } from '../types';
@@ -50,13 +50,47 @@ function getDishImageUrl(url: string | null | undefined, name: string, category:
 
 export default function DishCard({ piatto, esito }: { piatto: Piatto; esito: EsitoSemaforo }) {
   const language = useSession((s) => s.language);
+  const allergyIntensities = useSession((s) => s.allergyIntensities || {});
   const c = COLORS[esito.stato];
   const label = t(LABELS[esito.stato], language);
   const rosso = esito.stato === 'rosso';
   const imgUri = getDishImageUrl(piatto.image_url, piatto.nome_piatto, piatto.categoria);
 
+  const onLongPress = () => {
+    if (esito.stato === 'verde') return;
+    
+    let msg = '';
+    const mapIntensity = (code: string) => {
+      const i = allergyIntensities[code];
+      if (i === 'lieve') return ' (Intensità: Lieve)';
+      if (i === 'grave') return ' (Intensità: Grave/Anafilassi)';
+      return ' (Intensità: Moderata)';
+    };
+
+    if (esito.match_contenuti.length > 0) {
+      msg += 'Contiene:\n';
+      esito.match_contenuti.forEach(c => {
+        msg += `- ${getAllergenName(c, language)}${c !== 'vegano' && c !== 'vegetariano' ? mapIntensity(c) : ''}\n`;
+      });
+    }
+    if (esito.match_tracce.length > 0) {
+      if (msg) msg += '\n';
+      msg += 'Tracce:\n';
+      esito.match_tracce.forEach(c => {
+        msg += `- ${getAllergenName(c, language)}${mapIntensity(c)}\n`;
+      });
+    }
+
+    Alert.alert(`Allergie: ${piatto.nome_piatto}`, msg);
+  };
+
   return (
-    <View style={[styles.card, { backgroundColor: c.bg, borderColor: c.border }, rosso && styles.dimmed]}>
+    <TouchableOpacity 
+      style={[styles.card, { backgroundColor: c.bg, borderColor: c.border }, rosso && styles.dimmed]}
+      activeOpacity={0.9}
+      onLongPress={onLongPress}
+      delayLongPress={400}
+    >
       <View style={styles.row}>
         {/* Immagine Piatto */}
         <Image source={{ uri: imgUri }} style={styles.image as any} />
@@ -99,7 +133,7 @@ export default function DishCard({ piatto, esito }: { piatto: Piatto; esito: Esi
           <Text style={styles.price}>{(piatto.prezzo_cents / 100).toFixed(2)} €</Text>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 

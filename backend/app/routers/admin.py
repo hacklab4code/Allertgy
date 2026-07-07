@@ -51,7 +51,7 @@ ALLOWED_IMAGE_TYPES = {
 }
 MAX_MENU_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_DISH_IMAGE_BYTES = 5 * 1024 * 1024
-MENU_PLANS = {"pro", "premium"}
+MENU_PLANS = {"verified", "pro", "premium"}
 MENU_ACCESS_STATUSES = {"trialing", "active", "comped"}
 # Limiti galleria foto per piano (vedi PIANO_LANCIO.md §7)
 PLAN_PHOTO_LIMITS = {"free": 1, "verified": 3, "pro": 8, "premium": 20}

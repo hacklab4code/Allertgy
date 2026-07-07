@@ -44,6 +44,7 @@ class AllergenOut(BaseModel):
     name_it: str
     emoji: Optional[str]
     is_diet: int
+    category: str = "ue"
     intensity: Optional[str] = None
 
     class Config:
@@ -178,11 +179,13 @@ class PlanDefinitionOut(BaseModel):
     name: str
     price_cents: int
     tagline: str
+    trial_days: Optional[int] = None
     features: list[str]
     photo_limit: int = 1
     has_menu: bool = False
     has_review_reply: bool = False
     has_priority: bool = False
+    has_push_notify: bool = False
 
 
 class InternalSummaryOut(BaseModel):
@@ -206,7 +209,7 @@ class InternalRestaurantOut(RestaurantOut):
 
 
 class InternalRestaurantBusinessIn(BaseModel):
-    business_plan: Optional[str] = Field(default=None, pattern="^(free|verified|pro|premium)$")
+    business_plan: Optional[str] = Field(default=None, pattern="^(free|base|pro_notify)$")
     subscription_status: Optional[str] = Field(default=None, pattern="^(free|trialing|active|past_due|canceled|comped)$")
     plan_price_cents: Optional[int] = Field(default=None, ge=0)
     is_active: Optional[int] = Field(default=None, ge=0, le=1)
@@ -290,6 +293,8 @@ class UserDocumentOut(BaseModel):
 class AppleHealthIn(BaseModel):
     apple_health_connected: int
     emergency_medicines: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
 
 
 class UserProfileOut(BaseModel):
@@ -310,6 +315,8 @@ class UserProfileOut(BaseModel):
     onboarding_completed: bool
     apple_health_connected: int
     emergency_medicines: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -355,7 +362,8 @@ class PublicRestaurantOut(BaseModel):
     is_verified: bool = False
     rating_avg: Optional[float] = None
     rating_count: int = 0
-    menu_available: bool = False  # dettaglio allergeni visibile solo con piano Pro/Premium attivo
+    menu_available: bool = False  # dettaglio allergeni visibile solo con piano Base o Pro Notifiche
+    boost_active: bool = False     # True se il locale ha un Boost Visibilità attivo
     piatti: list[DishOut] = []
     safety_notice: str = (
         "Informazioni sugli allergeni dichiarate dal ristoratore. "
@@ -458,7 +466,7 @@ class NotificationOut(BaseModel):
 # ---------- Billing (Stripe) ----------
 class CheckoutSessionIn(BaseModel):
     restaurant_id: int
-    plan: str = Field(pattern="^(verified|pro|premium)$")
+    plan: str = Field(pattern="^(base|pro_notify)$")
 
 
 class CheckoutSessionOut(BaseModel):
@@ -475,7 +483,7 @@ class PortalSessionOut(BaseModel):
 
 class StartTrialIn(BaseModel):
     restaurant_id: int
-    plan: str = Field(default="pro", pattern="^(verified|pro|premium)$")
+    plan: str = Field(default="base", pattern="^(base|pro_notify)$")
 
 
 class InvoiceOut(BaseModel):
@@ -488,6 +496,40 @@ class InvoiceOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------- Boost Visibilità (one-time) ----------
+class StartBoostIn(BaseModel):
+    restaurant_id: int
+
+
+class BoostSessionOut(BaseModel):
+    checkout_url: str
+
+
+class VisibilityBoostOut(BaseModel):
+    id: int
+    restaurant_id: int
+    amount_cents: int
+    duration_days: int
+    activated_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ---------- Notifiche push ai preferiti (solo piano Pro Notifiche) ----------
+class SendNotificationIn(BaseModel):
+    restaurant_id: int
+    title: str = Field(min_length=1, max_length=100)
+    body: str = Field(min_length=1, max_length=500)
+
+
+class SendNotificationOut(BaseModel):
+    sent_count: int
+    message: str
 
 
 # ---------- Documenti legali ----------

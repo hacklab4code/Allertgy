@@ -44,7 +44,7 @@ function dateOnly(value: string | null | undefined) {
 function planHasMenu(r: InternalRestaurant) {
   const status = r.subscription_status ?? 'free';
   const plan = r.business_plan ?? 'free';
-  return status === 'comped' || ((plan === 'pro' || plan === 'premium') && ['trialing', 'active'].includes(status));
+  return status === 'comped' || ((plan === 'verified' || plan === 'pro' || plan === 'premium') && ['trialing', 'active'].includes(status));
 }
 
 export default function InternalAdmin() {

@@ -1,6 +1,6 @@
 export const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
-export interface Allergen { id: number; code: string; name_it: string; emoji: string | null; is_diet: number }
+export interface Allergen { id: number; code: string; name_it: string; emoji: string | null; is_diet: number; category: string }
 export interface DishIn {
   nome_piatto: string; descrizione?: string | null; categoria?: string | null;
   prezzo_cents?: number | null; image_url?: string | null; menu_group?: string | null;
@@ -28,6 +28,8 @@ export interface UserProfile {
   safety_disclaimer_version: string | null; onboarding_completed_at: string | null;
   legal_consents_ok: boolean; disclaimer_accepted: boolean; onboarding_completed: boolean;
   apple_health_connected: number; emergency_medicines: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
 }
 
 export interface RegisterConsents {
@@ -201,9 +203,15 @@ export const api = {
       method: 'PUT', body: JSON.stringify({ allergen_codes: codes }),
     }),
   getProfile: () => req<UserProfile>('/profile'),
-  updateAppleHealth: (apple_health_connected: number, emergency_medicines: string | null) =>
-    req<{ id: number; apple_health_connected: number; emergency_medicines: string | null }>('/profile/apple-health', {
-      method: 'PUT', body: JSON.stringify({ apple_health_connected, emergency_medicines }),
+  updateAppleHealth: (
+    apple_health_connected: number,
+    emergency_medicines: string | null,
+    emergency_contact_name: string | null,
+    emergency_contact_phone: string | null
+  ) =>
+    req<{ id: number; apple_health_connected: number; emergency_medicines: string | null; emergency_contact_name: string | null; emergency_contact_phone: string | null }>('/profile/apple-health', {
+      method: 'PUT',
+      body: JSON.stringify({ apple_health_connected, emergency_medicines, emergency_contact_name, emergency_contact_phone }),
     }),
   getDocuments: () => req<{ id: number; filename: string; file_path: string; status: string; created_at: string }[]>('/profile/documents'),
   uploadDocument: (file: File) => {

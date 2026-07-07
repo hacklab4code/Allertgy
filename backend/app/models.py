@@ -31,6 +31,8 @@ class User(Base):
     onboarding_completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     apple_health_connected: Mapped[Optional[int]] = mapped_column(Integer, default=0)
     emergency_medicines: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    emergency_contact_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    emergency_contact_phone: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     photo_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=text("CURRENT_TIMESTAMP")
@@ -38,6 +40,9 @@ class User(Base):
 
     allergens: Mapped[list["Allergen"]] = relationship(
         secondary="user_allergens", lazy="selectin"
+    )
+    user_allergens: Mapped[list["UserAllergen"]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin"
     )
 
     @property
@@ -66,6 +71,7 @@ class Allergen(Base):
     emoji: Mapped[Optional[str]] = mapped_column(String(8))
     is_diet: Mapped[int] = mapped_column(Integer, default=0)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    category: Mapped[str] = mapped_column(String(30), default="ue")
 
 
 class UserAllergen(Base):
@@ -80,7 +86,12 @@ class UserAllergen(Base):
     source: Mapped[str] = mapped_column(
         Enum("manual", "document_ai", name="user_allergen_source"), default="manual"
     )
+    intensity: Mapped[str] = mapped_column(
+        Enum("lieve", "moderata", "grave", name="user_allergen_intensity"), default="moderata"
+    )
     confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    allergen: Mapped["Allergen"] = relationship(lazy="joined")
 
 
 class Restaurant(Base):
@@ -387,3 +398,31 @@ class Invoice(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=text("CURRENT_TIMESTAMP")
     )
+
+
+class VisibilityBoost(Base):
+    """Boost visibilità acquistato on-demand dal ristoratore (pagamento unico).
+
+    Ogni acquisto crea un record separato; il backend considera il locale
+    "in boost" se esiste almeno un record con expires_at > now() e
+    stripe_payment_intent_id non nullo (= pagato con successo).
+    """
+    __tablename__ = "visibility_boosts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        ForeignKey("restaurants.id", ondelete="CASCADE")
+    )
+    stripe_payment_intent_id: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, unique=True
+    )
+    amount_cents: Mapped[int] = mapped_column(Integer, default=990)
+    duration_days: Mapped[int] = mapped_column(Integer, default=30)
+    # Impostato quando il PaymentIntent è confermato via webhook
+    activated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    restaurant: Mapped["Restaurant"] = relationship(lazy="joined")

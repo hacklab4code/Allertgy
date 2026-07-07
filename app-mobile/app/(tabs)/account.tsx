@@ -7,15 +7,18 @@ import {
 import { api, API } from '../../src/api/client';
 import { useSession } from '../../src/store/session';
 import type { Allergen } from '../../src/types';
+import { getFlagEmoji, getLanguageLabel } from '../../src/constants/languages';
 import { TRANSLATED_ALLERGENS, t } from '../../src/engine/translations';
 
 export default function Account() {
-  const { email, allergie, setAllergie, logout, setEmergencyMedicines, language, setLanguage, ingredientiEsclusi, setIngredientiEsclusi } = useSession();
+  const { email, allergie, setAllergie, logout, setEmergencyMedicines, language, ingredientiEsclusi, setIngredientiEsclusi, emergencyContactName, emergencyContactPhone, setEmergencyContact } = useSession();
   const [all, setAll] = useState<Allergen[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [emergencyDraft, setEmergencyDraft] = useState('');
+  const [contactNameDraft, setContactNameDraft] = useState('');
+  const [contactPhoneDraft, setContactPhoneDraft] = useState('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   const mie = all.filter((a) => allergie.includes(a.code));
@@ -26,6 +29,9 @@ export default function Account() {
       setProfile(p);
       setEmergencyMedicines(p.emergency_medicines);
       setEmergencyDraft(p.emergency_medicines ?? '');
+      setEmergencyContact(p.emergency_contact_name ?? null, p.emergency_contact_phone ?? null);
+      setContactNameDraft(p.emergency_contact_name ?? '');
+      setContactPhoneDraft(p.emergency_contact_phone ?? '');
       const docs = await api.getDocuments();
       setDocuments(docs);
       const photo = await api.getProfilePhoto().catch(() => null);
@@ -62,12 +68,12 @@ export default function Account() {
 
   const confirmLogout = () =>
     Alert.alert(
-      language === 'it' ? 'Esci dall\'account' : 'Logout',
-      language === 'it' ? 'Vuoi davvero uscire?' : 'Are you sure you want to logout?',
+      t('logout_title', language),
+      t('logout_confirm', language),
       [
-        { text: language === 'it' ? 'Annulla' : 'Cancel', style: 'cancel' },
+        { text: t('cancel', language), style: 'cancel' },
         {
-          text: language === 'it' ? 'Esci' : 'Logout', style: 'destructive',
+          text: t('logout_btn', language), style: 'destructive',
           onPress: () => { logout(); router.replace('/welcome'); },
         },
       ]
@@ -77,22 +83,43 @@ export default function Account() {
     setLoading(true);
     try {
       const value = emergencyDraft.trim() || null;
-      await api.updateAppleHealth(0, value);
+      await api.updateAppleHealth(profile?.apple_health_connected ?? 0, value, emergencyContactName, emergencyContactPhone);
       setEmergencyMedicines(value);
       await loadProfileData();
       Alert.alert(
-        language === 'it' ? 'Salvato' : 'Saved',
-        language === 'it'
-          ? 'Le informazioni di emergenza sono state aggiornate.'
-          : 'Emergency information has been updated.'
+        t('saved', language),
+        t('emergency_saved', language)
       );
     } catch (e) {
-      Alert.alert(language === 'it' ? 'Errore' : 'Error', (e as Error).message);
+      Alert.alert(t('error', language), (e as Error).message);
     }
     setLoading(false);
   };
 
-  const isIt = language === 'it';
+  const saveEmergencyContact = async () => {
+    setLoading(true);
+    try {
+      const name = contactNameDraft.trim() || null;
+      const phone = contactPhoneDraft.trim() || null;
+      await api.updateAppleHealth(
+        profile?.apple_health_connected ?? 0,
+        emergencyDraft.trim() || null,
+        name,
+        phone
+      );
+      setEmergencyContact(name, phone);
+      await loadProfileData();
+      Alert.alert(
+        t('saved', language),
+        t('contact_saved', language)
+      );
+    } catch (e) {
+      Alert.alert(t('error', language), (e as Error).message);
+    }
+    setLoading(false);
+  };
+
+  const isIt = language === 'it';  // kept for legacy UI strings still using it/en pattern
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -114,7 +141,7 @@ export default function Account() {
       {loading && <ActivityIndicator color="#059669" style={{ marginBottom: 12 }} />}
 
       {/* Sezione 1: Salute & Profilo */}
-      <Text style={styles.sectionLabel}>{isIt ? 'SALUTE E PROFILO' : 'HEALTH & PROFILE'}</Text>
+      <Text style={styles.sectionLabel}>{t('health_profile_label', language) || (isIt ? 'SALUTE E PROFILO' : 'HEALTH & PROFILE')}</Text>
       <View style={styles.card}>
         {/* Allergies Row */}
         <TouchableOpacity style={styles.item} onPress={() => router.push('/allergie')}>
@@ -167,34 +194,50 @@ export default function Account() {
 
         <View style={styles.separator} />
 
-        {/* Lingua / Language Switch Row */}
-        <View style={[styles.item, { paddingVertical: 10 }]}>
-          <Text style={styles.itemIcon}>🌐</Text>
+        {/* Contatto di emergenza Row */}
+        <View style={[styles.item, { alignItems: 'flex-start' }]}>
+          <Text style={styles.itemIcon}>📞</Text>
           <View style={{ flex: 1 }}>
-            <Text style={styles.itemTitle}>{isIt ? 'Lingua dell\'app' : 'App Language'}</Text>
-            <Text style={styles.itemSub}>{isIt ? 'Seleziona italiano o inglese' : 'Select Italian or English'}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            <TouchableOpacity 
-              onPress={() => setLanguage('it')}
-              style={[
-                styles.langBtn, 
-                language === 'it' && styles.langBtnActive
-              ]}
-            >
-              <Text style={[styles.langBtnText, language === 'it' && styles.langBtnTextActive]}>IT</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={() => setLanguage('en')}
-              style={[
-                styles.langBtn, 
-                language === 'en' && styles.langBtnActive
-              ]}
-            >
-              <Text style={[styles.langBtnText, language === 'en' && styles.langBtnTextActive]}>EN</Text>
+            <Text style={styles.itemTitle}>{isIt ? 'Contatto di emergenza' : 'Emergency contact'}</Text>
+            <Text style={styles.itemSub}>
+              {isIt
+                ? 'Imposta un nome e numero telefonico da contattare in caso di emergenza.'
+                : 'Set a name and phone number to contact in case of emergency.'}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+              <TextInput
+                style={[styles.textInput, { flex: 1, height: 44, paddingVertical: 8 }]}
+                value={contactNameDraft}
+                onChangeText={setContactNameDraft}
+                placeholder={isIt ? 'Nome (es. Luca)' : 'Name (e.g. Luca)'}
+              />
+              <TextInput
+                style={[styles.textInput, { flex: 1, height: 44, paddingVertical: 8 }]}
+                value={contactPhoneDraft}
+                onChangeText={setContactPhoneDraft}
+                placeholder={isIt ? 'Tel (es. +39...)' : 'Phone (e.g. +39...)'}
+                keyboardType="phone-pad"
+              />
+            </View>
+            <TouchableOpacity style={styles.smallButton} onPress={saveEmergencyContact} disabled={loading}>
+              <Text style={styles.smallButtonText}>{isIt ? 'Salva contatto' : 'Save contact'}</Text>
             </TouchableOpacity>
           </View>
         </View>
+
+        <View style={styles.separator} />
+
+        {/* Lingua / Language */}
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/language')}>
+          <Text style={styles.itemIcon}>🌐</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.itemTitle}>{isIt ? 'Lingua dell\'app' : 'App Language'}</Text>
+            <Text style={styles.itemSub}>
+              {getFlagEmoji(language)} {getLanguageLabel(language)} · {(language || 'it').toUpperCase()}
+            </Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Sezione 1.5: Ingredienti da Evitare */}
@@ -238,6 +281,51 @@ export default function Account() {
       {/* Sezione 3: Assistenza e Info */}
       <Text style={styles.sectionLabel}>{isIt ? 'INFO E SUPPORTO' : 'INFO & SUPPORT'}</Text>
       <View style={styles.card}>
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/legal-docs?tab=terms')}>
+          <Text style={styles.itemIcon}>📜</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.itemTitle}>{isIt ? 'Termini e condizioni' : 'Terms and conditions'}</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.separator} />
+        
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/legal-docs?tab=privacy')}>
+          <Text style={styles.itemIcon}>🛡️</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.itemTitle}>{isIt ? 'Privacy e dati sulla salute' : 'Privacy and health data'}</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.separator} />
+
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/legal-docs?tab=safety')}>
+          <Text style={styles.itemIcon}>⚠️</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.itemTitle}>{isIt ? 'Sicurezza e Limitazioni di Responsabilità' : 'Safety and Disclaimer'}</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.separator} />
+
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/legal-docs?tab=cookies')}>
+          <Text style={styles.itemIcon}>🍪</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.itemTitle}>{isIt ? 'Informativa Cookie' : 'Cookie Policy'}</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.separator} />
+
+        <TouchableOpacity style={styles.item} onPress={() => Alert.alert(isIt ? 'Semaforo AllerTgy' : 'AllerTgy Traffic Light', isIt ? '🟢 Verde: Nessun allergene del tuo profilo dichiarato.\n\n🟡 Giallo: Possibili tracce, chiedi conferma al personale.\n\n🔴 Rosso: Contiene allergeni del tuo profilo.' : '🟢 Green: No allergen from your profile declared.\n\n🟡 Yellow: Possible traces, ask staff for confirmation.\n\n🔴 Red: Contains allergens from your profile.')}>
+          <Text style={styles.itemIcon}>🚦</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.itemTitle}>{isIt ? 'Come funziona il semaforo' : 'How the traffic light works'}</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.separator} />
+
         <TouchableOpacity style={styles.item}
           onPress={() => Linking.openURL('mailto:supporto@allertgy.it?subject=Assistenza%20AllerTgy')}>
           <Text style={styles.itemIcon}>✉️</Text>
@@ -248,15 +336,7 @@ export default function Account() {
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
         <View style={styles.separator} />
-        <TouchableOpacity style={styles.item} onPress={() => router.push('/legal-docs')}>
-          <Text style={styles.itemIcon}>📜</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.itemTitle}>{isIt ? 'Termini, privacy e sicurezza' : 'Terms, privacy & safety'}</Text>
-            <Text style={styles.itemSub}>{isIt ? 'Testi legali completi e versioni' : 'Full legal texts and versions'}</Text>
-          </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-        <View style={styles.separator} />
+
         <View style={styles.item}>
           <Text style={styles.itemIcon}>ℹ️</Text>
           <View style={{ flex: 1 }}>
@@ -264,6 +344,14 @@ export default function Account() {
             <Text style={styles.itemSub}>AllerTgy v0.5 · server: {API}</Text>
           </View>
         </View>
+      </View>
+
+      <View style={styles.disclaimerBox}>
+        <Text style={styles.disclaimerText}>
+          {isIt 
+            ? 'AllerTgy confronta il tuo profilo con i dati dichiarati dal locale. Non sostituisce il parere medico: comunica sempre le tue allergie al personale.'
+            : 'AllerTgy compares your profile with the data declared by the venue. It does not replace medical advice: always communicate your allergies to the staff.'}
+        </Text>
       </View>
 
       <TouchableOpacity style={styles.logout} onPress={confirmLogout}>
@@ -387,4 +475,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   smallButtonText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  disclaimerBox: {
+    backgroundColor: '#EEF5F1',
+    borderWidth: 1,
+    borderColor: '#DDE8E2',
+    borderRadius: 14,
+    padding: 14,
+    marginVertical: 16,
+  },
+  disclaimerText: {
+    fontSize: 12.5,
+    color: '#596B63',
+    lineHeight: 18,
+  },
 });

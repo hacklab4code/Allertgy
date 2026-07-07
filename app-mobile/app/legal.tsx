@@ -1,7 +1,8 @@
-import { router } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { api } from '../src/api/client';
+import { getFlagEmoji } from '../src/constants/languages';
 import { useSession } from '../src/store/session';
 
 export default function LegalScreen() {
@@ -10,7 +11,7 @@ export default function LegalScreen() {
   const [health, setHealth] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const { setLegalStatus } = useSession();
+  const { setLegalStatus, language } = useSession();
 
   const accept = async () => {
     setBusy(true);
@@ -28,7 +29,15 @@ export default function LegalScreen() {
   const ready = terms && privacy && health;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <>
+      <Stack.Screen options={{ 
+        headerRight: () => (
+          <TouchableOpacity onPress={() => router.push('/language')} style={{ marginRight: 4 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F8A6A' }}>{getFlagEmoji(language)} {(language || 'it').toUpperCase()}</Text>
+          </TouchableOpacity>
+        ) 
+      }} />
+      <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.icon}>⚖️</Text>
       <Text style={styles.title}>Termini, privacy e dati salute</Text>
       <Text style={styles.text}>
@@ -48,6 +57,7 @@ export default function LegalScreen() {
         {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Accetta e continua</Text>}
       </TouchableOpacity>
     </ScrollView>
+    </>
   );
 }
 

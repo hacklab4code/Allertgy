@@ -1,12 +1,14 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { Stack, router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { api } from '../src/api/client';
+import { getFlagEmoji } from '../src/constants/languages';
 import { useSession, type Role } from '../src/store/session';
 import { useNotifStore } from '../src/store/notifications';
+import type { Allergen } from '../src/types';
 
 export default function Login() {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
@@ -22,6 +24,44 @@ export default function Login() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const session = useSession();
+
+  const [allAllergens, setAllAllergens] = useState<Allergen[]>([]);
+  const [selectedAllergens, setSelectedAllergens] = useState<Set<string>>(new Set());
+  const [intensities, setIntensities] = useState<Record<string, 'lieve' | 'moderata' | 'grave'>>({});
+
+  useEffect(() => {
+    if (mode === 'register') {
+      api.allergens().then(setAllAllergens).catch(() => {});
+    }
+  }, [mode]);
+
+  const toggleAllergen = (code: string) => {
+    const next = new Set(selectedAllergens);
+    next.has(code) ? next.delete(code) : next.add(code);
+    setSelectedAllergens(next);
+  };
+
+  const updateIntensity = (code: string, level: 'lieve' | 'moderata' | 'grave') => {
+    if (!selectedAllergens.has(code)) {
+      const next = new Set(selectedAllergens);
+      next.add(code);
+      setSelectedAllergens(next);
+    }
+    setIntensities((prev) => ({ ...prev, [code]: level }));
+  };
+
+  const onLongPressAllergen = (code: string, name: string) => {
+    Alert.alert(
+      `Intensità: ${name}`,
+      `Imposta quanto è grave questa allergia:`,
+      [
+        { text: 'Lieve', onPress: () => updateIntensity(code, 'lieve') },
+        { text: 'Moderata', onPress: () => updateIntensity(code, 'moderata') },
+        { text: 'Grave/Anafilassi', onPress: () => updateIntensity(code, 'grave'), style: 'destructive' },
+        { text: 'Annulla', style: 'cancel' },
+      ]
+    );
+  };
 
   const legalOk = mode !== 'register' || (
     acceptTerms &&
@@ -58,14 +98,32 @@ export default function Login() {
       session.setEmail(email.trim());
       session.setRole(res.role === 'owner' ? 'owner' : 'customer');
       if (res.role !== 'owner') {
-        const profile = await api.getProfile();
-        session.setLegalStatus(profile.legal_consents_ok, !!profile.health_data_consent_at);
-        session.setProfileCompleted(profile.onboarding_completed);
-        session.setDisclaimer(profile.disclaimer_accepted);
-        session.setEmergencyMedicines(profile.emergency_medicines);
-        // recupera il profilo salvato sul server
-        const mine = mode === 'login' ? await api.myAllergens().catch(() => []) : [];
-        session.setAllergie(mine.map((a) => a.code));
+        if (mode === 'register') {
+          const codes = [...selectedAllergens];
+          await api.saveAllergens(codes, intensities).catch(e => {
+            console.log("Errore salvataggio allergeni in registrazione:", e);
+          });
+          session.setAllergie(codes, intensities);
+          session.setLegalStatus(true, true);
+          session.setProfileCompleted(true);
+          session.setDisclaimer(false);
+          session.setEmergencyMedicines(null);
+        } else {
+          const profile = await api.getProfile();
+          session.setLegalStatus(profile.legal_consents_ok, !!profile.health_data_consent_at);
+          session.setProfileCompleted(profile.onboarding_completed);
+          session.setDisclaimer(profile.disclaimer_accepted);
+          session.setEmergencyMedicines(profile.emergency_medicines);
+          session.setEmergencyContact(profile.emergency_contact_name ?? null, profile.emergency_contact_phone ?? null);
+          const mine = await api.myAllergens().catch(() => []);
+          const intensitiesMap: Record<string, 'lieve' | 'moderata' | 'grave'> = {};
+          mine.forEach((a) => {
+            if (a.intensity) {
+              intensitiesMap[a.code] = a.intensity as 'lieve' | 'moderata' | 'grave';
+            }
+          });
+          session.setAllergie(mine.map((a) => a.code), intensitiesMap);
+        }
         useNotifStore.getState().refresh();
       } else {
         session.setLegalStatus(true, false);
@@ -82,6 +140,13 @@ export default function Login() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.screen}
     >
+      <Stack.Screen options={{ 
+        headerRight: () => (
+          <TouchableOpacity onPress={() => router.push('/language')} style={{ marginRight: 4 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F8A6A' }}>{getFlagEmoji(session.language)} {(session.language || 'it').toUpperCase()}</Text>
+          </TouchableOpacity>
+        ) 
+      }} />
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.logo}>AllerTgy</Text>
         <View style={styles.heading}>
@@ -159,6 +224,65 @@ export default function Login() {
               📧 Se l'indirizzo esiste, riceverai un'email con il link per reimpostare la password.
               Il link scade tra 30 minuti.
             </Text>
+          </View>
+        )}
+
+        {mode === 'register' && role === 'customer' && allAllergens.length > 0 && (
+          <View style={styles.allergenSection}>
+            <Text style={styles.allergenSectionTitle}>Seleziona le tue allergie e intolleranze</Text>
+            <Text style={styles.allergenSectionSubtitle}>
+              Tocca per selezionare, tieni premuto per impostare la gravità (Lieve/Mod./Grave).
+            </Text>
+            
+            <Text style={styles.allergenSubsectionTitle}>Allergeni principali</Text>
+            <View style={styles.allergenGrid}>
+              {allAllergens.filter(a => !a.is_diet).map((a) => {
+                const on = selectedAllergens.has(a.code);
+                return (
+                  <TouchableOpacity
+                    key={a.code}
+                    style={[styles.allergenChip, on && styles.chipOnAllergy]}
+                    onPress={() => toggleAllergen(a.code)}
+                    onLongPress={() => onLongPressAllergen(a.code, a.name_it)}
+                    delayLongPress={300}
+                  >
+                    <Text style={[styles.allergenChipText, on && styles.chipTextOnAllergy]}>
+                      {a.emoji} {a.name_it}
+                      {on && intensities[a.code] === 'lieve' && ' (Lieve)'}
+                      {on && (!intensities[a.code] || intensities[a.code] === 'moderata') && ' (Mod.)'}
+                      {on && intensities[a.code] === 'grave' && ' (Grave)'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {allAllergens.some(a => a.is_diet) && (
+              <>
+                <Text style={styles.allergenSubsectionTitle}>Preferenze alimentari</Text>
+                <View style={styles.allergenGrid}>
+                  {allAllergens.filter(a => a.is_diet).map((a) => {
+                    const on = selectedAllergens.has(a.code);
+                    return (
+                      <TouchableOpacity
+                        key={a.code}
+                        style={[styles.allergenChip, on && styles.chipOnDiet]}
+                        onPress={() => toggleAllergen(a.code)}
+                        onLongPress={() => onLongPressAllergen(a.code, a.name_it)}
+                        delayLongPress={300}
+                      >
+                        <Text style={[styles.allergenChipText, on && styles.chipTextOnDiet]}>
+                          {a.emoji} {a.name_it}
+                          {on && intensities[a.code] === 'lieve' && ' (Lieve)'}
+                          {on && (!intensities[a.code] || intensities[a.code] === 'moderata') && ' (Mod.)'}
+                          {on && intensities[a.code] === 'grave' && ' (Grave)'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
           </View>
         )}
 
@@ -276,4 +400,18 @@ const styles = StyleSheet.create({
   checkboxOn: { backgroundColor: '#0F8A6A', borderColor: '#0F8A6A' },
   checkboxMark: { color: '#fff', fontWeight: '900', fontSize: 14 },
   checkText: { flex: 1, color: '#596B63', fontSize: 12.5, lineHeight: 18, fontWeight: '600' },
+  allergenSection: { gap: 10, marginTop: 12, marginBottom: 16 },
+  allergenSectionTitle: { fontSize: 16, fontWeight: '800', color: '#10201B' },
+  allergenSectionSubtitle: { fontSize: 12.5, color: '#596B63', lineHeight: 18, marginBottom: 6 },
+  allergenSubsectionTitle: { fontSize: 13, fontWeight: '700', color: '#0B5D4D', marginTop: 10, marginBottom: 6 },
+  allergenGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  allergenChip: {
+    borderWidth: 1.5, borderColor: '#DDE8E2', backgroundColor: '#ffffff',
+    borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12,
+  },
+  chipOnAllergy: { borderColor: '#fca5a5', backgroundColor: '#fff5f5' },
+  chipTextOnAllergy: { color: '#e11d48', fontWeight: '800' },
+  chipOnDiet: { borderColor: '#86efac', backgroundColor: '#f0fdf4' },
+  chipTextOnDiet: { color: '#16a34a', fontWeight: '800' },
+  allergenChipText: { color: '#596B63', fontSize: 12.5, fontWeight: '600' },
 });

@@ -20,7 +20,7 @@ allerTgy/
 - Foto profilo e galleria locale su **storage privato** (R2 o fallback locale) con URL firmati a scadenza — mai su `/static`
 - Pagina pubblica ristorante `/r/{slug}` con SEO, orari, galleria, rating e anteprima menù (gating piano Pro)
 - Documenti medici con **consenso AI per-documento**, estrazione allergeni Gemini, **conferma manuale obbligatoria**, limite 5 analisi/mese, log accessi, cancellazione reale (GDPR)
-- Recensioni (una per utente/locale), risposta del ristoratore (piano Verificato+), moderazione da admin interno
+- Recensioni (una per utente/locale), risposta del ristoratore (piano Pro+), moderazione da admin interno
 - Abbonamenti **Stripe** end-to-end (Checkout, Customer Portal, webhook, fatture) — attivi con le chiavi in `.env`
 - Notifiche push Expo (menù aggiornato dei preferiti, risposte alle recensioni) ed email transazionali (Resend)
 - Testi legali completi serviti da `GET /legal/{doc}` e pubblicati su web e app
@@ -77,11 +77,11 @@ Il modello è **clienti gratis** e **commercianti a pagamento**:
 | Piano | Prezzo | Include |
 |---|---:|---|
 | Gratis | €0 | scheda locale base sulla mappa |
-| Verificato | €9,90/mese | badge verificato e dati aggiornati |
-| Pro | €19,90/mese | menù digitale, allergeni per piatto, QR code, registro allergeni |
+| Verificato | €9,00/mese | mostra locale e prodotti (menù) e badge verificato |
+| Pro | €19,90/mese | risposta recensioni, QR code, registro allergeni e più foto |
 | Premium | €39,90/mese | priorità, supporto e strumenti avanzati |
 
-Il menù digitale con allergeni per piatto è protetto lato API: serve piano `pro`
+Il menù digitale con allergeni per piatto è protetto lato API: serve piano `verified`, `pro`
 o `premium` con stato `trialing`, `active` o `comped`.
 
 ### Dashboard interna admin

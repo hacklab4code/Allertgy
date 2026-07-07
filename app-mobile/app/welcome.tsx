@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getFlagEmoji } from '../src/constants/languages';
+import { useSession } from '../src/store/session';
 
 const SLIDES = [
   {
@@ -22,6 +24,8 @@ const SLIDES = [
 
 export default function Welcome() {
   const [slide, setSlide] = useState(0);
+  const { language } = useSession();
+  const currentLang = (language || 'it').toUpperCase();
 
   const next = () => {
     if (slide < SLIDES.length - 1) {
@@ -39,6 +43,12 @@ export default function Welcome() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity 
+        style={styles.langButtonTopRight} 
+        onPress={() => router.push('/language')}
+      >
+        <Text style={styles.langButtonTopRightText}>{getFlagEmoji(language)} {currentLang}</Text>
+      </TouchableOpacity>
       <ScrollView contentContainerStyle={styles.scroll} bounces={false}>
         <Text style={styles.logo}>AllerTgy</Text>
         <View style={styles.center}>
@@ -76,6 +86,23 @@ export default function Welcome() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7FAF8' },
+  langButtonTopRight: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    right: 24,
+    zIndex: 10,
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#DDE8E2',
+  },
+  langButtonTopRightText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F8A6A'
+  },
   scroll: { 
     flexGrow: 1, 
     paddingHorizontal: 24,

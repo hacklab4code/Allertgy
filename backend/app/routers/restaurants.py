@@ -18,7 +18,7 @@ from ..services import storage
 
 router = APIRouter(prefix="/restaurants", tags=["restaurants"])
 
-MENU_PLANS = {"pro", "premium"}
+MENU_PLANS = {"verified", "pro", "premium"}
 MENU_ACCESS_STATUSES = {"trialing", "active", "comped"}
 
 
