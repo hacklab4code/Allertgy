@@ -1,17 +1,132 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import * as Location from 'expo-location';
+import { api } from '../../src/api/client';
+import { calcolaCompatibilita } from '../../src/engine/compatibility';
+import RestaurantCard from '../../src/components/RestaurantCard';
 import { useSession } from '../../src/store/session';
 import { colors, radius, shadow, spacing, typography } from '../../src/theme';
+import type { Menu } from '../../src/types';
+import LanguageFlagsRow from '../../src/components/LanguageFlagsRow';
+import { useTranslation } from '../../src/constants/translations';
+import { avviaGeofencing } from '../../src/services/geofencing';
 
-/** Scheda Cerca: punto d'ingresso del cliente — scanner QR o codice locale. */
+/**
+ * Home del cliente. Tre sezioni prioritarie:
+ * 1. QR / codice locale (azione principale)
+ * 2. Stato profilo (allergie o alert)
+ * 3. Locali vicini + ultimo visitato (compresso)
+ */
 export default function Home() {
   const [code, setCode] = useState('');
-  const { allergie, recents, email } = useSession();
+  const {
+    allergie: primaryAllergies,
+    recents,
+    email,
+    toggleFavorite,
+    isFavorite,
+    token,
+    ingredientiEsclusi,
+    language,
+    subProfiles,
+    setSubProfiles,
+    activeProfileId,
+    setActiveProfileId,
+  } = useSession();
+
+  const activeProfile = useMemo(() => {
+    if (!activeProfileId) return null;
+    return subProfiles.find(p => p.id === activeProfileId) || null;
+  }, [activeProfileId, subProfiles]);
+
+  const allergie = useMemo(() => {
+    if (activeProfile) return activeProfile.allergens.map(a => a.code);
+    return primaryAllergies;
+  }, [activeProfile, primaryAllergies]);
+
+  const { t } = useTranslation();
+  const isIt = (language || 'it').toLowerCase() === 'it';
   const hasAllergie = allergie.length > 0;
-  const firstName = (email ?? '').split('@')[0] || 'benvenuto';
+  const firstName = activeProfile ? activeProfile.name : ((email ?? '').split('@')[0] || 'benvenuto');
+
+  const [restaurants, setRestaurants] = useState<Menu[]>([]);
+  const [loadingRestaurants, setLoadingRestaurants] = useState(false);
+  const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'prompt' | 'granted' | 'denied' | 'error'>('prompt');
+
+  const requestLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        setLocationStatus('granted');
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        setUserLocation(loc);
+      } else {
+        setLocationStatus('denied');
+      }
+    } catch (e) {
+      console.log("Errore posizione:", e);
+      setLocationStatus('error');
+    }
+  };
+
+  useEffect(() => {
+    setLoadingRestaurants(true);
+    api.listRestaurants()
+      .then((res) => {
+        setRestaurants(res);
+        avviaGeofencing(res).catch((err) => console.log('Errore geofencing:', err));
+      })
+      .catch((e) => console.log('Errore rete:', e))
+      .finally(() => setLoadingRestaurants(false));
+
+    requestLocation();
+
+    if (token) {
+      api.getSubProfiles().then(setSubProfiles).catch(() => {});
+    }
+  }, [token]);
+
+  const onToggle = (code: string, name: string) => {
+    const wasFav = isFavorite(code);
+    toggleFavorite(code, name);
+    if (token) {
+      (wasFav ? api.removeFavorite(code) : api.addFavorite(code)).catch(() => {});
+    }
+  };
+
+  const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  const nearbyRestaurants = useMemo(() => {
+    if (!userLocation || restaurants.length === 0) return [];
+    const userLat = userLocation.coords.latitude;
+    const userLon = userLocation.coords.longitude;
+
+    return restaurants
+      .map((r) => {
+        if (r.latitude == null || r.longitude == null) return null;
+        const dist = getDistanceKm(userLat, userLon, r.latitude, r.longitude);
+        const distanceLabel = dist < 1
+          ? `${Math.round(dist * 1000)} m`
+          : `${dist.toFixed(1)} km`;
+        const compatibility = r.piatti.length > 0
+          ? calcolaCompatibilita(allergie, r.piatti, ingredientiEsclusi)
+          : null;
+        return { code: r.public_code, name: r.nome_ristorante, city: r.citta, compatibility, distance: dist, distanceLabel };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 3);
+  }, [restaurants, userLocation, allergie, ingredientiEsclusi]);
 
   const go = (c?: string) => {
     const target = (c ?? code).trim();
@@ -19,164 +134,274 @@ export default function Home() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      {/* Saluto */}
-      <Text style={styles.greeting}>Ciao {firstName} 👋</Text>
-      <Text style={styles.title}>Dove stai mangiando?</Text>
-      <Text style={styles.subtitle}>
-        Inquadra il QR sul tavolo o inserisci il codice: vedrai subito quali piatti sono adatti a te.
-      </Text>
+    <View style={styles.root}>
+      <LanguageFlagsRow />
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        {/* Benvenuto + sottoprofili */}
+        <View style={styles.hero}>
+          <Text style={styles.greeting}>{t('hello_user')} {firstName}</Text>
+          <Text style={styles.headline}>{t('where_eating')}</Text>
 
-      {/* Hero scanner */}
-      <TouchableOpacity style={styles.qr} onPress={() => router.push('/scanner')} activeOpacity={0.9}>
-        <View style={styles.qrIconWrap}>
-          <Text style={styles.qrEmoji}>📷</Text>
+          {token && subProfiles.length > 0 && (
+            <View style={styles.profileRow}>
+              {[{ id: null, name: isIt ? 'Io' : 'Me' }, ...subProfiles].map((p) => {
+                const isActive = (activeProfileId === null && p.id === null) || activeProfileId === p.id;
+                return (
+                  <TouchableOpacity
+                    key={p.id ?? '__self'}
+                    style={[styles.profileChip, isActive && styles.profileChipActive]}
+                    onPress={() => setActiveProfileId(p.id)}
+                  >
+                    <Text style={[styles.profileChipText, isActive && styles.profileChipTextActive]}>
+                      {p.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity style={styles.profileChipAdd} onPress={() => router.push('/sub-profiles')}>
+                <Text style={styles.profileChipAddText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.qrText}>Scansiona QR Code</Text>
-          <Text style={styles.qrSub}>Il modo più veloce al tavolo</Text>
-        </View>
-        <Text style={styles.qrArrow}>›</Text>
-      </TouchableOpacity>
 
-      <View style={styles.divider}>
-        <View style={styles.line} /><Text style={styles.or}>oppure</Text><View style={styles.line} />
-      </View>
-
-      {/* Inserimento codice con azione inline */}
-      <View style={styles.codeRow}>
-        <TextInput
-          style={styles.input}
-          placeholder="Codice (es. 100001)"
-          placeholderTextColor={colors.textMuted}
-          keyboardType="number-pad"
-          value={code}
-          onChangeText={setCode}
-          maxLength={6}
-          onSubmitEditing={() => go()}
-          returnKeyType="go"
-        />
-        <TouchableOpacity
-          style={[styles.codeGo, code.trim().length < 4 && styles.codeGoOff]}
-          disabled={code.trim().length < 4}
-          onPress={() => go()}
-        >
-          <Text style={styles.codeGoText}>Vai</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Stato profilo: guida l'utente se mancano le allergie */}
-      {hasAllergie ? (
-        <View style={[styles.statusCard, styles.statusOk]}>
-          <Text style={styles.statusEmoji}>🛡️</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.statusTitle}>Profilo attivo</Text>
-            <Text style={styles.statusText}>
-              {allergie.length} {allergie.length === 1 ? 'allergia/preferenza impostata' : 'allergie/preferenze impostate'} — i menù vengono filtrati su di te.
-            </Text>
-          </View>
-          <TouchableOpacity onPress={() => router.push('/allergie')}>
-            <Text style={styles.statusAction}>Modifica</Text>
+        {/* Blocco unico: trova ristorante */}
+        <View style={styles.findCard}>
+          <TouchableOpacity style={styles.scanBtn} onPress={() => router.push('/scanner')} activeOpacity={0.9}>
+            <View style={styles.scanIconWrap}>
+              <Text style={styles.scanIcon}>📷</Text>
+            </View>
+            <View style={styles.scanTextWrap}>
+              <Text style={styles.scanLabel}>{t('scan_qr_btn')}</Text>
+              <Text style={styles.scanSub}>{t('fastest_way')}</Text>
+            </View>
+            <Text style={styles.scanArrow}>›</Text>
           </TouchableOpacity>
-        </View>
-      ) : (
-        <TouchableOpacity style={[styles.statusCard, styles.statusWarn]} onPress={() => router.push('/allergie')} activeOpacity={0.9}>
-          <Text style={styles.statusEmoji}>⚠️</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.statusTitle, { color: colors.amberText }]}>Imposta le tue allergie</Text>
-            <Text style={[styles.statusText, { color: colors.amberText }]}>
-              Senza il profilo il semaforo non può proteggerti. Bastano pochi secondi.
-            </Text>
-          </View>
-          <Text style={[styles.statusAction, { color: colors.amberText }]}>Imposta ›</Text>
-        </TouchableOpacity>
-      )}
 
-      {/* Accesso rapido all'ultimo locale */}
-      {recents.length > 0 && (
-        <View style={styles.recentsBox}>
-          <View style={styles.recentsHead}>
-            <Text style={styles.recentsTitle}>Riprendi da dove eri</Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/locali')}>
-              <Text style={styles.allRecents}>Tutti i locali ›</Text>
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>{t('or_separator')}</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <View style={styles.codeRow}>
+            <TextInput
+              style={styles.codeInput}
+              placeholder={t('code_input_placeholder')}
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
+              value={code}
+              onChangeText={setCode}
+              maxLength={6}
+              onSubmitEditing={() => go()}
+              returnKeyType="go"
+            />
+            <TouchableOpacity
+              style={[styles.codeGo, code.trim().length < 4 && styles.codeGoDisabled]}
+              disabled={code.trim().length < 4}
+              onPress={() => go()}
+            >
+              <Text style={styles.codeGoText}>{t('go_btn')}</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.recent} onPress={() => go(recents[0].code)} activeOpacity={0.85}>
-            <View style={styles.recentAvatar}><Text style={styles.recentAvatarText}>🍽</Text></View>
-            <View style={{ flex: 1 }}>
+        </View>
+
+        {/* Stato profilo allergie */}
+        {hasAllergie ? (
+          <TouchableOpacity style={styles.statusOk} onPress={() => router.push('/allergie')} activeOpacity={0.85}>
+            <Text style={styles.statusDot}>🛡</Text>
+            <Text style={styles.statusOkText}>
+              {allergie.length} {allergie.length === 1 ? t('profile_active_desc_one') : t('profile_active_desc_many')}
+            </Text>
+            <Text style={styles.statusEdit}>{t('edit')}</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.statusWarn} onPress={() => router.push('/allergie')} activeOpacity={0.85}>
+            <Text style={styles.statusDot}>⚠️</Text>
+            <Text style={styles.statusWarnText}>{t('set_allergies_warn_desc')}</Text>
+            <Text style={styles.statusSet}>{t('set_btn')}</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Ultimo visitato */}
+        {recents.length > 0 && (
+          <TouchableOpacity style={styles.recentCard} onPress={() => go(recents[0].code)} activeOpacity={0.85}>
+            <View style={styles.recentIcon}><Text style={styles.recentIconText}>🍽</Text></View>
+            <View style={styles.recentTextWrap}>
+              <Text style={styles.recentLabel}>{isIt ? 'Riprendi' : 'Resume'}</Text>
               <Text style={styles.recentName}>{recents[0].name}</Text>
-              <Text style={styles.recentCode}>Codice #{recents[0].code}</Text>
             </View>
+            <Text style={styles.recentCode}>#{recents[0].code}</Text>
             <Text style={styles.recentArrow}>›</Text>
           </TouchableOpacity>
+        )}
+
+        {/* Locali vicini */}
+        <View style={styles.nearbySection}>
+          <View style={styles.nearbyHead}>
+            <Text style={styles.nearbyTitle}>{t('nearby_restaurants_title')}</Text>
+            {locationStatus === 'granted' && nearbyRestaurants.length > 0 && (
+              <TouchableOpacity onPress={() => router.push('/(tabs)/locali')}>
+                <Text style={styles.nearbyMore}>{isIt ? 'Mappa' : 'Map'}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {loadingRestaurants ? (
+            <ActivityIndicator color={colors.brand} style={{ marginVertical: spacing.lg }} />
+          ) : locationStatus === 'granted' ? (
+            nearbyRestaurants.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyEmoji}>🍽️</Text>
+                <Text style={styles.emptyText}>{t('no_nearby_restaurants_desc')}</Text>
+              </View>
+            ) : (
+              <View style={styles.nearbyList}>
+                {nearbyRestaurants.map((item) => (
+                  <RestaurantCard
+                    key={item.code}
+                    code={item.code}
+                    name={item.name}
+                    city={item.city}
+                    compatibility={item.compatibility}
+                    isFavorite={isFavorite(item.code)}
+                    onToggleFavorite={() => onToggle(item.code, item.name)}
+                    distanceLabel={item.distanceLabel}
+                  />
+                ))}
+              </View>
+            )
+          ) : locationStatus === 'denied' || locationStatus === 'error' ? (
+            <TouchableOpacity style={styles.locationPrompt} onPress={requestLocation} activeOpacity={0.9}>
+              <Text style={styles.locationPromptEmoji}>📍</Text>
+              <Text style={styles.locationPromptText}>{t('location_disabled_desc')}</Text>
+              <Text style={styles.locationPromptAction}>{t('enable_btn')}</Text>
+            </TouchableOpacity>
+          ) : (
+            <ActivityIndicator color={colors.brand} style={{ marginVertical: spacing.lg }} />
+          )}
         </View>
-      )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.xl, paddingTop: spacing.lg, paddingBottom: 48, backgroundColor: colors.bg },
-  greeting: { ...typography.caption, color: colors.brandDark, marginBottom: 2 },
-  title: { ...typography.h1, color: colors.ink },
-  subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.xl },
+  root: { flex: 1, backgroundColor: colors.bg },
+  scroll: { padding: spacing.xl, paddingBottom: 48 },
 
-  qr: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.brand, borderRadius: radius.xl, padding: spacing.xl,
-    ...shadow.raised,
+  /* Hero */
+  hero: { marginBottom: spacing.lg },
+  greeting: { ...typography.caption, color: colors.brandDark, marginBottom: 2 },
+  headline: { ...typography.h1, color: colors.ink, marginBottom: spacing.sm },
+
+  /* Profilo switcher */
+  profileRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
+  profileChip: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
   },
-  qrIconWrap: {
-    width: 52, height: 52, borderRadius: radius.lg,
+  profileChipActive: { borderColor: colors.brand, backgroundColor: colors.brand50 },
+  profileChipText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
+  profileChipTextActive: { color: colors.brandDark },
+  profileChipAdd: {
+    width: 28, height: 28, borderRadius: radius.pill, backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  profileChipAddText: { fontSize: 16, fontWeight: '700', color: colors.textMuted, lineHeight: 18 },
+
+  /* Carta unica find */
+  findCard: {
+    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg,
+    borderWidth: 1, borderColor: colors.border, ...shadow.card,
+  },
+  scanBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: colors.brand, borderRadius: radius.md, padding: spacing.lg,
+  },
+  scanIconWrap: {
+    width: 44, height: 44, borderRadius: radius.md,
     backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center',
   },
-  qrEmoji: { fontSize: 28 },
-  qrText: { color: colors.white, fontWeight: '800', fontSize: 18 },
-  qrSub: { color: colors.brand100, fontSize: 12.5, marginTop: 2, fontWeight: '600' },
-  qrArrow: { color: colors.white, fontSize: 30, fontWeight: '300', opacity: 0.8 },
+  scanIcon: { fontSize: 22 },
+  scanLabel: { color: colors.white, fontWeight: '800', fontSize: 16 },
+  scanSub: { color: colors.brand100, fontSize: 11, marginTop: 1, fontWeight: '600' },
+  scanTextWrap: { flex: 1 },
+  scanArrow: { color: colors.white, fontSize: 26, fontWeight: '300', opacity: 0.8 },
 
-  divider: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: spacing.lg },
-  line: { flex: 1, height: 1, backgroundColor: colors.border },
-  or: { ...typography.caption, color: colors.textMuted },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.md },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerText: { ...typography.caption, color: colors.textMuted },
 
   codeRow: { flexDirection: 'row', gap: spacing.sm },
-  input: {
-    flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.md, paddingHorizontal: spacing.lg, height: 56, fontSize: 18,
+  codeInput: {
+    flex: 1, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.md, paddingHorizontal: spacing.lg, height: 48, fontSize: 17,
     letterSpacing: 3, color: colors.ink, fontWeight: '700',
   },
   codeGo: {
-    width: 72, height: 56, borderRadius: radius.md, backgroundColor: colors.brandDark,
+    width: 64, height: 48, borderRadius: radius.md, backgroundColor: colors.brandDark,
     alignItems: 'center', justifyContent: 'center',
   },
-  codeGoOff: { backgroundColor: colors.borderStrong },
-  codeGoText: { color: colors.white, fontWeight: '800', fontSize: 15 },
+  codeGoDisabled: { backgroundColor: colors.borderStrong },
+  codeGoText: { color: colors.white, fontWeight: '800', fontSize: 14 },
 
-  statusCard: {
+  /* Stato allergie */
+  statusOk: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    backgroundColor: colors.greenBg, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md,
+    borderWidth: 1, borderColor: colors.greenBorder,
+  },
+  statusWarn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    backgroundColor: colors.amberBg, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md,
+    borderWidth: 1, borderColor: colors.amberBorder,
+  },
+  statusDot: { fontSize: 18 },
+  statusOkText: { flex: 1, color: colors.greenText, fontSize: 13, fontWeight: '600' },
+  statusWarnText: { flex: 1, color: colors.amberText, fontSize: 13, fontWeight: '600' },
+  statusEdit: { color: colors.brandDark, fontWeight: '800', fontSize: 12 },
+  statusSet: { color: colors.amberText, fontWeight: '800', fontSize: 12 },
+
+  /* Recent */
+  recentCard: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.xl, borderWidth: 1,
+    backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md,
+    borderWidth: 1, borderColor: colors.border, marginTop: spacing.sm,
   },
-  statusOk: { backgroundColor: colors.greenBg, borderColor: colors.greenBorder },
-  statusWarn: { backgroundColor: colors.amberBg, borderColor: colors.amberBorder },
-  statusEmoji: { fontSize: 24 },
-  statusTitle: { fontWeight: '800', color: colors.greenText, fontSize: 14 },
-  statusText: { color: colors.greenText, fontSize: 12.5, marginTop: 2, lineHeight: 17 },
-  statusAction: { fontWeight: '800', color: colors.brandDark, fontSize: 13 },
-
-  recentsBox: {
-    marginTop: spacing.xxl, backgroundColor: colors.surface, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border, padding: spacing.lg, ...shadow.card,
-  },
-  recentsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
-  recentsTitle: { ...typography.h3, color: colors.ink },
-  allRecents: { color: colors.brandDark, fontWeight: '700', fontSize: 13 },
-  recent: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  recentAvatar: {
-    width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.brand50,
+  recentIcon: {
+    width: 38, height: 38, borderRadius: radius.sm, backgroundColor: colors.brand50,
     alignItems: 'center', justifyContent: 'center',
   },
-  recentAvatarText: { fontSize: 20 },
-  recentName: { color: colors.ink, fontWeight: '700', fontSize: 15 },
-  recentCode: { color: colors.textMuted, fontSize: 12.5, marginTop: 1 },
-  recentArrow: { color: colors.textMuted, fontSize: 26, fontWeight: '300' },
+  recentIconText: { fontSize: 18 },
+  recentTextWrap: { flex: 1 },
+  recentLabel: { ...typography.label, color: colors.textMuted },
+  recentName: { color: colors.ink, fontWeight: '700', fontSize: 14, marginTop: 1 },
+  recentCode: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
+  recentArrow: { color: colors.textMuted, fontSize: 22, fontWeight: '300' },
+
+  /* Locali vicini */
+  nearbySection: { marginTop: spacing.xl },
+  nearbyHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  nearbyTitle: { ...typography.h2, color: colors.ink },
+  nearbyMore: { color: colors.brandDark, fontWeight: '700', fontSize: 13 },
+  nearbyList: { gap: spacing.xs },
+
+  emptyBox: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  emptyEmoji: { fontSize: 22 },
+  emptyText: { flex: 1, color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
+
+  locationPrompt: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  locationPromptEmoji: { fontSize: 22 },
+  locationPromptText: { flex: 1, color: colors.textSecondary, fontSize: 13 },
+  locationPromptAction: { color: colors.brandDark, fontWeight: '800', fontSize: 13 },
 });

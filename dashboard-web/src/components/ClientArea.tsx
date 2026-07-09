@@ -175,7 +175,7 @@ export default function ClientArea({ onBack, onLogout }: { onBack: () => void; o
   const saveEmergencyNotes = async () => {
     setBusy(true);
     try {
-      await api.updateAppleHealth(0, emergencyDraft.trim() || null);
+      await api.updateAppleHealth(0, emergencyDraft.trim() || null, null, null);
       await fetchProfileAndDocs();
     } catch (err) {
       console.error(err);

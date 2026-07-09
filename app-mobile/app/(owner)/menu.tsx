@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput,
+  ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { api } from '../../src/api/client';
 import { useOwner } from '../../src/store/owner';
 import type { Allergen, PiattoIn } from '../../src/types';
@@ -18,6 +19,11 @@ export default function MenuEditor() {
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [legalAck, setLegalAck] = useState(false);
+  
+  // Stati per scansione AI e URL
+  const [showUrlModal, setShowUrlModal] = useState(false);
+  const [menuUrlInput, setMenuUrlInput] = useState('');
+  const [loadingStep, setLoadingStep] = useState<string | null>(null);
 
   useEffect(() => {
     api.allergens().then(setAllergens).catch((e) => setError(e.message));
@@ -51,16 +57,16 @@ export default function MenuEditor() {
   const status = current.subscription_status ?? 'free';
   const plan = current.business_plan ?? 'free';
   const hasMenuAccess = status === 'comped'
-    || ((plan === 'pro' || plan === 'premium') && (status === 'trialing' || status === 'active'));
+    || ((plan === 'base' || plan === 'pro_notify') && (status === 'trialing' || status === 'active'));
 
   if (!hasMenuAccess) {
     return (
       <ScrollView contentContainerStyle={styles.lockWrap}>
         <View style={styles.lockCard}>
           <Text style={styles.lockEmoji}>🔒</Text>
-          <Text style={styles.lockTitle}>Il menù digitale è nel piano Pro</Text>
+          <Text style={styles.lockTitle}>Il menù digitale è a partire dal piano Base</Text>
           <Text style={styles.lockText}>
-            Con il piano Pro crei il menù con allergeni e tracce per ogni piatto, generi il QR per i
+            Con il piano Base crei il menù con allergeni e tracce per ogni piatto, generi il QR per i
             tavoli e stampi il registro allergeni. Provalo <Text style={{ fontWeight: '800' }}>14 giorni gratis</Text>,
             senza carta.
           </Text>
@@ -102,6 +108,112 @@ export default function MenuEditor() {
       { text: 'Elimina', style: 'destructive', onPress: () => setPiatti(piatti.filter((_, j) => j !== i)) },
     ]);
 
+  const pickImageAndAnalyze = async () => {
+    Alert.alert(
+      'Carica Foto Menù (AI)',
+      'Seleziona una foto nitida del menù cartaceo. L\'AI leggerà i piatti e riconoscerà gli allergeni.',
+      [
+        { text: 'Annulla', style: 'cancel' },
+        { text: 'Scatta Foto con Fotocamera', onPress: handleLaunchCamera },
+        { text: 'Scegli da Galleria Immagini', onPress: handleLaunchLibrary },
+      ]
+    );
+  };
+
+  const handleLaunchCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permesso negato', 'Abilita l\'accesso alla fotocamera nelle impostazioni del dispositivo.');
+      return;
+    }
+    const res = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!res.canceled && res.assets && res.assets.length > 0) {
+      uploadPhoto(res.assets[0].uri);
+    }
+  };
+
+  const handleLaunchLibrary = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permesso negato', 'Consenti l\'accesso alla galleria fotografica per caricare un\'immagine.');
+      return;
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!res.canceled && res.assets && res.assets.length > 0) {
+      uploadPhoto(res.assets[0].uri);
+    }
+  };
+
+  const uploadPhoto = async (uri: string) => {
+    setError('');
+    setLoadingStep('Preparazione dell\'immagine...');
+    try {
+      // Step visuali progressivi
+      setTimeout(() => setLoadingStep('Caricamento foto sul server...'), 800);
+      setTimeout(() => setLoadingStep('Analisi e lettura OCR...'), 1800);
+      setTimeout(() => setLoadingStep('Identificazione piatti e allergeni con AI...'), 2800);
+
+      const filename = uri.split('/').pop() || 'menu.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri,
+        name: filename,
+        type,
+      } as any);
+
+      const res = await api.analyze(formData);
+      if (res.piatti && res.piatti.length > 0) {
+        setPiatti(res.piatti);
+        if (res.note) {
+          Alert.alert('Analisi completata', res.note);
+        }
+      } else {
+        Alert.alert('Nessun piatto rilevato', 'L\'AI non ha rilevato piatti in questa immagine. Prova con una foto più nitida o ravvicinata.');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoadingStep(null);
+    }
+  };
+
+  const handleAnalyzeUrl = async () => {
+    if (!menuUrlInput.trim()) return;
+    setShowUrlModal(false);
+    setError('');
+    setLoadingStep('Connessione al link inserito...');
+    try {
+      setTimeout(() => setLoadingStep('Scaricamento del menù...'), 1000);
+      setTimeout(() => setLoadingStep('Estrazione scritte e allergeni con AI...'), 2200);
+
+      const res = await api.analyzeUrl(menuUrlInput.trim());
+      if (res.piatti && res.piatti.length > 0) {
+        setPiatti(res.piatti);
+        setMenuUrlInput('');
+        if (res.note) {
+          Alert.alert('Analisi completata', res.note);
+        }
+      } else {
+        Alert.alert('Nessun piatto rilevato', 'L\'AI non ha rilevato piatti in questo link. Assicurati che sia un menù valido.');
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoadingStep(null);
+    }
+  };
+
   const publish = async () => {
     const validi = piatti.filter((p) => p.nome_piatto.trim());
     if (validi.length === 0) { setError('Aggiungi almeno un piatto con un nome.'); return; }
@@ -123,6 +235,24 @@ export default function MenuEditor() {
           {current.name} <Text style={styles.headerCode}>#{current.public_code}</Text>
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        {/* AI Assistant Banner */}
+        {loaded && (
+          <View style={styles.aiBanner}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.aiTitle}>✨ Carica menù con AI</Text>
+              <Text style={styles.aiSub}>Riconosci piatti e allergeni da foto o link web</Text>
+            </View>
+            <View style={styles.aiButtonsRow}>
+              <TouchableOpacity style={styles.aiActionBtn} onPress={pickImageAndAnalyze}>
+                <Text style={styles.aiActionText}>📸 Foto</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.aiActionBtn} onPress={() => setShowUrlModal(true)}>
+                <Text style={styles.aiActionText}>🔗 Link</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {!loaded && <ActivityIndicator style={{ marginVertical: 20 }} color="#059669" />}
 
@@ -224,6 +354,45 @@ export default function MenuEditor() {
           ? <ActivityIndicator color="#fff" />
           : <Text style={styles.publishText}>✓ Approva e pubblica ({piatti.filter((p) => p.nome_piatto.trim()).length} piatti)</Text>}
       </TouchableOpacity>
+
+      {/* Modal Inserimento URL */}
+      <Modal visible={showUrlModal} transparent animationType="slide" onRequestClose={() => setShowUrlModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>🔗 Analizza da Link / URL</Text>
+            <Text style={styles.modalDesc}>
+              Inserisci il link del menù online (es. PDF o sito web della tua attività).
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="https://esempio.it/menu.pdf"
+              keyboardType="url"
+              autoCapitalize="none"
+              value={menuUrlInput}
+              onChangeText={setMenuUrlInput}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={[styles.modalBtn, styles.modalBtnCancel]} onPress={() => setShowUrlModal(false)}>
+                <Text style={styles.modalBtnCancelText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalBtn, styles.modalBtnConfirm]} onPress={handleAnalyzeUrl}>
+                <Text style={styles.modalBtnConfirmText}>Analizza</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Loader Step AI */}
+      <Modal visible={loadingStep !== null} transparent animationType="fade">
+        <View style={styles.loaderOverlay}>
+          <View style={styles.loaderContent}>
+            <ActivityIndicator size="large" color="#059669" />
+            <Text style={styles.loaderTitle}>✨ Elaborazione AI</Text>
+            <Text style={styles.loaderStep}>{loadingStep}</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -304,4 +473,130 @@ const styles = StyleSheet.create({
   publishText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   button: { backgroundColor: '#059669', borderRadius: 12, padding: 14, paddingHorizontal: 24 },
   buttonText: { color: '#fff', fontWeight: '700' },
+  aiBanner: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  aiTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#064e3b',
+  },
+  aiSub: {
+    fontSize: 11,
+    color: '#047857',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  aiButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  aiActionBtn: {
+    backgroundColor: '#059669',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  aiActionText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1e293b',
+    marginBottom: 8,
+  },
+  modalDesc: {
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  modalInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
+  },
+  modalBtn: {
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtnCancel: {
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  modalBtnConfirm: {
+    backgroundColor: '#059669',
+  },
+  modalBtnCancelText: {
+    color: '#475569',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  modalBtnConfirmText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  loaderOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loaderContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    gap: 12,
+    width: 250,
+  },
+  loaderTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1e293b',
+  },
+  loaderStep: {
+    fontSize: 13,
+    color: '#059669',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });

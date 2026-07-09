@@ -103,8 +103,15 @@ export default function DishCard({ piatto, esito }: { piatto: Piatto; esito: Esi
           
           {piatto.descrizione ? <Text style={styles.desc}>{piatto.descrizione}</Text> : null}
           
-          <View style={[styles.badge, { backgroundColor: c.badgeBg }]}>
-            <Text style={[styles.badgeText, { color: c.text }]}>{label.toUpperCase()}</Text>
+          <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 8 }}>
+            <View style={[styles.badge, { backgroundColor: c.badgeBg, marginTop: 0 }]}>
+              <Text style={[styles.badgeText, { color: c.text }]}>{label.toUpperCase()}</Text>
+            </View>
+            {piatto.kitchen_protocol_confirmed === 1 && (
+              <View style={[styles.badge, { backgroundColor: '#e0f2fe', marginTop: 0 }]}>
+                <Text style={[styles.badgeText, { color: '#0369a1' }]}>🛡️ CUCINA SICURA</Text>
+              </View>
+            )}
           </View>
           
           {esito.match_contenuti.length > 0 && (

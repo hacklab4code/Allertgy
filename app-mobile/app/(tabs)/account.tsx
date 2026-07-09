@@ -2,16 +2,20 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  Alert, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, TextInput
+  Alert, Image, Linking, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, TextInput
 } from 'react-native';
 import { api, API } from '../../src/api/client';
 import { useSession } from '../../src/store/session';
 import type { Allergen } from '../../src/types';
 import { getFlagEmoji, getLanguageLabel } from '../../src/constants/languages';
 import { TRANSLATED_ALLERGENS, t } from '../../src/engine/translations';
+import LanguageFlagsRow from '../../src/components/LanguageFlagsRow';
+import { useTranslation } from '../../src/constants/translations';
+import { colors } from '../../src/theme';
 
 export default function Account() {
-  const { email, allergie, setAllergie, logout, setEmergencyMedicines, language, ingredientiEsclusi, setIngredientiEsclusi, emergencyContactName, emergencyContactPhone, setEmergencyContact } = useSession();
+  const { email, allergie, setAllergie, logout, setEmergencyMedicines, language, ingredientiEsclusi, setIngredientiEsclusi, emergencyContactName, emergencyContactPhone, setEmergencyContact, subProfiles } = useSession();
+  const { t: tLocal } = useTranslation();
   const [all, setAll] = useState<Allergen[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [documents, setDocuments] = useState<any[]>([]);
@@ -119,10 +123,32 @@ export default function Account() {
     setLoading(false);
   };
 
+  const shareProfile = async (profileId: number | null, duration: '24h' | 'permanent', label?: string) => {
+    setLoading(true);
+    try {
+      const share = await api.createProfileShare(profileId, duration, label);
+      const link = `allertgy://shared-profile/${share.token}`;
+      const expiry = duration === '24h'
+        ? (isIt ? 'valido per 24 ore' : 'valid for 24 hours')
+        : (isIt ? 'valido finché non lo revochi' : 'valid until revoked');
+      await Share.share({
+        message: isIt
+          ? `Profilo allergie AllerTgy di ${share.label} (${expiry}): ${link}`
+          : `AllerTgy allergy profile for ${share.label} (${expiry}): ${link}`,
+        url: link,
+      });
+    } catch (e) {
+      Alert.alert(t('error', language), (e as Error).message);
+    }
+    setLoading(false);
+  };
+
   const isIt = language === 'it';  // kept for legacy UI strings still using it/en pattern
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <LanguageFlagsRow />
+      <ScrollView contentContainerStyle={styles.container}>
       {/* Intestazione profilo */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.avatar} onPress={changePhoto}>
@@ -166,6 +192,82 @@ export default function Account() {
           </View>
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
+
+        <View style={styles.separator} />
+
+        {/* Allergy Card Pass Row */}
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/allergy-card')}>
+          <Text style={styles.itemIcon}>🪪</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.itemTitle}>{isIt ? 'Pass Allergeni (Allergy Card)' : 'Allergen Pass (Allergy Card)'}</Text>
+            <Text style={styles.itemSub}>
+              {isIt ? 'Genera un tesserino tradotto in 5 lingue per i camerieri' : 'Generate a card translated into 5 languages for waiters'}
+            </Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+
+        <View style={styles.separator} />
+
+        {/* Family Profiles Row */}
+        <TouchableOpacity style={styles.item} onPress={() => router.push('/sub-profiles')}>
+          <Text style={styles.itemIcon}>👥</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.itemTitle}>{isIt ? 'Profili Famiglia (Multi-Profile)' : 'Family Profiles (Multi-Profile)'}</Text>
+            <Text style={styles.itemSub}>
+              {isIt ? 'Gestisci le allergie di figli e familiari' : 'Manage allergies for children and family members'}
+            </Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+
+        <View style={styles.separator} />
+
+        {/* Profile Sharing Row */}
+        <View style={[styles.item, { alignItems: 'flex-start' }]}>
+          <Text style={styles.itemIcon}>🔗</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.itemTitle}>{isIt ? 'Condividi profilo allergie' : 'Share allergy profile'}</Text>
+            <Text style={styles.itemSub}>
+              {isIt
+                ? 'Invia il profilo per 24h a chi fa la spesa per una festa, oppure condividilo per sempre con familiari e caregiver.'
+                : 'Send your profile for 24h to someone shopping for an event, or share it permanently with family and caregivers.'}
+            </Text>
+            <View style={styles.shareActions}>
+              <TouchableOpacity
+                style={styles.shareButton}
+                onPress={() => shareProfile(null, '24h', isIt ? 'Io' : 'Me')}
+                disabled={loading}
+              >
+                <Text style={styles.shareButtonText}>{isIt ? 'Io · 24h' : 'Me · 24h'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shareButtonGhost}
+                onPress={() => shareProfile(null, 'permanent', isIt ? 'Io' : 'Me')}
+                disabled={loading}
+              >
+                <Text style={styles.shareButtonGhostText}>{isIt ? 'Io · famiglia' : 'Me · family'}</Text>
+              </TouchableOpacity>
+            </View>
+            {subProfiles.length > 0 && (
+              <View style={styles.sharedProfilesList}>
+                {subProfiles.map((p) => (
+                  <View key={p.id} style={styles.sharedProfileRow}>
+                    <Text style={styles.sharedProfileName}>{p.name}</Text>
+                    <View style={styles.sharedProfileButtons}>
+                      <TouchableOpacity onPress={() => shareProfile(p.id, '24h', p.name)} disabled={loading}>
+                        <Text style={styles.sharedProfileLink}>24h</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => shareProfile(p.id, 'permanent', p.name)} disabled={loading}>
+                        <Text style={styles.sharedProfileLink}>{isIt ? 'Sempre' : 'Always'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
 
         <View style={styles.separator} />
 
@@ -228,23 +330,22 @@ export default function Account() {
         <View style={styles.separator} />
 
         {/* Lingua / Language */}
-        <TouchableOpacity style={styles.item} onPress={() => router.push('/language')}>
+        <View style={styles.item}>
           <Text style={styles.itemIcon}>🌐</Text>
           <View style={{ flex: 1 }}>
-            <Text style={styles.itemTitle}>{isIt ? 'Lingua dell\'app' : 'App Language'}</Text>
+            <Text style={styles.itemTitle}>{tLocal('app_language_label')}</Text>
             <Text style={styles.itemSub}>
               {getFlagEmoji(language)} {getLanguageLabel(language)} · {(language || 'it').toUpperCase()}
             </Text>
           </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
+        </View>
       </View>
 
       {/* Sezione 1.5: Ingredienti da Evitare */}
-      <Text style={styles.sectionLabel}>{t('custom_ingredients_label', language)}</Text>
+      <Text style={styles.sectionLabel}>{tLocal('custom_ingredients_label')}</Text>
       <View style={styles.card}>
         <View style={{ padding: 14, gap: 10 }}>
-          <Text style={styles.itemSub}>{t('custom_ingredients_sub', language)}</Text>
+          <Text style={styles.itemSub}>{tLocal('custom_ingredients_sub')}</Text>
           <TextInput
             style={styles.textInput}
             value={ingredientiEsclusi.filter(s => s.length > 0).join(', ')}
@@ -358,6 +459,7 @@ export default function Account() {
         <Text style={styles.logoutText}>{isIt ? 'Esci dall\'account' : 'Logout'}</Text>
       </TouchableOpacity>
     </ScrollView>
+    </View>
   );
 }
 
@@ -475,6 +577,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   smallButtonText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  shareActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  shareButton: {
+    backgroundColor: '#059669',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  shareButtonText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  shareButtonGhost: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  shareButtonGhostText: { color: '#047857', fontWeight: '800', fontSize: 12 },
+  sharedProfilesList: { marginTop: 10, gap: 6 },
+  sharedProfileRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  sharedProfileName: { color: '#1e293b', fontWeight: '700', fontSize: 12 },
+  sharedProfileButtons: { flexDirection: 'row', gap: 12 },
+  sharedProfileLink: { color: '#047857', fontWeight: '900', fontSize: 12 },
   disclaimerBox: {
     backgroundColor: '#EEF5F1',
     borderWidth: 1,

@@ -28,6 +28,22 @@ export interface EsitoSemaforo {
   match_esclusi?: string[];
 }
 
+/** Ingredienti di origine animale — se presenti, un piatto non è vegano/vegetariano */
+const INGREDIENTI_ANIMALI = [
+  'carne', 'pollo', 'manzo', 'maiale', 'agnello', 'vitello', 'prosciutto', 'speck', 'pancetta', 'guanciale',
+  'pesce', 'salmone', 'tonno', 'acciughe', 'alici', 'gamberi', 'gamberetti', 'aragosta', 'polpo', 'calamari', 'seppia', 'molluschi', 'crostacei',
+  'uova', 'uovo', 'latte', 'panna', 'burro', 'formaggio', 'parmigiano', 'pecorino', 'mozzarella', 'gorgonzola', 'ricotta', 'stracchino', 'mascarpone',
+  'miele', 'gelatina animale', 'strutto', 'lardo',
+];
+
+/** Diete e i codici allergene di origine animale che le violano */
+const DIETA_REGole: Record<string, readonly string[]> = {
+  vegano: INGREDIENTI_ANIMALI,
+  vegetariano: ['carne', 'pollo', 'manzo', 'maiale', 'agnello', 'vitello', 'prosciutto', 'speck', 'pancetta', 'guanciale',
+    'pesce', 'salmone', 'tonno', 'acciughe', 'alici', 'gamberi', 'gamberetti', 'aragosta', 'polpo', 'calamari', 'seppia', 'molluschi', 'crostacei',
+  ],
+};
+
 export function calcolaSemaforo(
   allergieUtente: readonly string[],
   piatto: PiattoAllergeni,
@@ -42,17 +58,22 @@ export function calcolaSemaforo(
   const match_contenuti = piatto.allergeni_contenuti.filter((a) => profiloAllergie.has(a));
   const match_tracce = piatto.allergeni_tracce.filter((a) => profiloAllergie.has(a));
 
-  // Verifica diete
+  // Verifica diete: identifica ingredienti animali nel piatto
+  const tuttiIngredientiPiatto = [
+    ...piatto.allergeni_contenuti,
+    ...piatto.allergeni_tracce,
+    ...((piatto.descrizione || '').toLowerCase().split(/\s+/)),
+    ...((piatto.nome_piatto || '').toLowerCase().split(/\s+/)),
+  ];
+  const setIngredienti = new Set(tuttiIngredientiPiatto);
+
   const dieteNonRispettate: string[] = [];
   for (const dieta of dieteUtente) {
-    if (dieta === 'vegano') {
-      if (!piatto.allergeni_contenuti.includes('vegano')) {
-        dieteNonRispettate.push('vegano');
-      }
-    } else if (dieta === 'vegetariano') {
-      if (!piatto.allergeni_contenuti.includes('vegetariano') && !piatto.allergeni_contenuti.includes('vegano')) {
-        dieteNonRispettate.push('vegetariano');
-      }
+    const ingredientiVietati = DIETA_REGole[dieta];
+    if (!ingredientiVietati) continue;
+    const violazione = ingredientiVietati.some((ing) => setIngredienti.has(ing));
+    if (violazione) {
+      dieteNonRispettate.push(dieta);
     }
   }
 

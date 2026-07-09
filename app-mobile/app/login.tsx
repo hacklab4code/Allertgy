@@ -5,15 +5,22 @@ import {
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { api } from '../src/api/client';
-import { getFlagEmoji } from '../src/constants/languages';
 import { useSession, type Role } from '../src/store/session';
 import { useNotifStore } from '../src/store/notifications';
 import type { Allergen } from '../src/types';
+import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
+import { useTranslation } from '../src/constants/translations';
+import { TRANSLATED_ALLERGENS } from '../src/engine/translations';
+import { registraPushToken } from '../src/services/geofencing';
 
 export default function Login() {
+  const session = useSession();
+  const { t } = useTranslation();
+  const isIt = (session.language || 'it').toLowerCase() === 'it';
+
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [forgotSent, setForgotSent] = useState(false);
-  const [role, setRole] = useState<Role>('customer');
+  const [role, setRole] = useState<Role>(session.role || 'customer');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,7 +30,6 @@ export default function Login() {
   const [acceptOwnerResponsibility, setAcceptOwnerResponsibility] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const session = useSession();
 
   const [allAllergens, setAllAllergens] = useState<Allergen[]>([]);
   const [selectedAllergens, setSelectedAllergens] = useState<Set<string>>(new Set());
@@ -52,13 +58,13 @@ export default function Login() {
 
   const onLongPressAllergen = (code: string, name: string) => {
     Alert.alert(
-      `Intensità: ${name}`,
-      `Imposta quanto è grave questa allergia:`,
+      isIt ? `Intensità: ${name}` : `Severity: ${name}`,
+      isIt ? `Imposta quanto è grave questa allergia:` : `Set how severe this allergy is:`,
       [
-        { text: 'Lieve', onPress: () => updateIntensity(code, 'lieve') },
-        { text: 'Moderata', onPress: () => updateIntensity(code, 'moderata') },
-        { text: 'Grave/Anafilassi', onPress: () => updateIntensity(code, 'grave'), style: 'destructive' },
-        { text: 'Annulla', style: 'cancel' },
+        { text: isIt ? 'Lieve' : 'Mild', onPress: () => updateIntensity(code, 'lieve') },
+        { text: isIt ? 'Moderata' : 'Moderate', onPress: () => updateIntensity(code, 'moderata') },
+        { text: isIt ? 'Grave/Anafilassi' : 'Severe/Anaphylaxis', onPress: () => updateIntensity(code, 'grave'), style: 'destructive' },
+        { text: isIt ? 'Annulla' : 'Cancel', style: 'cancel' },
       ]
     );
   };
@@ -97,6 +103,7 @@ export default function Login() {
       session.setToken(res.access_token);
       session.setEmail(email.trim());
       session.setRole(res.role === 'owner' ? 'owner' : 'customer');
+      registraPushToken().catch(() => {});
       if (res.role !== 'owner') {
         if (mode === 'register') {
           const codes = [...selectedAllergens];
@@ -140,27 +147,23 @@ export default function Login() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.screen}
     >
-      <Stack.Screen options={{ 
-        headerRight: () => (
-          <TouchableOpacity onPress={() => router.push('/language')} style={{ marginRight: 4 }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F8A6A' }}>{getFlagEmoji(session.language)} {(session.language || 'it').toUpperCase()}</Text>
-          </TouchableOpacity>
-        ) 
-      }} />
+      <Stack.Screen options={{ headerRight: undefined }} />
+      <LanguageFlagsRow />
+
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.logo}>AllerTgy</Text>
         <View style={styles.heading}>
           <Text style={styles.title}>
-            {mode === 'login' ? 'Accedi al tuo account'
-              : mode === 'forgot' ? 'Recupera la password'
-              : 'Crea il tuo account'}
+            {mode === 'login' ? t('login_title')
+              : mode === 'forgot' ? t('forgot_title')
+              : t('register_title')}
           </Text>
           <Text style={styles.tagline}>
             {mode === 'login'
-              ? 'Riapri il tuo profilo allergie e continua dal tuo ultimo locale.'
+              ? t('login_subtitle')
               : mode === 'forgot'
-              ? 'Ti invieremo un link via email per scegliere una nuova password.'
-              : 'Il profilo allergie resta sul tuo dispositivo e nel tuo account.'}
+              ? t('forgot_subtitle')
+              : t('register_subtitle')}
           </Text>
         </View>
 
@@ -172,14 +175,18 @@ export default function Login() {
               onPress={() => setRole('customer')}
             >
               <Text style={styles.roleEmoji}>🙋</Text>
-              <Text style={[styles.roleText, role === 'customer' && styles.roleTextOn]}>Sono un cliente</Text>
+              <Text style={[styles.roleText, role === 'customer' && styles.roleTextOn]}>
+                {isIt ? 'Sono un cliente' : 'I am a customer'}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.role, role === 'owner' && styles.roleOn]}
               onPress={() => setRole('owner')}
             >
               <Text style={styles.roleEmoji}>👨‍🍳</Text>
-              <Text style={[styles.roleText, role === 'owner' && styles.roleTextOn]}>Ho un ristorante</Text>
+              <Text style={[styles.roleText, role === 'owner' && styles.roleTextOn]}>
+                {isIt ? 'Ho un ristorante' : 'I own a restaurant'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -188,16 +195,16 @@ export default function Login() {
 
         {mode === 'register' && (
           <View style={styles.field}>
-            <Text style={styles.label}>Nome</Text>
+            <Text style={styles.label}>{t('name_label')}</Text>
             <TextInput
-              style={styles.input} placeholder="Il tuo nome" autoCapitalize="words"
+              style={styles.input} placeholder={isIt ? "Il tuo nome" : "Your name"} autoCapitalize="words"
               value={displayName} onChangeText={setDisplayName}
             />
           </View>
         )}
 
         <View style={styles.field}>
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{t('email_label')}</Text>
           <TextInput
             style={styles.input} placeholder="nome@email.it" autoCapitalize="none"
             keyboardType="email-address" value={email} onChangeText={setEmail}
@@ -205,14 +212,14 @@ export default function Login() {
         </View>
         {mode !== 'forgot' && (
           <View style={styles.field}>
-            <Text style={styles.label}>Password</Text>
+            <Text style={styles.label}>{t('password_label')}</Text>
             <TextInput
-              style={styles.input} placeholder="Minimo 8 caratteri"
+              style={styles.input} placeholder={isIt ? "Minimo 8 caratteri" : "Minimum 8 characters"}
               secureTextEntry value={password} onChangeText={setPassword}
             />
             {mode === 'login' && (
               <TouchableOpacity onPress={() => { setMode('forgot'); setError(''); setForgotSent(false); }}>
-                <Text style={styles.forgotLink}>Password dimenticata?</Text>
+                <Text style={styles.forgotLink}>{t('forgot_password_link')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -221,20 +228,23 @@ export default function Login() {
         {mode === 'forgot' && forgotSent && (
           <View style={styles.legalBox}>
             <Text style={styles.checkText}>
-              📧 Se l'indirizzo esiste, riceverai un'email con il link per reimpostare la password.
-              Il link scade tra 30 minuti.
+              📧 {isIt 
+                ? "Se l'indirizzo esiste, riceverai un'email con il link per reimpostare la password. Il link scade tra 30 minuti." 
+                : "If the email exists, you will receive a link to reset your password. The link expires in 30 minutes."}
             </Text>
           </View>
         )}
 
         {mode === 'register' && role === 'customer' && allAllergens.length > 0 && (
           <View style={styles.allergenSection}>
-            <Text style={styles.allergenSectionTitle}>Seleziona le tue allergie e intolleranze</Text>
+            <Text style={styles.allergenSectionTitle}>{t('select_allergies_title')}</Text>
             <Text style={styles.allergenSectionSubtitle}>
-              Tocca per selezionare, tieni premuto per impostare la gravità (Lieve/Mod./Grave).
+              {isIt 
+                ? "Tocca per selezionare, tieni premuto per impostare la gravità (Lieve/Mod./Grave)." 
+                : "Tap to select, hold to set severity (Mild/Mod./Severe)."}
             </Text>
             
-            <Text style={styles.allergenSubsectionTitle}>Allergeni principali</Text>
+            <Text style={styles.allergenSubsectionTitle}>{isIt ? "Allergeni principali" : "Main allergens"}</Text>
             <View style={styles.allergenGrid}>
               {allAllergens.filter(a => !a.is_diet).map((a) => {
                 const on = selectedAllergens.has(a.code);
@@ -243,14 +253,14 @@ export default function Login() {
                     key={a.code}
                     style={[styles.allergenChip, on && styles.chipOnAllergy]}
                     onPress={() => toggleAllergen(a.code)}
-                    onLongPress={() => onLongPressAllergen(a.code, a.name_it)}
+                    onLongPress={() => onLongPressAllergen(a.code, isIt ? a.name_it : (TRANSLATED_ALLERGENS[a.code.toLowerCase()]?.en || a.name_it))}
                     delayLongPress={300}
                   >
                     <Text style={[styles.allergenChipText, on && styles.chipTextOnAllergy]}>
-                      {a.emoji} {a.name_it}
-                      {on && intensities[a.code] === 'lieve' && ' (Lieve)'}
+                      {a.emoji} {isIt ? a.name_it : (TRANSLATED_ALLERGENS[a.code.toLowerCase()]?.en || a.name_it)}
+                      {on && intensities[a.code] === 'lieve' && (isIt ? ' (Lieve)' : ' (Mild)')}
                       {on && (!intensities[a.code] || intensities[a.code] === 'moderata') && ' (Mod.)'}
-                      {on && intensities[a.code] === 'grave' && ' (Grave)'}
+                      {on && intensities[a.code] === 'grave' && (isIt ? ' (Grave)' : ' (Severe)')}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -259,7 +269,7 @@ export default function Login() {
 
             {allAllergens.some(a => a.is_diet) && (
               <>
-                <Text style={styles.allergenSubsectionTitle}>Preferenze alimentari</Text>
+                <Text style={styles.allergenSubsectionTitle}>{isIt ? "Preferenze alimentari" : "Dietary preferences"}</Text>
                 <View style={styles.allergenGrid}>
                   {allAllergens.filter(a => a.is_diet).map((a) => {
                     const on = selectedAllergens.has(a.code);
@@ -268,14 +278,14 @@ export default function Login() {
                         key={a.code}
                         style={[styles.allergenChip, on && styles.chipOnDiet]}
                         onPress={() => toggleAllergen(a.code)}
-                        onLongPress={() => onLongPressAllergen(a.code, a.name_it)}
+                        onLongPress={() => onLongPressAllergen(a.code, isIt ? a.name_it : (TRANSLATED_ALLERGENS[a.code.toLowerCase()]?.en || a.name_it))}
                         delayLongPress={300}
                       >
                         <Text style={[styles.allergenChipText, on && styles.chipTextOnDiet]}>
-                          {a.emoji} {a.name_it}
-                          {on && intensities[a.code] === 'lieve' && ' (Lieve)'}
+                          {a.emoji} {isIt ? a.name_it : (TRANSLATED_ALLERGENS[a.code.toLowerCase()]?.en || a.name_it)}
+                          {on && intensities[a.code] === 'lieve' && (isIt ? ' (Lieve)' : ' (Mild)')}
                           {on && (!intensities[a.code] || intensities[a.code] === 'moderata') && ' (Mod.)'}
-                          {on && intensities[a.code] === 'grave' && ' (Grave)'}
+                          {on && intensities[a.code] === 'grave' && (isIt ? ' (Grave)' : ' (Severe)')}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -291,24 +301,28 @@ export default function Login() {
             <CheckRow
               checked={acceptTerms}
               onPress={() => setAcceptTerms(!acceptTerms)}
-              text="Accetto i Termini di servizio di AllerTgy."
+              text={isIt ? "Accetto i Termini di servizio di AllerTgy." : "I accept the AllerTgy Terms of Service."}
             />
             <CheckRow
               checked={acceptPrivacy}
               onPress={() => setAcceptPrivacy(!acceptPrivacy)}
-              text="Ho letto l'Informativa Privacy."
+              text={isIt ? "Ho letto l'Informativa Privacy." : "I have read the Privacy Policy."}
             />
             {role === 'customer' ? (
               <CheckRow
                 checked={acceptHealthData}
                 onPress={() => setAcceptHealthData(!acceptHealthData)}
-                text="Acconsento al trattamento dei dati su allergie, intolleranze e preferenze alimentari per personalizzare il menù."
+                text={isIt 
+                  ? "Acconsento al trattamento dei dati su allergie, intolleranze e preferenze alimentari per personalizzare il menù." 
+                  : "I consent to the processing of data on allergies, intolerances and dietary preferences to customize the menu."}
               />
             ) : (
               <CheckRow
                 checked={acceptOwnerResponsibility}
                 onPress={() => setAcceptOwnerResponsibility(!acceptOwnerResponsibility)}
-                text="Dichiaro di essere autorizzato a gestire il locale e di pubblicare informazioni allergeni verificate."
+                text={isIt 
+                  ? "Dichiaro di essere autorizzato a gestire il locale e di pubblicare informazioni allergeni verificate." 
+                  : "I declare that I am authorized to manage the venue and to publish verified allergen info."}
               />
             )}
           </View>
@@ -322,7 +336,7 @@ export default function Login() {
           {busy
             ? <ActivityIndicator color="#fff" />
             : <Text style={styles.buttonText}>
-                {mode === 'login' ? 'Accedi' : mode === 'forgot' ? 'Invia link di recupero' : 'Crea account'}
+                {mode === 'login' ? t('login_btn') : mode === 'forgot' ? t('forgot_btn') : t('register_btn')}
               </Text>}
         </TouchableOpacity>
 
@@ -331,9 +345,9 @@ export default function Login() {
           onPress={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setForgotSent(false); }}
         >
           <Text style={styles.switch}>
-            {mode === 'login' ? 'Non hai un account? Registrati'
-              : mode === 'forgot' ? '← Torna all\'accesso'
-              : 'Hai già un account? Accedi'}
+            {mode === 'login' ? t('no_account_prompt')
+              : mode === 'forgot' ? t('back_to_login_link')
+              : t('have_account_prompt')}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -354,7 +368,7 @@ function CheckRow({ checked, onPress, text }: { checked: boolean; onPress: () =>
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F7FAF8' },
-  container: { flexGrow: 1, padding: 24, paddingTop: 70, paddingBottom: 32 },
+  container: { flexGrow: 1, padding: 24, paddingTop: 24, paddingBottom: 32 },
   logo: { fontSize: 22, fontWeight: '800', color: '#0B5D4D', marginBottom: 28 },
   heading: { gap: 6, marginBottom: 20 },
   title: { fontSize: 26, lineHeight: 32, fontWeight: '800', color: '#10201B' },

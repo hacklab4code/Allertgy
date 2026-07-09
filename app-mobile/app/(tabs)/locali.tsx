@@ -1,12 +1,15 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, Dimensions } from 'react-native';
-import MapView, { Marker, Callout } from 'react-native-maps';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, Dimensions, TextInput } from 'react-native';
+import MapWrapper, { MarkerComponent as Marker, CalloutComponent as Callout } from '../../src/components/MapWrapper';
 import * as Location from 'expo-location';
 import { api } from '../../src/api/client';
 import { calcolaCompatibilita, type CompatibilitaResult } from '../../src/engine/compatibility';
 import RestaurantCard from '../../src/components/RestaurantCard';
 import { useSession } from '../../src/store/session';
+import LanguageFlagsRow from '../../src/components/LanguageFlagsRow';
+import { useTranslation } from '../../src/constants/translations';
+
 import { colors, radius, shadow, spacing, typography } from '../../src/theme';
 import type { Menu } from '../../src/types';
 
@@ -23,11 +26,34 @@ interface LocaleData {
 }
 
 export default function Locali() {
-  const { recents, favorites, toggleFavorite, isFavorite, allergie, token, ingredientiEsclusi } = useSession();
+  const { 
+    recents, favorites, toggleFavorite, isFavorite, allergie: primaryAllergies, token, 
+    ingredientiEsclusi, language, subProfiles, setSubProfiles, activeProfileId, setActiveProfileId 
+  } = useSession();
+
+  // Find active profile
+  const activeProfile = useMemo(() => {
+    if (!activeProfileId) return null;
+    return subProfiles.find(p => p.id === activeProfileId) || null;
+  }, [activeProfileId, subProfiles]);
+
+  const allergie = useMemo(() => {
+    if (activeProfile) {
+      return activeProfile.allergens.map(a => a.code);
+    }
+    return primaryAllergies;
+  }, [activeProfile, primaryAllergies]);
+
+  const { t } = useTranslation();
+  const isIt = (language || 'it').toLowerCase() === 'it';
   const [restaurants, setRestaurants] = useState<Menu[]>([]);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [compatFilter, setCompatFilter] = useState<'all' | 'safe' | '80'>('all');
+  const [cuisineFilter, setCuisineFilter] = useState<'all' | 'italiano' | 'sushi' | 'burger' | 'altro'>('all');
 
   useEffect(() => {
     setLoading(true);
@@ -35,7 +61,11 @@ export default function Locali() {
       .then(setRestaurants)
       .catch((e) => console.log('Errore di rete locali:', e))
       .finally(() => setLoading(false));
-  }, []);
+
+    if (token) {
+      api.getSubProfiles().then(setSubProfiles).catch(() => {});
+    }
+  }, [token]);
 
   useEffect(() => {
     (async () => {
@@ -67,6 +97,46 @@ export default function Locali() {
       };
     });
   }, [restaurants, allergie, ingredientiEsclusi]);
+
+  const filteredLocali = useMemo(() => {
+    return locali.filter((l) => {
+      // 1. Filtro Ricerca Testo
+      const query = searchQuery.toLowerCase().trim();
+      if (query) {
+        const matchesName = l.name.toLowerCase().includes(query);
+        const matchesCity = l.city?.toLowerCase().includes(query) ?? false;
+        const matchesCode = l.code.toLowerCase().includes(query);
+        if (!matchesName && !matchesCity && !matchesCode) return false;
+      }
+
+      // 2. Filtro Compatibilità
+      if (compatFilter === 'safe') {
+        if (!l.compatibility || l.compatibility.percentuale !== 100) return false;
+      } else if (compatFilter === '80') {
+        if (!l.compatibility || l.compatibility.percentuale < 80) return false;
+      }
+
+      // 3. Filtro Cucina
+      if (cuisineFilter !== 'all') {
+        const rest = restaurants.find(r => r.public_code === l.code);
+        const searchPool = `${l.name} ${rest?.nome_ristorante || ''} ${rest?.piatti.map(p => p.nome_piatto).join(' ') || ''}`.toLowerCase();
+        if (cuisineFilter === 'italiano') {
+          if (!searchPool.includes('pizza') && !searchPool.includes('pasta') && !searchPool.includes('trattoria') && !searchPool.includes('oster') && !searchPool.includes('italiana')) return false;
+        } else if (cuisineFilter === 'sushi') {
+          if (!searchPool.includes('sushi') && !searchPool.includes('giappo') && !searchPool.includes('cinese') && !searchPool.includes('asian') && !searchPool.includes('ramen')) return false;
+        } else if (cuisineFilter === 'burger') {
+          if (!searchPool.includes('burger') && !searchPool.includes('pub') && !searchPool.includes('panin') && !searchPool.includes('fast food')) return false;
+        } else if (cuisineFilter === 'altro') {
+          const isIt = searchPool.includes('pizza') || searchPool.includes('pasta') || searchPool.includes('trattoria') || searchPool.includes('oster') || searchPool.includes('italiana');
+          const isSushi = searchPool.includes('sushi') || searchPool.includes('giappo') || searchPool.includes('cinese') || searchPool.includes('asian') || searchPool.includes('ramen');
+          const isBurger = searchPool.includes('burger') || searchPool.includes('pub') || searchPool.includes('panin') || searchPool.includes('fast food');
+          if (isIt || isSushi || isBurger) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [locali, searchQuery, compatFilter, cuisineFilter, restaurants]);
 
   // Locali preferiti arricchiti con dati compatibilità
   const favoritesEnriched = useMemo<LocaleData[]>(() => {
@@ -106,8 +176,8 @@ export default function Locali() {
   const getMarkerColor = (compat: CompatibilitaResult | null) => {
     if (!compat) return colors.textMuted;
     if (compat.percentuale === 100) return colors.green;
-    if (compat.hasRosso) return colors.red;
-    return colors.yellow;
+    if (compat.rosso > 0) return colors.red;
+    return colors.amber;
   };
 
   const Section = ({ icon, title, subtitle, children, action }: {
@@ -131,33 +201,138 @@ export default function Locali() {
   );
 
   return (
-    <View style={styles.mainContainer}>
-      <View style={styles.headerArea}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>I tuoi locali</Text>
-          <Text style={styles.headerSub}>
-            Scopri quanto puoi mangiare in ogni ristorante in base al tuo profilo.
-          </Text>
-        </View>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <LanguageFlagsRow />
+      <View style={styles.mainContainer}>
+        <View style={styles.headerArea}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>{isIt ? "I tuoi locali" : "Your venues"}</Text>
+            <Text style={styles.headerSub}>
+              {isIt ? "Scopri quanto puoi mangiare in ogni ristorante in base al tuo profilo." : "Discover how much you can eat at each restaurant based on your profile."}
+            </Text>
+          </View>
 
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity 
-            style={[styles.toggleBtn, viewMode === 'list' && styles.toggleBtnActive]}
-            onPress={() => setViewMode('list')}
-          >
-            <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>📄 Lista</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.toggleBtn, viewMode === 'map' && styles.toggleBtnActive]}
-            onPress={() => setViewMode('map')}
-          >
-            <Text style={[styles.toggleText, viewMode === 'map' && styles.toggleTextActive]}>🗺️ Mappa</Text>
-          </TouchableOpacity>
+          {/* Sottoprofili Switcher */}
+          {token && subProfiles.length > 0 && (
+            <View style={styles.profileSwitcherContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.profileSwitcherScroll}>
+                <TouchableOpacity
+                  style={[styles.profileSwitcherBtn, activeProfileId === null && styles.profileSwitcherBtnActive]}
+                  onPress={() => setActiveProfileId(null)}
+                >
+                  <Text style={[styles.profileSwitcherText, activeProfileId === null && styles.profileSwitcherTextActive]}>
+                    👤 {isIt ? 'Io' : 'Me'}
+                  </Text>
+                </TouchableOpacity>
+                {subProfiles.map(p => (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[styles.profileSwitcherBtn, activeProfileId === p.id && styles.profileSwitcherBtnActive]}
+                    onPress={() => setActiveProfileId(p.id)}
+                  >
+                    <Text style={[styles.profileSwitcherText, activeProfileId === p.id && styles.profileSwitcherTextActive]}>
+                      👥 {p.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[styles.profileSwitcherBtn, { borderColor: '#cbd5e1', borderStyle: 'dashed' }]}
+                  onPress={() => router.push('/sub-profiles')}
+                >
+                  <Text style={[styles.profileSwitcherText, { color: '#64748b' }]}>
+                    ＋ {isIt ? 'Gestisci' : 'Manage'}
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          )}
+
+          <View style={styles.toggleContainer}>
+            <TouchableOpacity 
+              style={[styles.toggleBtn, viewMode === 'list' && styles.toggleBtnActive]}
+              onPress={() => setViewMode('list')}
+            >
+              <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>{t('list_view')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.toggleBtn, viewMode === 'map' && styles.toggleBtnActive]}
+              onPress={() => setViewMode('map')}
+            >
+              <Text style={[styles.toggleText, viewMode === 'map' && styles.toggleTextActive]}>{t('map_view')}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Search Bar */}
+          <View style={styles.searchBar}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder={isIt ? "Cerca per nome o città..." : "Search by name or city..."}
+              placeholderTextColor={colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              clearButtonMode="while-editing"
+            />
+          </View>
+
+          {/* Horizontal Filters Scroll */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll} style={{ marginTop: spacing.sm }}>
+            <TouchableOpacity 
+              style={[styles.filterChip, compatFilter === 'all' && styles.filterChipActive]}
+              onPress={() => setCompatFilter('all')}
+            >
+              <Text style={[styles.filterChipText, compatFilter === 'all' && styles.filterChipTextActive]}>⚙️ {isIt ? 'Tutte' : 'All'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.filterChip, compatFilter === 'safe' && styles.filterChipActive]}
+              onPress={() => setCompatFilter('safe')}
+            >
+              <Text style={[styles.filterChipText, compatFilter === 'safe' && styles.filterChipTextActive]}>🟢 {isIt ? 'Sicuro 100%' : '100% Safe'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.filterChip, compatFilter === '80' && styles.filterChipActive]}
+              onPress={() => setCompatFilter('80')}
+            >
+              <Text style={[styles.filterChipText, compatFilter === '80' && styles.filterChipTextActive]}>🟡 {isIt ? 'Compat. > 80%' : 'Compat. > 80%'}</Text>
+            </TouchableOpacity>
+
+            <View style={styles.filterDivider} />
+
+            <TouchableOpacity 
+              style={[styles.filterChip, cuisineFilter === 'all' && styles.filterChipActive]}
+              onPress={() => setCuisineFilter('all')}
+            >
+              <Text style={[styles.filterChipText, cuisineFilter === 'all' && styles.filterChipTextActive]}>🍽️ {isIt ? 'Cucine' : 'Cuisines'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.filterChip, cuisineFilter === 'italiano' && styles.filterChipActive]}
+              onPress={() => setCuisineFilter('italiano')}
+            >
+              <Text style={[styles.filterChipText, cuisineFilter === 'italiano' && styles.filterChipTextActive]}>🍕 {isIt ? 'Italiano' : 'Italian'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.filterChip, cuisineFilter === 'sushi' && styles.filterChipActive]}
+              onPress={() => setCuisineFilter('sushi')}
+            >
+              <Text style={[styles.filterChipText, cuisineFilter === 'sushi' && styles.filterChipTextActive]}>🍣 Sushi</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.filterChip, cuisineFilter === 'burger' && styles.filterChipActive]}
+              onPress={() => setCuisineFilter('burger')}
+            >
+              <Text style={[styles.filterChipText, cuisineFilter === 'burger' && styles.filterChipTextActive]}>🍔 Burger</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.filterChip, cuisineFilter === 'altro' && styles.filterChipActive]}
+              onPress={() => setCuisineFilter('altro')}
+            >
+              <Text style={[styles.filterChipText, cuisineFilter === 'altro' && styles.filterChipTextActive]}>✨ {isIt ? 'Altro' : 'Other'}</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
-      </View>
 
       {viewMode === 'map' ? (
-        <MapView
+        <MapWrapper
           style={styles.map}
           showsUserLocation={true}
           showsMyLocationButton={true}
@@ -168,7 +343,7 @@ export default function Locali() {
             longitudeDelta: 0.0421,
           }}
         >
-          {locali.filter(l => l.latitude && l.longitude).map(locale => (
+          {filteredLocali.filter(l => l.latitude && l.longitude).map(locale => (
             <Marker
               key={locale.code}
               coordinate={{ latitude: locale.latitude!, longitude: locale.longitude! }}
@@ -184,12 +359,14 @@ export default function Locali() {
                     isFavorite={isFavorite(locale.code)}
                     onToggleFavorite={() => onToggle(locale.code, locale.name)}
                     compact={true}
+                    latitude={locale.latitude}
+                    longitude={locale.longitude}
                   />
                 </View>
               </Callout>
             </Marker>
           ))}
-        </MapView>
+        </MapWrapper>
       ) : (
         <ScrollView contentContainerStyle={styles.container}>
           {/* Statistiche preferiti */}
@@ -197,12 +374,12 @@ export default function Locali() {
             <View style={styles.statsCard}>
               <View style={styles.statItem}>
                 <Text style={styles.statNumber}>{favStats.count}</Text>
-                <Text style={styles.statLabel}>Preferiti</Text>
+                <Text style={styles.statLabel}>{t('favorites_stats')}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={[styles.statNumber, { color: colors.green }]}>{favStats.avgCompatibility}%</Text>
-                <Text style={styles.statLabel}>Compatibilità media</Text>
+                <Text style={styles.statLabel}>{t('avg_compat_stats')}</Text>
               </View>
             </View>
           )}
@@ -210,17 +387,17 @@ export default function Locali() {
           {/* ⭐ Preferiti */}
           <Section
             icon="⭐️"
-            title="Preferiti"
+            title={isIt ? "Preferiti" : "Favorites"}
             subtitle={favorites.length > 0
-              ? `${favorites.length} ${favorites.length === 1 ? 'locale salvato' : 'locali salvati'}`
+              ? `${favorites.length} ${favorites.length === 1 ? (isIt ? 'locale salvato' : 'venue saved') : (isIt ? 'locali salvati' : 'venues saved')}`
               : undefined}
           >
             {favorites.length === 0 ? (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyEmoji}>⭐️</Text>
-                <Text style={styles.emptyTitle}>Nessun preferito</Text>
+                <Text style={styles.emptyTitle}>{t('no_favorites_title')}</Text>
                 <Text style={styles.emptyText}>
-                  Tocca la stellina su un locale per ritrovarlo qui e ricevere una notifica quando aggiorna il menù.
+                  {t('no_favorites_desc')}
                 </Text>
               </View>
             ) : (
@@ -234,6 +411,8 @@ export default function Locali() {
                     compatibility={item.compatibility}
                     isFavorite={true}
                     onToggleFavorite={() => onToggle(item.code, item.name)}
+                    latitude={item.latitude}
+                    longitude={item.longitude}
                   />
                 ))}
               </View>
@@ -243,22 +422,22 @@ export default function Locali() {
           {/* 📍 Consigliati */}
           <Section
             icon="📍"
-            title="Tutti i locali"
-            subtitle="Ordinati per compatibilità con il tuo profilo"
+            title={t('all_restaurants_title')}
+            subtitle={t('all_restaurants_sub')}
           >
             {loading ? (
               <ActivityIndicator color={colors.brand} style={{ marginVertical: spacing.xl }} />
-            ) : locali.length === 0 ? (
+            ) : filteredLocali.length === 0 ? (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyEmoji}>🍽️</Text>
-                <Text style={styles.emptyTitle}>Nessun locale trovato</Text>
+                <Text style={styles.emptyTitle}>{isIt ? "Nessun locale trovato" : "No venues found"}</Text>
                 <Text style={styles.emptyText}>
-                  Non ci sono ancora ristoranti registrati. Scansiona un QR o inserisci un codice dalla scheda Cerca.
+                  {isIt ? "Nessun ristorante corrisponde ai filtri impostati." : "No restaurants match the selected filters."}
                 </Text>
               </View>
             ) : (
               <View style={styles.cardList}>
-                {[...locali]
+                {[...filteredLocali]
                   .sort((a, b) => (b.compatibility?.percentuale ?? -1) - (a.compatibility?.percentuale ?? -1))
                   .map((item) => (
                     <RestaurantCard
@@ -269,6 +448,8 @@ export default function Locali() {
                       compatibility={item.compatibility}
                       isFavorite={isFavorite(item.code)}
                       onToggleFavorite={() => onToggle(item.code, item.name)}
+                      latitude={item.latitude}
+                      longitude={item.longitude}
                     />
                   ))}
               </View>
@@ -277,7 +458,7 @@ export default function Locali() {
 
           {/* 🕐 Visitati di recente */}
           {recentsOnly.length > 0 && (
-            <Section icon="🕐" title="Visitati di recente">
+            <Section icon="🕐" title={isIt ? "Visitati di recente" : "Visited recently"}>
               <View style={styles.cardList}>
                 {recentsOnly.map((item) => (
                   <RestaurantCard
@@ -288,6 +469,8 @@ export default function Locali() {
                     compatibility={item.compatibility}
                     isFavorite={isFavorite(item.code)}
                     onToggleFavorite={() => onToggle(item.code, item.name)}
+                    latitude={item.latitude}
+                    longitude={item.longitude}
                   />
                 ))}
               </View>
@@ -295,6 +478,7 @@ export default function Locali() {
           )}
         </ScrollView>
       )}
+      </View>
     </View>
   );
 }
@@ -336,7 +520,7 @@ const styles = StyleSheet.create({
   toggleContainer: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    borderRadius: radius.full,
+    borderRadius: radius.pill,
     padding: 4,
     borderWidth: 1,
     borderColor: colors.border,
@@ -345,7 +529,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     alignItems: 'center',
-    borderRadius: radius.full,
+    borderRadius: radius.pill,
   },
   toggleBtnActive: {
     backgroundColor: colors.ink,
@@ -470,5 +654,89 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 19,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
+    height: 44,
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: spacing.sm,
+    color: colors.textMuted,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.ink,
+    height: '100%',
+  },
+  filterScroll: {
+    gap: spacing.sm,
+    paddingRight: spacing.lg,
+    paddingVertical: 4,
+    alignItems: 'center',
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  filterChipActive: {
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.inkSoft,
+  },
+  filterChipTextActive: {
+    color: colors.white,
+    fontWeight: '700',
+  },
+  filterDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: colors.borderStrong,
+    marginHorizontal: 4,
+  },
+  profileSwitcherContainer: {
+    marginTop: spacing.md,
+    height: 40,
+  },
+  profileSwitcherScroll: {
+    gap: spacing.sm,
+    paddingRight: spacing.lg,
+    alignItems: 'center',
+  },
+  profileSwitcherBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.md,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+  },
+  profileSwitcherBtnActive: {
+    borderColor: colors.brand,
+    backgroundColor: '#f0fdf4',
+  },
+  profileSwitcherText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  profileSwitcherTextActive: {
+    color: colors.brand,
   },
 });

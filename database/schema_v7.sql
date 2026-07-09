@@ -1,0 +1,13 @@
+-- ---------- ANNOTAZIONI E WARNING DEI CLIENTI ----------
+CREATE TABLE IF NOT EXISTS customer_annotations (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  restaurant_id INT UNSIGNED NOT NULL,
+  user_id       INT UNSIGNED NOT NULL,
+  allergen_id   TINYINT UNSIGNED NOT NULL,
+  ingredient    VARCHAR(100) NULL,
+  notes         TEXT NOT NULL,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (allergen_id) REFERENCES allergens(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

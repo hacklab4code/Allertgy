@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useRef } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-/** Legge QR nel formato "allertgy:123456" (o direttamente il codice numerico). */
+/** Legge QR nel formato "allertgy:123456", URL /r/123456 o direttamente il codice numerico. */
 export default function Scanner() {
   const [permission, requestPermission] = useCameraPermissions();
   const scanned = useRef(false);
@@ -27,7 +27,11 @@ export default function Scanner() {
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         onBarcodeScanned={({ data }) => {
           if (scanned.current) return;
-          const code = data.replace(/^allertgy:/i, '').trim();
+          const code = data
+            .replace(/^allertgy:\/?\/?/i, '')
+            .replace(/^.*\/r\//i, '')
+            .split(/[?#]/)[0]
+            .trim();
           if (/^\d{4,8}$/.test(code)) {
             scanned.current = true;
             router.replace(`/menu/${code}`);

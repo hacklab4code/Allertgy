@@ -8,6 +8,15 @@ export interface Allergen {
   intensity?: 'lieve' | 'moderata' | 'grave' | null;
 }
 
+export interface MenuOutItem {
+  id: number;
+  restaurant_id: number;
+  name: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface Piatto {
   id: number;
   nome_piatto: string;
@@ -16,6 +25,9 @@ export interface Piatto {
   prezzo_cents: number | null;
   image_url?: string | null;
   menu_group?: string | null;
+  menu_id?: number | null;
+  kitchen_protocol_confirmed?: number;
+  cross_contamination_checked_at?: string | null;
   allergeni_contenuti: string[];
   allergeni_tracce: string[];
 }
@@ -25,13 +37,22 @@ export interface Menu {
   public_code: string;
   nome_ristorante: string;
   citta: string | null;
+  indirizzo?: string | null;
+  telefono?: string | null;
+  email_contatto?: string | null;
+  orari_apertura?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   aggiornato_il: string | null;
   menu_version?: number;
   menu_legal_confirmed_at?: string | null;
   menu_legal_version?: string | null;
+  google_rating?: number | null;
+  google_reviews_count?: number | null;
+  tripadvisor_rating?: number | null;
+  tripadvisor_reviews_count?: number | null;
   safety_notice?: string;
+  menus?: MenuOutItem[];
   piatti: Piatto[];
 }
 
@@ -60,17 +81,20 @@ export interface PiattoIn {
   allergeni_tracce: string[];
 }
 
-export type BusinessPlan = 'free' | 'verified' | 'pro' | 'premium';
+export type BusinessPlan = 'free' | 'base' | 'pro_notify';
 export type SubscriptionStatus = 'free' | 'trialing' | 'active' | 'past_due' | 'canceled' | 'comped';
 
 export interface Restaurant {
   id: number;
   public_code: string;
+  slug?: string;
   name: string;
   city: string | null;
   latitude?: number | null;
   longitude?: number | null;
   image_url?: string | null;
+  website?: string | null;
+  menu_url?: string | null;
   menu_updated_at: string | null;
   menu_version?: number;
   menu_legal_confirmed_at?: string | null;
@@ -81,6 +105,8 @@ export interface Restaurant {
   is_verified?: number;
   plan_started_at?: string | null;
   trial_ends_at?: string | null;
+  vat_number?: string | null;
+  allergen_manager?: string | null;
 }
 
 export interface Plan {
@@ -94,3 +120,59 @@ export interface Plan {
   has_review_reply: boolean;
   has_priority: boolean;
 }
+
+export interface CustomerAnnotation {
+  id: number;
+  restaurant_id: number;
+  allergen_id: number;
+  allergen_code: string;
+  allergen_name_it: string;
+  allergen_emoji: string | null;
+  ingredient: string | null;
+  notes: string;
+  author_name: string;
+  is_mine: boolean;
+  created_at: string;
+}
+
+export interface SubProfileAllergen {
+  code: string;
+  name_it: string;
+  emoji: string | null;
+  intensity: 'lieve' | 'moderata' | 'grave';
+}
+
+export interface SubProfile {
+  id: number;
+  name: string;
+  relationship: string;
+  allergens: SubProfileAllergen[];
+  created_at: string;
+}
+
+export interface SubProfileIn {
+  name: string;
+  relationship: string;
+  allergens: { code: string; intensity: 'lieve' | 'moderata' | 'grave' }[];
+}
+
+export interface ProfileShare {
+  id: number;
+  token: string;
+  label: string;
+  scope: '24h' | 'permanent';
+  expires_at: string | null;
+  created_at: string;
+  share_url: string;
+}
+
+export interface SharedProfile {
+  token: string;
+  label: string;
+  owner_display_name: string | null;
+  profile_name: string;
+  relationship: string;
+  expires_at: string | null;
+  allergens: SubProfileAllergen[];
+}
+

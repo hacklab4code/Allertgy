@@ -1,14 +1,34 @@
 export const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 export interface Allergen { id: number; code: string; name_it: string; emoji: string | null; is_diet: number; category: string }
+export interface DishTranslation {
+  lang: string;
+  name: string;
+  description?: string | null;
+}
+
 export interface DishIn {
+  id?: number;
   nome_piatto: string; descrizione?: string | null; categoria?: string | null;
   prezzo_cents?: number | null; image_url?: string | null; menu_group?: string | null;
+  menu_id?: number | null;
+  kitchen_protocol_confirmed?: number;
+  cross_contamination_checked_at?: string | null;
   allergeni_contenuti: string[]; allergeni_tracce: string[];
+  translations?: DishTranslation[];
+}
+
+export interface MenuOutItem {
+  id: number;
+  restaurant_id: number;
+  name: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
 }
 export interface Restaurant {
   id: number; public_code: string; name: string; city: string | null;
-  slug?: string | null; website?: string | null; description?: string | null;
+  slug?: string | null; website?: string | null; menu_url?: string | null; description?: string | null;
   is_active?: number;
   address?: string | null; phone?: string | null; email_contact?: string | null;
   opening_hours?: string | null; image_url?: string | null; menu_updated_at: string | null;
@@ -16,8 +36,10 @@ export interface Restaurant {
   menu_version?: number; menu_legal_confirmed_at?: string | null; menu_legal_version?: string | null;
   business_plan?: BusinessPlan; subscription_status?: SubscriptionStatus; plan_price_cents?: number;
   is_verified?: number; featured_priority?: number; plan_started_at?: string | null; trial_ends_at?: string | null;
-  billing_email?: string | null; vat_number?: string | null; sdi_code?: string | null;
+  billing_email?: string | null; vat_number?: string | null; allergen_manager?: string | null; sdi_code?: string | null;
   pec_email?: string | null; commercial_notes?: string | null; created_at?: string | null;
+  google_place_id?: string | null; google_rating?: number | null; google_reviews_count?: number | null;
+  tripadvisor_url?: string | null; tripadvisor_rating?: number | null; tripadvisor_reviews_count?: number | null;
 }
 
 export interface UserProfile {
@@ -67,7 +89,19 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail ?? `Errore ${res.status}`);
+    let msg = '';
+    if (body.detail) {
+      if (typeof body.detail === 'string') {
+        msg = body.detail;
+      } else if (Array.isArray(body.detail)) {
+        msg = body.detail.map((err: any) => `${err.loc ? err.loc.join('.') + ': ' : ''}${err.msg || JSON.stringify(err)}`).join(', ');
+      } else {
+        msg = JSON.stringify(body.detail);
+      }
+    } else {
+      msg = body.message || body.error || JSON.stringify(body);
+    }
+    throw new Error(msg || `Errore ${res.status}`);
   }
   return res.status === 204 ? (undefined as T) : res.json();
 }
@@ -80,7 +114,7 @@ export interface MenuOut {
   latitude?: number | null; longitude?: number | null; image_url?: string | null;
 }
 
-export type BusinessPlan = 'free' | 'verified' | 'pro' | 'premium';
+export type BusinessPlan = 'free' | 'base' | 'pro_notify';
 export type SubscriptionStatus = 'free' | 'trialing' | 'active' | 'past_due' | 'canceled' | 'comped';
 
 export interface PlanDefinition {
@@ -144,24 +178,37 @@ export interface MenuEvaluationOut extends MenuOut {
 
 export interface Photo { id: number; url: string; is_cover: boolean; sort_order: number }
 
+export interface ExternalReview {
+  source: 'google' | 'tripadvisor';
+  author_name: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+}
+
 export interface PublicRestaurant {
   public_code: string; slug: string | null; name: string; city: string | null;
   address: string | null; latitude: number | null; longitude: number | null;
-  phone: string | null; website: string | null; description: string | null;
+  phone: string | null; website: string | null; menu_url: string | null; description: string | null;
   opening_hours: string | null; image_url: string | null; photos: Photo[];
   business_plan: BusinessPlan; is_verified: boolean;
   rating_avg: number | null; rating_count: number;
-  menu_available: boolean; piatti: DishOut[]; safety_notice: string;
+  google_place_id: string | null; google_rating: number | null; google_reviews_count: number | null;
+  tripadvisor_url: string | null; tripadvisor_rating: number | null; tripadvisor_reviews_count: number | null;
+  external_reviews: ExternalReview[];
+  menu_available: boolean; piatti: DishOut[]; safety_notice: string; menus?: MenuOutItem[];
 }
 
 export interface Review {
   id: number; restaurant_id: number; rating: number; comment: string | null;
+  rating_staff?: number | null; rating_menu?: number | null; rating_safety?: number | null;
   author_name: string; is_mine: boolean; reply: string | null; created_at: string;
 }
 
 export interface InternalReview {
   id: number; restaurant_id: number; restaurant_name: string; user_email: string;
   rating: number; comment: string | null; is_hidden: boolean;
+  rating_staff?: number | null; rating_menu?: number | null; rating_safety?: number | null;
   hidden_reason: string | null; reported_count: number; created_at: string;
 }
 
@@ -227,8 +274,8 @@ export const api = {
     }),
   allergens: () => req<Allergen[]>('/allergens'),
   myRestaurants: () => req<Restaurant[]>('/admin/restaurants'),
-  createRestaurant: (name: string, city: string, address?: string, phone?: string, email_contact?: string, opening_hours?: string) =>
-    req<Restaurant>('/admin/restaurants', { method: 'POST', body: JSON.stringify({ name, city, address, phone, email_contact, opening_hours }) }),
+  createRestaurant: (name: string, city: string, address?: string, phone?: string, email_contact?: string, opening_hours?: string, latitude?: number, longitude?: number) =>
+    req<Restaurant>('/admin/restaurants', { method: 'POST', body: JSON.stringify({ name, city, address, phone, email_contact, opening_hours, latitude, longitude }) }),
   updateRestaurant: (id: number, data: Partial<Restaurant>) =>
     req<Restaurant>(`/admin/restaurants/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   analyze: (file: File) => {
@@ -238,8 +285,29 @@ export const api = {
       method: 'POST', body: fd,
     });
   },
+  analyzeUrl: (url: string) => {
+    return req<{ ai_stub: boolean; note: string; piatti: DishIn[] }>('/admin/menu/analyze-url', {
+      method: 'POST', body: JSON.stringify({ url }),
+    });
+  },
   saveMenu: (rid: number, piatti: DishIn[]) =>
-    req(`/admin/restaurants/${rid}/menu`, { method: 'PUT', body: JSON.stringify({ piatti, replace: true }) }),
+    req<DishIn[]>(`/admin/restaurants/${rid}/menu`, { method: 'PUT', body: JSON.stringify({ piatti, replace: true }) }),
+  translateMenu: (rid: number) =>
+    req<{ status: string; count: number }>(`/admin/restaurants/${rid}/menu/translate`, { method: 'POST' }),
+  listMenus: (rid: number) =>
+    req<MenuOutItem[]>(`/admin/restaurants/${rid}/menus`),
+  createMenu: (rid: number, name: string, isActive?: boolean, sortOrder?: number) =>
+    req<MenuOutItem>(`/admin/restaurants/${rid}/menus`, {
+      method: 'POST',
+      body: JSON.stringify({ name, is_active: isActive ?? true, sort_order: sortOrder ?? 0 }),
+    }),
+  updateMenu: (rid: number, menuId: number, name: string, isActive: boolean, sortOrder: number) =>
+    req<MenuOutItem>(`/admin/restaurants/${rid}/menus/${menuId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, is_active: isActive, sort_order: sortOrder }),
+    }),
+  deleteMenu: (rid: number, menuId: number) =>
+    req(`/admin/restaurants/${rid}/menus/${menuId}`, { method: 'DELETE' }),
   approve: (rid: number, legalAcknowledged: boolean) =>
     req<Restaurant>(`/admin/restaurants/${rid}/approve`, {
       method: 'POST',
@@ -251,6 +319,14 @@ export const api = {
       menu_version: number; legal_version: string | null; snapshot_json: string | null;
       note: string | null; created_at: string;
     }[]>(`/admin/restaurants/${rid}/menu/audit`),
+  getRestaurantAnalytics: (rid: number) =>
+    req<{
+      restaurant_id: number;
+      total_views: number;
+      total_allergen_queries: number;
+      distribution: { code: string; name: string; emoji: string; count: number }[];
+      time_series: { date: string; count: number }[];
+    }>(`/admin/restaurants/${rid}/analytics`),
   downloadRegistryPdf: async (rid: number) => {
     const headers: Record<string, string> = {};
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -278,15 +354,17 @@ export const api = {
     }),
 
   // --- Pagina pubblica + recensioni ---
-  publicRestaurant: (codeOrSlug: string) => req<PublicRestaurant>(`/restaurants/${codeOrSlug}/public`),
+  publicRestaurant: (codeOrSlug: string, lang?: string) => req<PublicRestaurant>(`/restaurants/${codeOrSlug}/public${lang ? `?lang=${lang}` : ''}`),
   listReviews: (code: string) => req<Review[]>(`/restaurants/${code}/reviews`),
-  upsertReview: (code: string, rating: number, comment: string) =>
-    req<Review>(`/restaurants/${code}/reviews`, { method: 'POST', body: JSON.stringify({ rating, comment }) }),
+  upsertReview: (code: string, rating: number, comment: string, rating_staff?: number, rating_menu?: number, rating_safety?: number) =>
+    req<Review>(`/restaurants/${code}/reviews`, { method: 'POST', body: JSON.stringify({ rating, comment, rating_staff, rating_menu, rating_safety }) }),
   deleteMyReview: (code: string) =>
     req<void>(`/restaurants/${code}/reviews/mine`, { method: 'DELETE' }),
   reportReview: (id: number) => req<void>(`/reviews/${id}/report`, { method: 'POST' }),
   replyToReview: (id: number, reply: string) =>
     req<Review>(`/reviews/${id}/reply`, { method: 'POST', body: JSON.stringify({ reply }) }),
+  syncExternalReviews: (code: string) =>
+    req<Restaurant>(`/restaurants/${code}/sync-external`, { method: 'POST' }),
 
   // --- Galleria foto locale ---
   listRestaurantPhotos: (rid: number) => req<Photo[]>(`/admin/restaurants/${rid}/photos`),
@@ -301,6 +379,10 @@ export const api = {
     req<void>(`/admin/restaurants/${rid}/photos/${photoId}`, { method: 'DELETE' }),
 
   // --- Billing Stripe ---
+  billingStartTrial: (restaurantId: number, plan: BusinessPlan) =>
+    req<Restaurant>('/billing/start-trial', {
+      method: 'POST', body: JSON.stringify({ restaurant_id: restaurantId, plan }),
+    }),
   billingCheckout: (restaurantId: number, plan: BusinessPlan) =>
     req<{ checkout_url: string }>('/billing/checkout-session', {
       method: 'POST', body: JSON.stringify({ restaurant_id: restaurantId, plan }),
@@ -310,6 +392,16 @@ export const api = {
       method: 'POST', body: JSON.stringify({ restaurant_id: restaurantId }),
     }),
   billingInvoices: (restaurantId: number) => req<InvoiceRow[]>(`/billing/invoices/${restaurantId}`),
+  billingFollowersCount: (restaurantId: number) =>
+    req<{ count: number }>(`/billing/followers-count/${restaurantId}`),
+  billingSendNotification: (restaurantId: number, title: string, body: string) =>
+    req<{ sent_count: number; message: string }>('/billing/send-notification', {
+      method: 'POST', body: JSON.stringify({ restaurant_id: restaurantId, title, body }),
+    }),
+  billingBoost: (restaurantId: number) =>
+    req<{ checkout_url: string }>('/billing/boost', {
+      method: 'POST', body: JSON.stringify({ restaurant_id: restaurantId }),
+    }),
 
   // --- Notifiche ristoratore (stesso account/JWT) ---
   notifications: () => req<OwnerNotification[]>('/profile/notifications'),

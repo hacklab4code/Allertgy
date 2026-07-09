@@ -1,4 +1,3 @@
-from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
@@ -38,11 +37,11 @@ class User(Base):
         DateTime, server_default=text("CURRENT_TIMESTAMP")
     )
 
-    allergens: Mapped[list["Allergen"]] = relationship(
-        secondary="user_allergens", lazy="selectin"
+    allergens = relationship(
+        "Allergen", secondary="user_allergens", lazy="selectin"
     )
-    user_allergens: Mapped[list["UserAllergen"]] = relationship(
-        cascade="all, delete-orphan", lazy="selectin"
+    user_allergens = relationship(
+        "UserAllergen", cascade="all, delete-orphan", lazy="selectin"
     )
 
     @property
@@ -128,25 +127,60 @@ class Restaurant(Base):
     trial_ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     billing_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     vat_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    allergen_manager: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     sdi_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     pec_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     commercial_notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     slug: Mapped[Optional[str]] = mapped_column(String(160), unique=True, nullable=True)
     website: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    menu_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     stripe_price_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    
+    google_place_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    google_rating: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    google_reviews_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    tripadvisor_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    tripadvisor_rating: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    tripadvisor_reviews_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=text("CURRENT_TIMESTAMP")
     )
 
-    photos: Mapped[list["RestaurantPhoto"]] = relationship(
-        back_populates="restaurant", cascade="all, delete-orphan", lazy="selectin",
-        order_by="RestaurantPhoto.sort_order",
+    photos = relationship(
+        "RestaurantPhoto", back_populates="restaurant", cascade="all, delete-orphan",
+        lazy="selectin", order_by="RestaurantPhoto.sort_order",
     )
-    dishes: Mapped[list["Dish"]] = relationship(
-        back_populates="restaurant", cascade="all, delete-orphan", lazy="selectin"
+    menus = relationship(
+        "Menu", back_populates="restaurant", cascade="all, delete-orphan",
+        lazy="selectin", order_by="Menu.sort_order",
+    )
+    dishes = relationship(
+        "Dish", back_populates="restaurant", cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+
+
+class Menu(Base):
+    __tablename__ = "menus"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        ForeignKey("restaurants.id", ondelete="CASCADE")
+    )
+    name: Mapped[str] = mapped_column(String(100))
+    is_active: Mapped[int] = mapped_column(Integer, default=1)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    restaurant = relationship("Restaurant", back_populates="menus")
+    dishes = relationship(
+        "Dish", back_populates="menu", cascade="all, delete-orphan", lazy="selectin"
     )
 
 
@@ -157,6 +191,9 @@ class Dish(Base):
     restaurant_id: Mapped[int] = mapped_column(
         ForeignKey("restaurants.id", ondelete="CASCADE")
     )
+    menu_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("menus.id", ondelete="SET NULL"), nullable=True
+    )
     name: Mapped[str] = mapped_column(String(150))
     description: Mapped[Optional[str]] = mapped_column(Text)
     category: Mapped[Optional[str]] = mapped_column(String(60))
@@ -164,11 +201,30 @@ class Dish(Base):
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     is_available: Mapped[int] = mapped_column(Integer, default=1)
     menu_group: Mapped[Optional[str]] = mapped_column(String(100), default="Principale")
+    kitchen_protocol_confirmed: Mapped[int] = mapped_column(Integer, default=0)
+    cross_contamination_checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
-    restaurant: Mapped["Restaurant"] = relationship(back_populates="dishes")
-    dish_allergens: Mapped[list["DishAllergen"]] = relationship(
-        cascade="all, delete-orphan", lazy="selectin"
+    restaurant = relationship("Restaurant", back_populates="dishes")
+    menu = relationship("Menu", back_populates="dishes")
+    dish_allergens = relationship(
+        "DishAllergen", cascade="all, delete-orphan", lazy="selectin"
     )
+    translations = relationship(
+        "DishTranslation", back_populates="dish", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class DishTranslation(Base):
+    __tablename__ = "dish_translations"
+
+    dish_id: Mapped[int] = mapped_column(
+        ForeignKey("dishes.id", ondelete="CASCADE"), primary_key=True
+    )
+    lang: Mapped[str] = mapped_column(String(10), primary_key=True)
+    name: Mapped[str] = mapped_column(String(150))
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    dish = relationship("Dish", back_populates="translations")
 
 
 class DishAllergen(Base):
@@ -184,7 +240,7 @@ class DishAllergen(Base):
         Enum("contains", "traces", name="dish_allergen_kind"), primary_key=True
     )
 
-    allergen: Mapped["Allergen"] = relationship(lazy="joined")
+    allergen = relationship("Allergen", lazy="joined")
 
 
 class MenuAuditLog(Base):
@@ -252,7 +308,7 @@ class RestaurantPhoto(Base):
         DateTime, server_default=text("CURRENT_TIMESTAMP")
     )
 
-    restaurant: Mapped["Restaurant"] = relationship(back_populates="photos")
+    restaurant = relationship("Restaurant", back_populates="photos")
 
 
 class MedicalDocument(Base):
@@ -272,8 +328,8 @@ class MedicalDocument(Base):
         DateTime, server_default=text("CURRENT_TIMESTAMP")
     )
 
-    extractions: Mapped[list["AllergenExtraction"]] = relationship(
-        cascade="all, delete-orphan", lazy="selectin"
+    extractions = relationship(
+        "AllergenExtraction", cascade="all, delete-orphan", lazy="selectin"
     )
 
 
@@ -314,6 +370,9 @@ class Review(Base):
     )
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     rating: Mapped[int] = mapped_column(Integer)
+    rating_staff: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    rating_menu: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    rating_safety: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_hidden: Mapped[int] = mapped_column(Integer, default=0)
     hidden_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -326,9 +385,9 @@ class Review(Base):
         server_default=text("CURRENT_TIMESTAMP"),
     )
 
-    user: Mapped["User"] = relationship(lazy="joined")
-    reply: Mapped[Optional["ReviewReply"]] = relationship(
-        cascade="all, delete-orphan", lazy="selectin", uselist=False
+    user = relationship("User", lazy="joined")
+    reply = relationship(
+        "ReviewReply", cascade="all, delete-orphan", lazy="selectin", uselist=False
     )
 
 
@@ -425,4 +484,115 @@ class VisibilityBoost(Base):
         DateTime, server_default=text("CURRENT_TIMESTAMP")
     )
 
-    restaurant: Mapped["Restaurant"] = relationship(lazy="joined")
+    restaurant = relationship("Restaurant", lazy="joined")
+
+
+class CustomerAnnotation(Base):
+    __tablename__ = "customer_annotations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        ForeignKey("restaurants.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    allergen_id: Mapped[int] = mapped_column(
+        ForeignKey("allergens.id", ondelete="CASCADE")
+    )
+    ingredient: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    notes: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    user = relationship("User", lazy="joined")
+    allergen = relationship("Allergen", lazy="joined")
+
+
+class RestaurantAnalytics(Base):
+    __tablename__ = "restaurant_analytics"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False
+    )
+    allergen_code: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    kinship: Mapped[str] = mapped_column(String(50), default="altro")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    allergens = relationship(
+        "Allergen", secondary="profile_allergens", lazy="selectin"
+    )
+    profile_allergens = relationship(
+        "ProfileAllergen", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+    @property
+    def relationship(self) -> str:
+        return self.kinship
+
+    @relationship.setter
+    def relationship(self, value: str) -> None:
+        self.kinship = value
+
+
+class ProfileAllergen(Base):
+    __tablename__ = "profile_allergens"
+
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("user_profiles.id", ondelete="CASCADE"), primary_key=True
+    )
+    allergen_id: Mapped[int] = mapped_column(
+        ForeignKey("allergens.id", ondelete="CASCADE"), primary_key=True
+    )
+    source: Mapped[str] = mapped_column(
+        String(30), default="manual"
+    )
+    intensity: Mapped[str] = mapped_column(
+        String(30), default="moderata"
+    )
+
+    allergen: Mapped["Allergen"] = relationship(lazy="joined")
+
+
+class ProfileShare(Base):
+    """Token privacy-safe per condividere un profilo allergie.
+
+    Espone solo nome profilo, relazione e allergeni; non include email, documenti,
+    contatti SOS o altri dati sanitari non necessari allo scopo.
+    """
+    __tablename__ = "profile_shares"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    source_profile_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("user_profiles.id", ondelete="CASCADE"), nullable=True
+    )
+    token: Mapped[str] = mapped_column(String(80), unique=True)
+    label: Mapped[str] = mapped_column(String(120))
+    scope: Mapped[str] = mapped_column(String(30), default="24h")
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    owner = relationship("User", lazy="joined")
+    source_profile = relationship("UserProfile", lazy="joined")
+

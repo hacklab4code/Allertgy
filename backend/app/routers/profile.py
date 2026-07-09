@@ -1,5 +1,6 @@
+import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -14,6 +15,7 @@ from ..models import (
     DocumentAccessLog,
     MedicalDocument,
     Notification,
+    ProfileShare,
     User,
     UserAllergen,
     UserDocument,
@@ -32,6 +34,12 @@ from ..schemas import (
     ProfilePhotoOut,
     UserDocumentOut,
     UserProfileOut,
+    SubProfileIn,
+    SubProfileOut,
+    SubProfileAllergenOut,
+    ProfileShareCreateIn,
+    ProfileShareOut,
+    SharedProfileOut,
 )
 from ..security import get_current_user
 from ..rate_limit import rate_limiter
@@ -371,7 +379,11 @@ def extract_allergens_from_document(
     except Exception:
         raise HTTPException(500, "Impossibile leggere il documento dallo storage")
 
-    result = analyze_medical_document(data, doc.mime_type)
+    valid_allergens = [
+        {"code": a.code, "name_it": a.name_it}
+        for a in db.scalars(select(Allergen)).all()
+    ]
+    result = analyze_medical_document(data, doc.mime_type, valid_allergens=valid_allergens)
 
     # Sostituisce le estrazioni non ancora applicate di questo documento
     db.execute(
@@ -543,3 +555,278 @@ def get_my_documents(
     return db.scalars(
         select(UserDocument).where(UserDocument.user_id == user.id)
     ).all()
+
+
+# ---------- Gestione Sottoprofili (Fase 3) ----------
+
+@router.get("/sub-profiles", response_model=list[SubProfileOut])
+def list_sub_profiles(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Elenca tutti i profili dell'utente corrente (famiglia / sottoprofili)."""
+    from ..models import UserProfile
+    profiles = db.scalars(
+        select(UserProfile)
+        .where(UserProfile.user_id == user.id)
+        .order_by(UserProfile.relationship == 'io', UserProfile.created_at)
+    ).all()
+    
+    res = []
+    for p in profiles:
+        allergen_list = []
+        for pa in p.profile_allergens:
+            from ..models import Allergen
+            a_obj = db.get(Allergen, pa.allergen_id)
+            if a_obj:
+                allergen_list.append(
+                    SubProfileAllergenOut(
+                        code=a_obj.code,
+                        name_it=a_obj.name_it,
+                        emoji=a_obj.emoji,
+                        intensity=pa.intensity
+                    )
+                )
+        res.append(
+            SubProfileOut(
+                id=p.id,
+                name=p.name,
+                relationship=p.relationship,
+                allergens=allergen_list,
+                created_at=p.created_at
+            )
+        )
+    return res
+
+
+@router.post("/sub-profiles", response_model=SubProfileOut)
+def create_sub_profile(
+    data: SubProfileIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Crea un nuovo sottoprofilo (es. figlio, coniuge)."""
+    from ..models import UserProfile, ProfileAllergen, Allergen
+    
+    p = UserProfile(user_id=user.id, name=data.name, relationship=data.relationship)
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    
+    allergen_list = []
+    for item in data.allergens:
+        a_obj = db.scalar(select(Allergen).where(Allergen.code == item.code))
+        if not a_obj:
+            raise HTTPException(400, f"Codice allergene non valido: {item.code}")
+        
+        pa = ProfileAllergen(
+            profile_id=p.id,
+            allergen_id=a_obj.id,
+            source="manual",
+            intensity=item.intensity
+        )
+        db.add(pa)
+        allergen_list.append(
+            SubProfileAllergenOut(
+                code=a_obj.code,
+                name_it=a_obj.name_it,
+                emoji=a_obj.emoji,
+                intensity=item.intensity
+            )
+        )
+    db.commit()
+    
+    return SubProfileOut(
+        id=p.id,
+        name=p.name,
+        relationship=p.relationship,
+        allergens=allergen_list,
+        created_at=p.created_at
+    )
+
+
+@router.put("/sub-profiles/{pid}", response_model=SubProfileOut)
+def update_sub_profile(
+    pid: int,
+    data: SubProfileIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Aggiorna un sottoprofilo esistente (inclusi allergeni)."""
+    from ..models import UserProfile, ProfileAllergen, Allergen
+    
+    p = db.get(UserProfile, pid)
+    if not p or p.user_id != user.id:
+        raise HTTPException(404, "Sottoprofilo non trovato")
+        
+    p.name = data.name
+    if p.relationship != 'io':
+        p.relationship = data.relationship
+        
+    db.commit()
+    
+    db.execute(delete(ProfileAllergen).where(ProfileAllergen.profile_id == p.id))
+    db.commit()
+    
+    allergen_list = []
+    for item in data.allergens:
+        a_obj = db.scalar(select(Allergen).where(Allergen.code == item.code))
+        if not a_obj:
+            raise HTTPException(400, f"Codice allergene non valido: {item.code}")
+        
+        pa = ProfileAllergen(
+            profile_id=p.id,
+            allergen_id=a_obj.id,
+            source="manual",
+            intensity=item.intensity
+        )
+        db.add(pa)
+        allergen_list.append(
+            SubProfileAllergenOut(
+                code=a_obj.code,
+                name_it=a_obj.name_it,
+                emoji=a_obj.emoji,
+                intensity=item.intensity
+            )
+        )
+    db.commit()
+    
+    return SubProfileOut(
+        id=p.id,
+        name=p.name,
+        relationship=p.relationship,
+        allergens=allergen_list,
+        created_at=p.created_at
+    )
+
+
+@router.delete("/sub-profiles/{pid}")
+def delete_sub_profile(
+    pid: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Elimina un sottoprofilo. Non è possibile eliminare il proprio profilo principale 'io'."""
+    from ..models import UserProfile
+    
+    p = db.get(UserProfile, pid)
+    if not p or p.user_id != user.id:
+        raise HTTPException(404, "Sottoprofilo non trovato")
+        
+    if p.relationship == 'io':
+        raise HTTPException(400, "Non è consentito eliminare il proprio profilo principale")
+        
+    db.delete(p)
+    db.commit()
+    return {"detail": "Sottoprofilo eliminato con successo"}
+
+
+# ---------- Condivisione profilo allergie ----------
+
+def _share_allergens_from_user(user: User) -> list[SubProfileAllergenOut]:
+    return [
+        SubProfileAllergenOut(
+            code=ua.allergen.code,
+            name_it=ua.allergen.name_it,
+            emoji=ua.allergen.emoji,
+            intensity=ua.intensity,
+        )
+        for ua in user.user_allergens
+    ]
+
+
+def _share_allergens_from_profile(profile) -> list[SubProfileAllergenOut]:
+    return [
+        SubProfileAllergenOut(
+            code=pa.allergen.code,
+            name_it=pa.allergen.name_it,
+            emoji=pa.allergen.emoji,
+            intensity=pa.intensity,
+        )
+        for pa in profile.profile_allergens
+    ]
+
+
+@router.post("/shares", response_model=ProfileShareOut, status_code=201)
+def create_profile_share(
+    data: ProfileShareCreateIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Crea un token per condividere un profilo allergie.
+
+    `duration=24h` è pensato per festa/spesa temporanea. `permanent` è per
+    famiglia o caregiver abituali. Il token espone solo allergeni e intensità.
+    """
+    if user.role != "customer":
+        raise HTTPException(403, "La condivisione profilo è riservata agli utenti cliente")
+
+    label = (data.label or "").strip()
+    source_profile_id = None
+    if data.profile_id is not None:
+        from ..models import UserProfile
+
+        profile = db.get(UserProfile, data.profile_id)
+        if not profile or profile.user_id != user.id:
+            raise HTTPException(404, "Profilo da condividere non trovato")
+        source_profile_id = profile.id
+        label = label or profile.name
+    else:
+        label = label or (user.display_name or "Io")
+
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(hours=24) if data.duration == "24h" else None
+    token = secrets.token_urlsafe(24)
+    share = ProfileShare(
+        owner_user_id=user.id,
+        source_profile_id=source_profile_id,
+        token=token,
+        label=label[:120],
+        scope=data.duration,
+        expires_at=expires_at,
+    )
+    db.add(share)
+    db.commit()
+    db.refresh(share)
+    return ProfileShareOut(
+        id=share.id,
+        token=share.token,
+        label=share.label,
+        scope=share.scope,
+        expires_at=share.expires_at,
+        created_at=share.created_at,
+        share_url=f"/shared-profile/{share.token}",
+    )
+
+
+@router.get("/shares/{token}", response_model=SharedProfileOut)
+def get_shared_profile(token: str, db: Session = Depends(get_db)):
+    share = db.scalar(select(ProfileShare).where(ProfileShare.token == token))
+    if not share or share.revoked_at:
+        raise HTTPException(404, "Profilo condiviso non trovato")
+
+    now = datetime.now(timezone.utc)
+    expires_at = share.expires_at
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at <= now:
+        raise HTTPException(410, "Questo profilo condiviso è scaduto")
+
+    if share.source_profile:
+        profile_name = share.source_profile.name
+        relationship = share.source_profile.kinship
+        allergens = _share_allergens_from_profile(share.source_profile)
+    else:
+        profile_name = share.label
+        relationship = "io"
+        allergens = _share_allergens_from_user(share.owner)
+
+    return SharedProfileOut(
+        token=share.token,
+        label=share.label,
+        owner_display_name=share.owner.display_name,
+        profile_name=profile_name,
+        relationship=relationship,
+        expires_at=share.expires_at,
+        allergens=allergens,
+    )

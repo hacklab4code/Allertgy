@@ -69,9 +69,9 @@ def _analyze_with_gemini(image_bytes: bytes, mime_type: str) -> AnalyzeOut:
     try:
         client = genai.Client(api_key=settings.gemini_api_key)
         
-        # Effettua la chiamata multimodale usando gemini-2.0-flash con output strutturato
+        # Effettua la chiamata multimodale usando gemini-2.5-flash con output strutturato
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-2.5-flash',
             contents=[
                 types.Part.from_bytes(
                     data=image_bytes,
@@ -98,5 +98,98 @@ def _analyze_with_gemini(image_bytes: bytes, mime_type: str) -> AnalyzeOut:
         return AnalyzeOut(
             ai_stub=True,
             note=f"Chiamata a Gemini Vision fallita: {e}. (Uso stub)",
+            piatti=STUB_PIATTI
+        )
+
+
+PROMPT_GEMINI_TEXT = """Analizza il testo o HTML di questo menù di ristorante italiano.
+Per ogni piatto identifica gli allergeni tra i 14 previsti dal Reg. UE 1169/2011,
+usando ESATTAMENTE questi codici: glutine, crostacei, uova, pesce, arachidi, soia,
+latte, frutta_a_guscio, sedano, senape, sesamo, solfiti, lupini, molluschi.
+Distingui tra allergeni sicuramente contenuti negli ingredienti e possibili tracce.
+Rispondi SOLO con JSON: {"piatti":[{"nome_piatto":"","descrizione":"","categoria":"","prezzo_cents":0,"allergeni_contenuti":[],"allergeni_tracce":[]}]}"""
+
+
+def analyze_menu_url(url: str) -> AnalyzeOut:
+    if not settings.gemini_api_key:
+        return AnalyzeOut(
+            ai_stub=True,
+            note="Analisi AI non ancora attiva (GEMINI_API_KEY assente). Uso stub.",
+            piatti=STUB_PIATTI,
+        )
+
+    import urllib.request
+    import urllib.error
+
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                )
+            },
+        )
+        with urllib.request.urlopen(req, timeout=12) as response:
+            content_type = (response.info().get_content_type() or "").lower()
+            content_bytes = response.read()
+
+        if content_type.startswith("image/"):
+            return _analyze_with_gemini(content_bytes, content_type)
+        elif content_type == "application/pdf":
+            return _analyze_with_gemini(content_bytes, content_type)
+        else:
+            text_content = content_bytes.decode("utf-8", errors="ignore")
+            return _analyze_text_with_gemini(text_content)
+
+    except Exception as e:
+        return AnalyzeOut(
+            ai_stub=True,
+            note=f"Impossibile analizzare il link ({e}). Uso stub dimostrativo.",
+            piatti=STUB_PIATTI,
+        )
+
+
+def _analyze_text_with_gemini(text_content: str) -> AnalyzeOut:
+    try:
+        from google import genai
+        from google.genai import types
+    except ImportError:
+        return AnalyzeOut(
+            ai_stub=True,
+            note="Modulo 'google-genai' non installato. (Uso stub)",
+            piatti=STUB_PIATTI,
+        )
+
+    try:
+        client = genai.Client(api_key=settings.gemini_api_key)
+        truncated_text = text_content[:20000]
+        
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                f"Contenuto del menu:\n\n{truncated_text}\n\n",
+                PROMPT_GEMINI_TEXT
+            ],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=GeminiMenuOutput,
+            )
+        )
+        
+        result = response.parsed
+        if not result or not hasattr(result, "piatti"):
+            raise ValueError("Risposta da Gemini non strutturata correttamente")
+            
+        return AnalyzeOut(
+            ai_stub=False,
+            note="Analisi del testo completata con successo tramite Gemini!",
+            piatti=result.piatti
+        )
+    except Exception as e:
+        return AnalyzeOut(
+            ai_stub=True,
+            note=f"Chiamata a Gemini per analisi testo fallita: {e}. (Uso stub)",
             piatti=STUB_PIATTI
         )

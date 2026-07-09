@@ -45,6 +45,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="home" options={{ title: 'AllerTgy', tabBarLabel: 'Cerca', tabBarIcon: icon('🔍') }} />
+      <Tabs.Screen name="spesa" options={{ title: 'Spesa', tabBarLabel: 'Spesa', tabBarIcon: icon('🛒') }} />
       <Tabs.Screen name="locali" options={{ title: 'I miei locali', tabBarLabel: 'Locali', tabBarIcon: icon('🍽️') }} />
       <Tabs.Screen name="account" options={{ title: 'Account', tabBarLabel: 'Account', tabBarIcon: icon('👤') }} />
     </Tabs>

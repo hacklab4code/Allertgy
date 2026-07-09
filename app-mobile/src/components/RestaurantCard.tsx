@@ -5,7 +5,7 @@
  */
 import { router } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableOpacity, View, Linking, Platform } from 'react-native';
 import { compatibilitaColor, type CompatibilitaResult } from '../engine/compatibility';
 import { colors, radius, shadow, spacing, typography } from '../theme';
 
@@ -20,6 +20,9 @@ interface Props {
   isFavorite: boolean;
   onToggleFavorite: () => void;
   compact?: boolean;
+  distanceLabel?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 const RING_SIZE = 62;
@@ -68,6 +71,9 @@ export default function RestaurantCard({
   isFavorite,
   onToggleFavorite,
   compact = false,
+  distanceLabel,
+  latitude,
+  longitude,
 }: Props) {
   const pct = compatibility?.percentuale ?? 0;
   const hasMenu = compatibility !== null && compatibility.totaleDishes > 0;
@@ -145,7 +151,7 @@ export default function RestaurantCard({
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{name}</Text>
         <Text style={styles.meta} numberOfLines={1}>
-          {city ? `${city} · ` : ''}#{code}
+          {city ? `${city} · ` : ''}{distanceLabel ? `${distanceLabel} · ` : ''}#{code}
         </Text>
 
         {/* Badge semaforo + conteggio piatti */}
@@ -160,14 +166,38 @@ export default function RestaurantCard({
           )}
         </View>
 
-        {/* Rating */}
-        {ratingAvg != null && ratingCount != null && ratingCount > 0 && (
-          <View style={styles.ratingRow}>
-            <Text style={styles.ratingStar}>★</Text>
-            <Text style={styles.ratingText}>{ratingAvg.toFixed(1)}</Text>
-            <Text style={styles.ratingCount}>({ratingCount})</Text>
-          </View>
-        )}
+        {/* Rating & Naviga */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: 4 }}>
+          {ratingAvg != null && ratingCount != null && ratingCount > 0 ? (
+            <View style={styles.ratingRow}>
+              <Text style={styles.ratingStar}>★</Text>
+              <Text style={styles.ratingText}>{ratingAvg.toFixed(1)}</Text>
+              <Text style={styles.ratingCount}>({ratingCount})</Text>
+            </View>
+          ) : null}
+          
+          {latitude && longitude ? (
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                const scheme = Platform.select({ ios: 'maps://0,0?q=', android: 'geo:0,0?q=' });
+                const latLng = `${latitude},${longitude}`;
+                const label = name;
+                const url = Platform.select({
+                  ios: `${scheme}${encodeURIComponent(label)}@${latLng}`,
+                  android: `${scheme}${latLng}(${encodeURIComponent(label)})`
+                });
+                if (url) {
+                  Linking.openURL(url).catch(() => {});
+                }
+              }}
+              style={styles.navBtn}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.navBtnText}>🗺️ Naviga</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
 
       {/* Bottone preferito con animazione bounce */}
@@ -291,6 +321,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
     fontWeight: '600',
+  },
+  navBtn: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  navBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.brandDark,
   },
 
   // Preferito

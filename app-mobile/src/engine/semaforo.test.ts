@@ -40,39 +40,47 @@ assert.equal(
   'verde',
 );
 
-// --- TEST DIETE ---
-const insalataVegan = {
-  nome_piatto: 'Insalata Greca Vegana',
-  descrizione: 'Insalata con finto formaggio vegano, olive e pomodori',
-  allergeni_contenuti: ['vegano'],
+// --- TEST DIETE (basate su ingredienti reali, non tag fittizi) ---
+const vegBurger = {
+  nome_piatto: 'Veg Burger',
+  descrizione: 'Burger con seitan, verdure grigliate e salsa di soia',
+  allergeni_contenuti: ['glutine', 'soia'],
+  allergeni_tracce: ['senape'],
+};
+
+const pizzaFormaggio = {
+  nome_piatto: 'Pizza Margherita',
+  descrizione: 'Pizza con pomodoro, mozzarella e basilico',
+  allergeni_contenuti: ['glutine', 'latte'],
   allergeni_tracce: [] as string[],
 };
 
-const insalataVegetariana = {
-  nome_piatto: 'Insalata Greca Vegetariana',
-  descrizione: 'Insalata con feta greca e cetrioli',
-  allergeni_contenuti: ['vegetariano'],
+const tagliataManzo = {
+  nome_piatto: 'Tagliata di manzo',
+  descrizione: 'Tagliata di manzo con rucola e grana',
+  allergeni_contenuti: ['latte'],
   allergeni_tracce: [] as string[],
 };
 
-const carbonaraNonVegan = {
-  nome_piatto: 'Carbonara',
-  descrizione: 'Pasta con uovo e guanciale',
-  allergeni_contenuti: ['glutine', 'uova'],
+const insalataMista = {
+  nome_piatto: 'Insalata Mista',
+  descrizione: 'Lattuga, pomodori, mais e olive',
+  allergeni_contenuti: [] as string[],
   allergeni_tracce: [] as string[],
 };
 
 // Profilo vegano
-assert.equal(calcolaSemaforo(['vegano'], insalataVegan).stato, 'verde');
-assert.equal(calcolaSemaforo(['vegano'], insalataVegetariana).stato, 'rosso');
-assert.deepEqual(calcolaSemaforo(['vegano'], insalataVegetariana).match_contenuti, ['vegano']);
-assert.equal(calcolaSemaforo(['vegano'], carbonaraNonVegan).stato, 'rosso');
+assert.equal(calcolaSemaforo(['vegano'], vegBurger).stato, 'verde', 'Veg burger dovrebbe essere verde per vegano');
+assert.equal(calcolaSemaforo(['vegano'], pizzaFormaggio).stato, 'rosso', 'Pizza con mozzarella dovrebbe essere rossa per vegano');
+assert.equal(calcolaSemaforo(['vegano'], tagliataManzo).stato, 'rosso', 'Tagliata di manzo dovrebbe essere rossa per vegano');
+assert.equal(calcolaSemaforo(['vegano'], insalataMista).stato, 'verde', 'Insalata mista dovrebbe essere verde per vegano');
 
 // Profilo vegetariano
-assert.equal(calcolaSemaforo(['vegetariano'], insalataVegan).stato, 'verde');
-assert.equal(calcolaSemaforo(['vegetariano'], insalataVegetariana).stato, 'verde');
-assert.equal(calcolaSemaforo(['vegetariano'], carbonaraNonVegan).stato, 'rosso');
-assert.deepEqual(calcolaSemaforo(['vegetariano'], carbonaraNonVegan).match_contenuti, ['vegetariano']);
+assert.equal(calcolaSemaforo(['vegetariano'], vegBurger).stato, 'verde', 'Veg burger dovrebbe essere verde per vegetariano');
+assert.equal(calcolaSemaforo(['vegetariano'], pizzaFormaggio).stato, 'verde', 'Pizza margherita dovrebbe essere verde per vegetariano (latte ok)');
+assert.equal(calcolaSemaforo(['vegetariano'], tagliataManzo).stato, 'rosso', 'Tagliata di manzo dovrebbe essere rossa per vegetariano');
+assert.deepEqual(calcolaSemaforo(['vegetariano'], tagliataManzo).match_contenuti, ['vegetariano'], 'Match vegetariano su tagliata');
+assert.equal(calcolaSemaforo(['vegetariano'], insalataMista).stato, 'verde', 'Insalata mista dovrebbe essere verde per vegetariano');
 
 
 // --- TEST INGREDIENTI ESCLUSI ---

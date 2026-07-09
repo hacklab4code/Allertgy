@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { api, type Allergen, type DishIn, type Photo } from '../api';
+import { api, type Allergen, type DishIn, type Photo, type MenuOutItem } from '../api';
 
 interface Props {
   piatti: DishIn[];
   allergens: Allergen[];
   onChange: (p: DishIn[]) => void;
   restaurantPhotos?: Photo[];
+  menus?: MenuOutItem[];
 }
 
 const STOCK_PHOTOS = [
@@ -20,7 +21,7 @@ const STOCK_PHOTOS = [
   { name: 'Pizza', url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80' },
 ];
 
-export default function MenuEditor({ piatti, allergens, onChange, restaurantPhotos }: Props) {
+export default function MenuEditor({ piatti, allergens, onChange, restaurantPhotos, menus = [] }: Props) {
   const foodAllergens = allergens.filter((a) => !a.is_diet);
   const diets = allergens.filter((a) => a.is_diet);
   const [activeGalleryIndex, setActiveGalleryIndex] = useState<number | null>(null);
@@ -275,6 +276,23 @@ export default function MenuEditor({ piatti, allergens, onChange, restaurantPhot
                   />
                 </div>
 
+                {/* Selettore Menù di appartenenza (Multi-menù) */}
+                {menus && menus.length > 0 && (
+                  <div className="mb-2">
+                    <label className="text-[10px] tracking-wider uppercase text-slate-400 font-bold block mb-1">Menù di appartenenza</label>
+                    <select
+                      value={p.menu_id || ''}
+                      onChange={(e) => update(i, { menu_id: e.target.value ? Number(e.target.value) : null })}
+                      className="text-xs text-slate-700 font-semibold border border-slate-200/60 rounded-xl px-3 py-2 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300 focus:bg-white focus:border-emerald-500 focus:outline-none w-full transition-all cursor-pointer"
+                    >
+                      <option value="">Nessuno (Tutti i Menù)</option>
+                      {menus.map((m) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 {/* Sezione Menù e Categoria in 2 colonne */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -378,6 +396,30 @@ export default function MenuEditor({ piatti, allergens, onChange, restaurantPhot
                             );
                           })}
                         </div>
+                      </div>
+
+                      {/* Controllo Contaminazione Cucina */}
+                      <div className="bg-amber-50 border border-amber-250 rounded-2xl p-3 mt-3 space-y-2">
+                        <span className="text-[10px] font-black text-amber-900 uppercase tracking-wide block">
+                          🛡️ Sicurezza Contaminazione Crociata
+                        </span>
+                        <label className="flex items-start gap-2 cursor-pointer text-[10px] text-slate-700 font-semibold leading-relaxed">
+                          <input
+                            type="checkbox"
+                            checked={p.kitchen_protocol_confirmed === 1}
+                            onChange={(e) => {
+                              const checked = e.target.checked ? 1 : 0;
+                              update(i, {
+                                kitchen_protocol_confirmed: checked,
+                                cross_contamination_checked_at: checked ? new Date().toISOString() : null
+                              });
+                            }}
+                            className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span>
+                            Confermo l'assenza di contaminazione crociata (es. farine volatili, olio di frittura condiviso) per gli allergeni esclusi.
+                          </span>
+                        </label>
                       </div>
                     </div>
                   ) : (

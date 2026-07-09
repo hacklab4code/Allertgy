@@ -16,8 +16,21 @@ function present(n: AppNotification): Presented {
       return { icon: '🍽️', title: 'Menù aggiornato', body: 'Un locale tra i tuoi preferiti ha pubblicato un nuovo menù. Controlla il semaforo!', code };
     case 'review_reply':
       return { icon: '💬', title: 'Risposta alla tua recensione', body: 'Il ristoratore ha risposto alla tua recensione.', code };
+    case 'promo':
+    case 'broadcast':
+      return {
+        icon: '📢',
+        title: payload.title || 'Novità dal locale',
+        body: payload.body || 'Hai una nuova comunicazione.',
+        code: payload.public_code || code
+      };
     default:
-      return { icon: '🔔', title: 'Notifica', body: n.type, code };
+      return {
+        icon: '🔔',
+        title: payload.title || 'Notifica',
+        body: payload.body || n.type,
+        code
+      };
   }
 }
 
@@ -41,7 +54,16 @@ export default function Notifiche() {
   const open = (n: AppNotification) => {
     const p = present(n);
     if (!n.read_at) markRead(n.id);
-    if (p.code) router.push(`/menu/${p.code}`);
+    if (p.code) {
+      if (n.type === 'promo' || n.type === 'broadcast') {
+        router.push({
+          pathname: `/menu/${p.code}`,
+          params: { promoTitle: p.title, promoBody: p.body }
+        });
+      } else {
+        router.push(`/menu/${p.code}`);
+      }
+    }
   };
 
   return (

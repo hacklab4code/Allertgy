@@ -6,19 +6,10 @@ import {
 } from 'react-native';
 import { api } from '../src/api/client';
 import { useSession } from '../src/store/session';
-import { getSectionTitle, groupAllergensBySection, getLang } from '../src/engine/translations';
+import { getSectionTitle, groupAllergensBySection, getLang, TRANSLATED_ALLERGENS } from '../src/engine/translations';
 import type { Allergen } from '../src/types';
-
-const getFlagEmoji = (lang: string | null) => {
-  switch (lang?.toLowerCase()) {
-    case 'it': return '🇮🇹';
-    case 'en': return '🇬🇧';
-    case 'es': return '🇪🇸';
-    case 'fr': return '🇫🇷';
-    case 'de': return '🇩🇪';
-    default: return '🌐';
-  }
-};
+import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
+import { useTranslation } from '../src/constants/translations';
 
 export default function Allergie() {
   const [all, setAll] = useState<Allergen[]>([]);
@@ -32,6 +23,8 @@ export default function Allergie() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const { setAllergie, setProfileCompleted, language } = useSession();
+  const { t } = useTranslation();
+  const isIt = (language || 'it').toLowerCase() === 'it';
   const lang = getLang(language);
 
   useEffect(() => {
@@ -49,6 +42,7 @@ export default function Allergie() {
         items: s.items.filter(
           (a) =>
             a.name_it.toLowerCase().includes(q) ||
+            (TRANSLATED_ALLERGENS[a.code.toLowerCase()]?.en.toLowerCase().includes(q)) ||
             (a.code && a.code.toLowerCase().includes(q)) ||
             (a.emoji && a.emoji.includes(q))
         ),
@@ -78,13 +72,13 @@ export default function Allergie() {
 
   const onLongPress = (code: string, name: string) => {
     Alert.alert(
-      `Intensità: ${name}`,
-      `Imposta quanto è grave questa allergia:`,
+      isIt ? `Intensità: ${name}` : `Severity: ${name}`,
+      isIt ? `Imposta quanto è grave questa allergia:` : `Set how severe this allergy is:`,
       [
-        { text: 'Lieve', onPress: () => updateIntensity(code, 'lieve') },
-        { text: 'Moderata', onPress: () => updateIntensity(code, 'moderata') },
-        { text: 'Grave/Anafilassi', onPress: () => updateIntensity(code, 'grave'), style: 'destructive' },
-        { text: 'Annulla', style: 'cancel' },
+        { text: isIt ? 'Lieve' : 'Mild', onPress: () => updateIntensity(code, 'lieve') },
+        { text: isIt ? 'Moderata' : 'Moderate', onPress: () => updateIntensity(code, 'moderata') },
+        { text: isIt ? 'Grave/Anafilassi' : 'Severe/Anaphylaxis', onPress: () => updateIntensity(code, 'grave'), style: 'destructive' },
+        { text: isIt ? 'Annulla' : 'Cancel', style: 'cancel' },
       ]
     );
   };
@@ -125,14 +119,14 @@ export default function Allergie() {
       <TouchableOpacity
         style={btnStyle}
         onPress={() => toggle(a.code)}
-        onLongPress={() => onLongPress(a.code, a.name_it)}
+        onLongPress={() => onLongPress(a.code, isIt ? a.name_it : (TRANSLATED_ALLERGENS[a.code.toLowerCase()]?.en || a.name_it))}
         delayLongPress={300}
       >
         <Text style={textStyle}>
-          {a.emoji} {a.name_it}
-          {on && intensities[a.code] === 'lieve' && ' (Lieve)'}
+          {a.emoji} {isIt ? a.name_it : (TRANSLATED_ALLERGENS[a.code.toLowerCase()]?.en || a.name_it)}
+          {on && intensities[a.code] === 'lieve' && (isIt ? ' (Lieve)' : ' (Mild)')}
           {on && (!intensities[a.code] || intensities[a.code] === 'moderata') && ' (Mod.)'}
-          {on && intensities[a.code] === 'grave' && ' (Grave)'}
+          {on && intensities[a.code] === 'grave' && (isIt ? ' (Grave)' : ' (Severe)')}
         </Text>
       </TouchableOpacity>
     );
@@ -140,19 +134,12 @@ export default function Allergie() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-      <Stack.Screen options={{
-        headerRight: () => (
-          <TouchableOpacity onPress={() => router.push('/language')} style={{ marginRight: 4 }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F8A6A' }}>{getFlagEmoji(language)} {(language || 'it').toUpperCase()}</Text>
-          </TouchableOpacity>
-        )
-      }} />
+      <Stack.Screen options={{ headerRight: undefined }} />
+      <LanguageFlagsRow />
+
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Seleziona le tue allergie e intolleranze</Text>
-        <Text style={styles.subtitle}>
-          Scegli tra oltre 100 allergeni e intolleranze organizzati per categoria.
-          Tieni premuto un chip per impostare l'intensità. Puoi anche continuare senza selezioni.
-        </Text>
+        <Text style={styles.title}>{t('select_allergies_title')}</Text>
+        <Text style={styles.subtitle}>{t('select_allergies_subtitle')}</Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {all.length === 0 && !error ? <ActivityIndicator style={{ marginTop: 40 }} /> : null}
 
@@ -162,7 +149,7 @@ export default function Allergie() {
             <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
               style={styles.searchInput}
-              placeholder="Cerca allergene (es. latte, glutine…)"
+              placeholder={t('search_allergen_placeholder')}
               placeholderTextColor="#94a3b8"
               value={search}
               onChangeText={setSearch}
@@ -182,8 +169,8 @@ export default function Allergie() {
         {search.trim() !== '' && (
           <Text style={styles.searchCount}>
             {totalFiltered > 0
-              ? `${totalFiltered} risultati per "${search}"`
-              : `Nessun risultato per "${search}"`}
+              ? (isIt ? `${totalFiltered} risultati per "${search}"` : `${totalFiltered} results for "${search}"`)
+              : (isIt ? `Nessun risultato per "${search}"` : `No results for "${search}"`)}
           </Text>
         )}
 
@@ -210,7 +197,9 @@ export default function Allergie() {
         {busy
           ? <ActivityIndicator color="#fff" />
           : <Text style={styles.saveText}>
-              {selected.size === 0 ? 'Continua senza allergie' : `Salva profilo (${selected.size} selezionati)`}
+              {selected.size === 0 
+                ? (isIt ? 'Continua senza allergie' : 'Continue without allergies') 
+                : (isIt ? `Salva profilo (${selected.size} selezionati)` : `Save profile (${selected.size} selected)`)}
             </Text>}
       </TouchableOpacity>
     </View>

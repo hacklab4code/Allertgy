@@ -44,14 +44,18 @@ const PLANS: Plan[] = [
     trial: true,
   },
   {
-    name: "Pro Notifiche",
+    name: "Pro Crescita",
     price: "€19",
     period: "/mese",
-    desc: "Come Base, più notifiche push ai tuoi clienti fedeli.",
+    desc: "Come Base, più strumenti per far tornare i clienti allergy-friendly.",
     features: [
       "Tutto del piano Base",
       "Notifiche push ai clienti che ti preferiscono",
       "Promuovi sconti, novità e offerte",
+      "Analisi AI menù illimitate",
+      "Traduzioni automatiche in 15 lingue",
+      "Statistiche avanzate su scansioni e allergeni cercati",
+      'Badge "Allergy-friendly" in evidenza',
       "Fino a 20 foto in galleria",
     ],
     cta: "Prova gratis 14 giorni",
@@ -186,6 +190,31 @@ export const PricingSection = ({ scrollTo, onSelectPlan }: PricingSectionProps) 
         <div className="text-right shrink-0">
           <div className="text-2xl font-extrabold text-[#854D0E] font-heading">€9,90</div>
           <div className="text-[11px] text-[#854D0E]/70 font-semibold">per 30 giorni</div>
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-60px" }}
+        transition={{ duration: 0.5 }}
+        className="mt-8 card-clay-white p-6 md:p-7 flex flex-col md:flex-row items-start md:items-center gap-5"
+      >
+        <div className="flex-1">
+          <span className="text-[10px] font-black bg-[#DCFCE7] text-[#166534] px-2.5 py-1 rounded-full uppercase">
+            Clienti · Plus Famiglia
+          </span>
+          <h3 className="text-xl font-extrabold text-[#1C221F] font-heading mt-3">
+            Il semaforo resta gratis. Plus sblocca famiglia, spesa e profili condivisi.
+          </h3>
+          <p className="text-sm text-[#4A524D] mt-2 leading-relaxed">
+            Per chi gestisce allergie di figli, nonni o feste: sottoprofili illimitati,
+            condivisione profilo 24h/permanente, scanner spesa illimitato e documenti AI.
+          </p>
+        </div>
+        <div className="text-left md:text-right shrink-0">
+          <div className="text-3xl font-extrabold text-[#166534] font-heading">€3,99</div>
+          <div className="text-[11px] text-[#166534]/70 font-semibold">/mese · opzionale</div>
         </div>
       </motion.div>
     </div>

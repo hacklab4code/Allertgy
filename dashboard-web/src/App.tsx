@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
-import { api, API, clearToken, hasToken, type Allergen, type DishIn, type Photo, type Restaurant } from './api';
+import { api, API, clearToken, hasToken, type Allergen, type DishIn, type Photo, type Restaurant, type MenuOutItem } from './api';
 import ClientArea from './components/ClientArea';
 import InternalAdmin from './components/InternalAdmin';
 import LegalPage from './components/LegalPage';
 import Login from './components/Login';
 import MenuEditor from './components/MenuEditor';
 import NotificationsPanel from './components/NotificationsPanel';
+import PushNotificationPanel from './components/PushNotificationPanel';
 import PublicRestaurant from './components/PublicRestaurant';
 import ResetPassword from './components/ResetPassword';
 import Landing from './Landing';
@@ -44,7 +45,7 @@ const PLAN_FEATURES = [
     name: 'Base',
     price: '€9/mese',
     description: 'Carica il tuo menù e gestisci il locale con tutti gli strumenti.',
-    trial: '30 giorni gratis',
+    trial: '14 giorni gratis',
     features: [
       'Menù digitale con allergeni e tracce',
       'Badge "Locale verificato"',
@@ -60,7 +61,7 @@ const PLAN_FEATURES = [
     name: 'Pro Notifiche',
     price: '€19/mese',
     description: 'Come Base, più la possibilità di inviare notifiche push ai clienti fedeli.',
-    trial: '30 giorni gratis',
+    trial: '14 giorni gratis',
     features: [
       'Tutto del piano Base',
       'Notifiche push agli utenti che ti hanno preferito',
@@ -113,15 +114,67 @@ export default function App() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [current, setCurrent] = useState<Restaurant | null>(null);
   const [allergens, setAllergens] = useState<Allergen[]>([]);
+  const getAllergenName = (code: string) => {
+    const found = allergens.find(a => a.code === code);
+    return found ? found.name_it : code.replace(/_/g, ' ');
+  };
   const [piatti, setPiatti] = useState<DishIn[] | null>(null);
   const [hasPublished, setHasPublished] = useState(false);
   const [aiNote, setAiNote] = useState('');
+  const [menuUrl, setMenuUrl] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [approved, setApproved] = useState<Restaurant | null>(null);
   const [newName, setNewName] = useState('');
   const [newCity, setNewCity] = useState('');
+  const [newAddress, setNewAddress] = useState('');
+  const [newLatitude, setNewLatitude] = useState<number | ''>('');
+  const [newLongitude, setNewLongitude] = useState<number | ''>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [menuLegalAck, setMenuLegalAck] = useState(false);
+  const [menus, setMenus] = useState<MenuOutItem[]>([]);
+  const [selectedMenuId, setSelectedMenuId] = useState<number | null>(null);
+  const [newMenuName, setNewMenuName] = useState('');
+  const [showAddMenuModal, setShowAddMenuModal] = useState(false);
+  const [webLang, setWebLang] = useState('it');
+
+  const TRANSLATIONS: Record<string, Record<string, string>> = {
+    it: {
+      dashboardTitle: "Area Ristoratori",
+      welcome: "Benvenuto",
+      menuEditor: "Editor Menù",
+      save: "Salva",
+      settings: "Impostazioni",
+      translateButton: "🤖 Traduci con AI",
+      translateSuccess: "Traduzione completata!",
+      crossContaminationTitle: "Controllo Contaminazione Crociata",
+      crossContaminationQ1: "Questo piatto viene preparato in aree con rischio di contatto crociato?",
+      crossContaminationConfirm: "Confermo che lo staff segue i protocolli di prevenzione delle contaminazioni crociate.",
+      newMenu: "Nuovo Menù",
+      addMenu: "Aggiungi Menù",
+      menuName: "Nome del Menù"
+    },
+    en: {
+      dashboardTitle: "Restaurant Area",
+      welcome: "Welcome",
+      menuEditor: "Menu Editor",
+      save: "Save & Publish",
+      settings: "Settings",
+      translateButton: "🤖 Translate with AI",
+      translateSuccess: "Menu translated successfully!",
+      crossContaminationTitle: "Cross-Contamination Verification",
+      crossContaminationQ1: "Is this dish prepared in areas with cross-contamination risk?",
+      crossContaminationConfirm: "I confirm the staff follows cross-contamination prevention protocols.",
+      newMenu: "New Menu",
+      addMenu: "Add Menu",
+      menuName: "Menu Name"
+    }
+  };
+  const t = (key: string) => {
+    return TRANSLATIONS[webLang]?.[key] ?? TRANSLATIONS['it']?.[key] ?? key;
+  };
 
   // Navigazione interna Ristorante (SaaS tabs)
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'menu' | 'settings' | 'plan' | 'qr'>('overview');
@@ -135,8 +188,20 @@ export default function App() {
   const [latitude, setLatitude] = useState<number | ''>('');
   const [longitude, setLongitude] = useState<number | ''>('');
   const [website, setWebsite] = useState('');
+  const [settingsMenuUrl, setSettingsMenuUrl] = useState('');
   const [description, setDescription] = useState('');
+  const [googlePlaceId, setGooglePlaceId] = useState('');
+  const [tripadvisorUrl, setTripadvisorUrl] = useState('');
+  const [vatNumber, setVatNumber] = useState('');
+  const [allergenManager, setAllergenManager] = useState('');
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [analytics, setAnalytics] = useState<{
+    restaurant_id: number;
+    total_views: number;
+    total_allergen_queries: number;
+    distribution: { code: string; name: string; emoji: string; count: number }[];
+    time_series: { date: string; count: number }[];
+  } | null>(null);
 
   const settingsMapRef = useRef<any>(null);
   const settingsMarkerRef = useRef<any>(null);
@@ -152,8 +217,21 @@ export default function App() {
       setLatitude(current.latitude ?? '');
       setLongitude(current.longitude ?? '');
       setWebsite(current.website || '');
+      setSettingsMenuUrl(current.menu_url || '');
       setDescription(current.description || '');
+      setGooglePlaceId(current.google_place_id || '');
+      setTripadvisorUrl(current.tripadvisor_url || '');
+      setVatNumber(current.vat_number || '');
+      setAllergenManager(current.allergen_manager || '');
       api.listRestaurantPhotos(current.id).then(setPhotos).catch(() => setPhotos([]));
+      api.getRestaurantAnalytics(current.id).then(setAnalytics).catch(() => setAnalytics(null));
+      api.listMenus(current.id).then((m) => {
+        setMenus(m);
+        if (m.length > 0) setSelectedMenuId(m[0].id);
+      }).catch(() => {
+        setMenus([]);
+        setSelectedMenuId(null);
+      });
     }
   }, [current]);
 
@@ -289,6 +367,18 @@ export default function App() {
     setBusy(false);
   };
 
+  const analyzeFromUrl = async () => {
+    if (!menuUrl.trim()) return;
+    setBusy(true); setError(''); setApproved(null);
+    try {
+      const res = await api.analyzeUrl(menuUrl.trim());
+      setPiatti(res.piatti);
+      setAiNote(res.note);
+      setMenuUrl('');
+    } catch (e) { setError((e as Error).message); }
+    setBusy(false);
+  };
+
   const save = async () => {
     if (!current || !piatti) return;
     if (!restaurantCanUseMenu(current)) {
@@ -350,6 +440,63 @@ export default function App() {
     );
   };
 
+  const searchNominatim = async (query: string) => {
+    if (!query.trim()) return;
+    setIsSearching(true);
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`, {
+        headers: {
+          'Accept-Language': 'it,en'
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSearchSuggestions(data);
+      }
+    } catch (err) {
+      console.error("Errore ricerca Nominatim:", err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSelectSuggestionForCreate = (s: any) => {
+    const name = s.address.restaurant || s.address.pub || s.address.cafe || s.address.amenity || s.address.shop || s.address.name || s.name || s.display_name.split(',')[0];
+    const city = s.address.city || s.address.town || s.address.village || s.address.municipality || s.address.county || '';
+    const road = s.address.road || '';
+    const houseNumber = s.address.house_number || '';
+    const addressStr = houseNumber ? `${road} ${houseNumber}` : road;
+
+    setNewName(name);
+    setNewCity(city);
+    setNewAddress(addressStr);
+    setNewLatitude(Number(s.lat));
+    setNewLongitude(Number(s.lon));
+    setSearchSuggestions([]);
+    setSearchQuery('');
+  };
+
+  const handleSelectSuggestionForEdit = (s: any) => {
+    const road = s.address.road || '';
+    const houseNumber = s.address.house_number || '';
+    const addressStr = houseNumber ? `${road} ${houseNumber}` : road;
+    const lat = Number(s.lat);
+    const lng = Number(s.lon);
+
+    setAddress(addressStr);
+    setLatitude(lat);
+    setLongitude(lng);
+
+    const L = (window as any).L;
+    if (L && settingsMapRef.current && settingsMarkerRef.current) {
+      settingsMarkerRef.current.setLatLng([lat, lng]);
+      settingsMapRef.current.setView([lat, lng], 16);
+    }
+
+    setSearchSuggestions([]);
+    setSearchQuery('');
+  };
+
   const saveSettings = async () => {
     if (!current) return;
     setBusy(true); setError('');
@@ -365,12 +512,29 @@ export default function App() {
         latitude: latitude === '' ? null : Number(latitude),
         longitude: longitude === '' ? null : Number(longitude),
         website: website.trim() || null,
+        menu_url: settingsMenuUrl.trim() || null,
         description: description.trim() || null,
+        google_place_id: googlePlaceId.trim() || null,
+        tripadvisor_url: tripadvisorUrl.trim() || null,
+        vat_number: vatNumber.trim() || null,
+        allergen_manager: allergenManager.trim() || null,
       });
       setCurrent(res);
       setRestaurants(restaurants.map(r => r.id === res.id ? res : r));
       alert("Impostazioni salvate con successo!");
       setActiveSubTab('overview');
+    } catch (e) { setError((e as Error).message); }
+    setBusy(false);
+  };
+
+  const syncExternal = async () => {
+    if (!current) return;
+    setBusy(true); setError('');
+    try {
+      const res = await api.syncExternalReviews(current.public_code);
+      setCurrent(res);
+      setRestaurants(restaurants.map(r => r.id === res.id ? res : r));
+      alert("Valutazioni Google e TripAdvisor sincronizzate con successo!");
     } catch (e) { setError((e as Error).message); }
     setBusy(false);
   };
@@ -507,36 +671,110 @@ export default function App() {
               </div>
             )}
 
-            <div className="pt-4 border-t border-slate-100 space-y-3">
+            <div className="pt-4 border-t border-slate-100 space-y-4">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">AGGIUNGI UN NUOVO LOCALE</span>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <input 
-                  value={newName} 
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Nome del locale (es. Trattoria Da Matteo)" 
-                  className="border border-slate-250 rounded-2xl px-4 py-3 flex-1 text-sm bg-slate-50 focus:bg-white focus:outline-none" 
-                />
-                <input 
-                  value={newCity} 
-                  onChange={(e) => setNewCity(e.target.value)}
-                  placeholder="Città" 
-                  className="border border-slate-250 rounded-2xl px-4 py-3 w-full sm:w-48 text-sm bg-slate-50 focus:bg-white focus:outline-none" 
-                />
-                <button 
-                  disabled={!newName || busy}
-                  onClick={async () => {
-                    setBusy(true);
-                    try {
-                      const r = await api.createRestaurant(newName, newCity);
-                      setRestaurants([...restaurants, r]); 
-                      selectRestaurant(r);
-                    } catch (e) { setError((e as Error).message); }
-                    setBusy(false);
-                  }}
-                  className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm disabled:opacity-40 transition-colors shadow-md shadow-emerald-600/10"
-                >
-                  Crea locale
-                </button>
+              
+              {/* Ricerca Rapida Autocompletamento */}
+              <div className="bg-emerald-50/40 border border-emerald-100 rounded-3xl p-4 space-y-3">
+                <label className="text-[10px] text-emerald-800 uppercase font-black tracking-wider block">🔍 Ricerca Automatica (Trova subito indirizzo e mappa)</label>
+                <div className="flex gap-2">
+                  <input 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        searchNominatim(searchQuery);
+                      }
+                    }}
+                    placeholder="Digita il nome del locale (es. Trattoria Da Matteo Milano)" 
+                    className="border border-slate-250 rounded-2xl px-4 py-3 flex-1 text-sm bg-white focus:outline-none" 
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => searchNominatim(searchQuery)}
+                    disabled={isSearching || !searchQuery.trim()}
+                    className="px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs transition-colors disabled:opacity-40"
+                  >
+                    {isSearching ? 'Cerca...' : 'Trova'}
+                  </button>
+                </div>
+
+                {searchSuggestions.length > 0 && (
+                  <div className="bg-white border border-slate-200 rounded-2xl p-2 max-h-60 overflow-y-auto space-y-1 shadow-lg relative z-20">
+                    {searchSuggestions.map((s, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleSelectSuggestionForCreate(s)}
+                        className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-slate-50 rounded-xl transition-colors block border-b border-slate-100 last:border-b-0"
+                      >
+                        <div className="font-extrabold text-slate-800">{s.display_name.split(',')[0]}</div>
+                        <div className="text-slate-500 mt-0.5 text-[10px] truncate">{s.display_name}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Campi di verifica manuale/creazione */}
+              <div className="space-y-3 pt-2">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input 
+                    value={newName} 
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Nome del locale (es. Trattoria Da Matteo)" 
+                    className="border border-slate-250 rounded-2xl px-4 py-3 flex-1 text-sm bg-slate-50 focus:bg-white focus:outline-none" 
+                  />
+                  <input 
+                    value={newCity} 
+                    onChange={(e) => setNewCity(e.target.value)}
+                    placeholder="Città" 
+                    className="border border-slate-250 rounded-2xl px-4 py-3 w-full sm:w-48 text-sm bg-slate-50 focus:bg-white focus:outline-none" 
+                  />
+                </div>
+
+                {newAddress && (
+                  <div className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-2xl p-3 flex flex-wrap gap-x-4 gap-y-1 items-center">
+                    <span>📍 <b>Indirizzo:</b> {newAddress}</span>
+                    {newLatitude && newLongitude && (
+                      <span className="text-[10px] text-slate-400 font-mono">({Number(newLatitude).toFixed(4)}, {Number(newLongitude).toFixed(4)})</span>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-1">
+                  <button 
+                    disabled={!newName || busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        const r = await api.createRestaurant(
+                          newName, 
+                          newCity, 
+                          newAddress || undefined, 
+                          undefined, 
+                          undefined, 
+                          undefined, 
+                          newLatitude !== '' ? Number(newLatitude) : undefined, 
+                          newLongitude !== '' ? Number(newLongitude) : undefined
+                        );
+                        setRestaurants([...restaurants, r]); 
+                        selectRestaurant(r);
+                        // Reset form di creazione
+                        setNewName('');
+                        setNewCity('');
+                        setNewAddress('');
+                        setNewLatitude('');
+                        setNewLongitude('');
+                      } catch (e) { setError((e as Error).message); }
+                      setBusy(false);
+                    }}
+                    className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs disabled:opacity-40 transition-colors shadow-md shadow-emerald-600/10"
+                  >
+                    Crea locale
+                  </button>
+                </div>
               </div>
             </div>
           </section>
@@ -548,11 +786,21 @@ export default function App() {
             
             {/* Sidebar di Navigazione Locale */}
             <aside className="md:col-span-3 bg-white rounded-3xl border border-slate-200 p-4 shadow-sm space-y-4">
-              <div className="px-2 py-1">
-                <h3 className="font-extrabold text-slate-800 text-base leading-tight truncate">{current.name}</h3>
-                <span className="inline-block bg-emerald-50 text-emerald-800 font-mono font-bold text-[10px] px-2 py-0.5 rounded-lg mt-1">
-                  Codice #{current.public_code}
-                </span>
+              <div className="px-2 py-1 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-slate-800 text-base leading-tight truncate">{current.name}</h3>
+                  <span className="inline-block bg-emerald-50 text-emerald-800 font-mono font-bold text-[10px] px-2 py-0.5 rounded-lg mt-1">
+                    Codice #{current.public_code}
+                  </span>
+                </div>
+                <select
+                  value={webLang}
+                  onChange={(e) => setWebLang(e.target.value)}
+                  className="bg-slate-100 text-slate-700 border-none rounded-lg px-1.5 py-1 text-[10px] font-bold focus:outline-none cursor-pointer shrink-0"
+                >
+                  <option value="it">🇮🇹 IT</option>
+                  <option value="en">🇬🇧 EN</option>
+                </select>
               </div>
               
               <div className="flex flex-col gap-1">
@@ -593,8 +841,8 @@ export default function App() {
                   className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2
                     ${activeSubTab === 'qr' ? 'bg-emerald-800 text-white shadow shadow-emerald-700/10' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
-                  <span>🖨️</span>
-                  <span>QR Code</span>
+                  <span>📋</span>
+                  <span>Registro & QR Code</span>
                 </button>
               </div>
 
@@ -847,6 +1095,75 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Statistiche & Analytics (Fase 2) */}
+                  {analytics && (
+                    <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-6">
+                      <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+                        <div>
+                          <h4 className="font-black text-base text-slate-800 flex items-center gap-2">
+                            <span>📊</span> Statistiche e Ricerche Clienti
+                          </h4>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Analisi in tempo reale delle scansioni del QR code e degli allergeni cercati dai clienti</p>
+                        </div>
+                        <span className="bg-emerald-50 text-emerald-800 text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider border border-emerald-100">Live</span>
+                      </div>
+
+                      {/* KPI Grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Visualizzazioni Totali</span>
+                          <span className="text-2xl font-black text-slate-800 mt-1 block">{analytics.total_views}</span>
+                          <p className="text-[10px] text-slate-450 mt-1">Scansioni del menù QR del tuo locale</p>
+                        </div>
+                        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Allergeni Ricercati</span>
+                          <span className="text-2xl font-black text-emerald-700 mt-1 block">{analytics.total_allergen_queries}</span>
+                          <p className="text-[10px] text-slate-450 mt-1">Richieste di match con filtri allergici</p>
+                        </div>
+                        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 col-span-2 md:col-span-1">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Allergene Principale</span>
+                          <span className="text-xl font-black text-rose-700 mt-1 block truncate">
+                            {analytics.distribution.length > 0 
+                              ? `${analytics.distribution[0].emoji} ${analytics.distribution[0].name}` 
+                              : 'Nessun dato'}
+                          </span>
+                          <p className="text-[10px] text-slate-450 mt-1">La ricerca più frequente nei filtri</p>
+                        </div>
+                      </div>
+
+                      {/* Allergen Distribution */}
+                      <div className="space-y-3">
+                        <h5 className="font-extrabold text-xs text-slate-700 uppercase tracking-wider">Distribuzione dei Filtri Allergici Comuni</h5>
+                        {analytics.distribution.length === 0 ? (
+                          <p className="text-xs text-slate-400 italic">Nessun filtro allergico applicato finora dai tuoi clienti.</p>
+                        ) : (
+                          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {analytics.distribution.slice(0, 6).map((item) => {
+                              const pct = analytics.total_allergen_queries > 0 
+                                ? Math.round((item.count / analytics.total_allergen_queries) * 100) 
+                                : 0;
+                              return (
+                                <div key={item.code} className="p-3 bg-white border border-slate-150 rounded-xl space-y-2">
+                                  <div className="flex justify-between items-center text-xs font-bold text-slate-700">
+                                    <span className="truncate">{item.emoji} {item.name}</span>
+                                    <span className="text-slate-400">{item.count}</span>
+                                  </div>
+                                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                    <div 
+                                      className="bg-emerald-600 h-full rounded-full" 
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-[9px] text-slate-400 block text-right font-semibold">{pct}% del totale</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Statistiche Menù */}
                   <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
                     <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
@@ -1009,6 +1326,129 @@ export default function App() {
                   ) : (
                     <>
                   
+                  {/* Gestione dei Multi-menù */}
+                  {!piatti && !approved && (
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm mb-6 space-y-4">
+                      <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-3">
+                        <div>
+                          <h3 className="text-lg font-black text-slate-800">📋 Gestione Menù Multipli</h3>
+                          <p className="text-xs text-slate-400 mt-0.5">Crea diversi menù per pranzo, cena, diete particolari o bambini.</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!current) return;
+                              if (confirm("Sei sicuro di voler tradurre automaticamente tutti i piatti del menù in Inglese, Spagnolo, Tedesco e Francese tramite AI?")) {
+                                setBusy(true);
+                                try {
+                                  await api.translateMenu(current.id);
+                                  alert("🤖 Menù tradotto con successo!");
+                                } catch (err) { alert((err as Error).message); }
+                                setBusy(false);
+                              }
+                            }}
+                            disabled={busy}
+                            className="bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-800 px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5"
+                          >
+                            {busy ? 'Traduzione...' : '🤖 Traduci menù con AI'}
+                          </button>
+                          <button
+                            onClick={() => setShowAddMenuModal(true)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-2xl text-xs font-black transition-all"
+                          >
+                            + Nuovo Menù
+                          </button>
+                        </div>
+                      </div>
+
+                      {menus.length === 0 ? (
+                        <p className="text-xs text-slate-400 py-4 text-center">Nessun menù configurato. Crea un menù per iniziare ad organizzare i tuoi piatti.</p>
+                      ) : (
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {menus.map((m) => (
+                            <div key={m.id} className="border border-slate-150 rounded-2xl p-4 bg-slate-50 flex items-center justify-between gap-3 hover:border-slate-350 transition-all">
+                              <div className="min-w-0">
+                                <span className={`w-2 h-2 rounded-full inline-block mr-1.5 ${m.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                                <span className="font-extrabold text-sm text-slate-800 truncate">{m.name}</span>
+                              </div>
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={async () => {
+                                    const nName = prompt("Inserisci il nuovo nome del menù:", m.name);
+                                    if (nName && nName.trim()) {
+                                      try {
+                                        const updated = await api.updateMenu(current!.id, m.id, nName.trim(), m.is_active, m.sort_order);
+                                        setMenus(menus.map(x => x.id === m.id ? updated : x));
+                                      } catch (err) { alert((err as Error).message); }
+                                    }
+                                  }}
+                                  className="text-xs hover:text-emerald-750 font-bold bg-white border border-slate-200 px-2.5 py-1.5 rounded-xl text-slate-500"
+                                >
+                                  Modifica
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (confirm(`Sei sicuro di voler eliminare il menù "${m.name}"? I piatti associati verranno scollegati ma rimarranno nel database.`)) {
+                                      try {
+                                        await api.deleteMenu(current!.id, m.id);
+                                        setMenus(menus.filter(x => x.id !== m.id));
+                                      } catch (err) { alert((err as Error).message); }
+                                    }
+                                  }}
+                                  className="text-xs hover:text-red-700 font-bold bg-white border border-slate-200 px-2.5 py-1.5 rounded-xl text-slate-500"
+                                >
+                                  Elimina
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Add Menu Modal */}
+                  {showAddMenuModal && (
+                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                      <div className="bg-white rounded-3xl border border-slate-200 p-6 max-w-md w-full space-y-4 shadow-xl">
+                        <h3 className="text-lg font-black text-slate-850">Crea Nuovo Menù</h3>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Nome Menù</label>
+                          <input
+                            type="text"
+                            value={newMenuName}
+                            onChange={(e) => setNewMenuName(e.target.value)}
+                            placeholder="es. Menù Serale, Carta dei Vini"
+                            className="w-full border border-slate-250 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-500 bg-slate-50 focus:bg-white"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                          <button
+                            onClick={() => { setShowAddMenuModal(false); setNewMenuName(''); }}
+                            className="px-4 py-2 border border-slate-200 rounded-xl text-slate-500 text-xs font-bold hover:bg-slate-50"
+                          >
+                            Annulla
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!newMenuName.trim()) return;
+                              try {
+                                const newM = await api.createMenu(current!.id, newMenuName.trim());
+                                setMenus([...menus, newM]);
+                                setShowAddMenuModal(false);
+                                setNewMenuName('');
+                              } catch (err) { alert((err as Error).message); }
+                            }}
+                            disabled={!newMenuName.trim()}
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black disabled:opacity-50"
+                          >
+                            Crea
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Scelta come caricare */}
                   {!piatti && !approved && (
                     <div className="grid md:grid-cols-3 gap-6">
@@ -1017,16 +1457,16 @@ export default function App() {
                       <section
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) upload(f); }}
-                        className="md:col-span-2 bg-white border-2 border-dashed border-emerald-300 rounded-3xl p-10 text-center flex flex-col items-center justify-center space-y-4 hover:bg-emerald-50/10 transition-colors cursor-pointer"
+                        className="bg-white border-2 border-dashed border-emerald-300 rounded-3xl p-6 text-center flex flex-col items-center justify-between space-y-4 hover:bg-emerald-50/10 transition-colors cursor-pointer"
                       >
                         <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-4xl shadow-inner">📸</div>
                         <div>
-                          <p className="text-lg font-extrabold text-slate-800">Analizza foto menù cartaceo (AI)</p>
+                          <p className="text-lg font-extrabold text-slate-800">Foto menù cartaceo (AI)</p>
                           <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto leading-relaxed">
-                            Carica o trascina la foto del menù cartaceo. L'AI estrarrà piatti, descrizioni e allergeni suggeriti in pochi secondi.
+                            Carica la foto del menù. L'AI estrarrà piatti, descrizioni e allergeni previsti.
                           </p>
                         </div>
-                        <label className="inline-block px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs cursor-pointer shadow shadow-emerald-600/10 transition-colors">
+                        <label className="inline-block w-full px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs cursor-pointer shadow shadow-emerald-600/10 transition-colors">
                           {busy ? 'Analisi in corso...' : 'Seleziona immagine'}
                           <input 
                             type="file" 
@@ -1036,6 +1476,33 @@ export default function App() {
                             onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} 
                           />
                         </label>
+                      </section>
+
+                      {/* Analizza da URL/Link */}
+                      <section className="bg-white border border-slate-200 rounded-3xl p-6 text-center flex flex-col items-center justify-between space-y-4 shadow-sm">
+                        <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-4xl shadow-inner">🔗</div>
+                        <div>
+                          <p className="text-lg font-extrabold text-slate-800">Link del menù (AI)</p>
+                          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto leading-relaxed">
+                            Inserisci il link di un menù online (es. PDF o sito). L'AI analizzerà scritte e allergeni.
+                          </p>
+                        </div>
+                        <div className="w-full space-y-2">
+                          <input
+                            type="url"
+                            value={menuUrl}
+                            onChange={(e) => setMenuUrl(e.target.value)}
+                            placeholder="https://esempio.it/menu.pdf"
+                            className="w-full border border-slate-250 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-500 bg-slate-50 focus:bg-white"
+                          />
+                          <button
+                            onClick={analyzeFromUrl}
+                            disabled={busy || !menuUrl.trim()}
+                            className="w-full px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow shadow-emerald-600/10 transition-colors disabled:opacity-50"
+                          >
+                            {busy ? 'Analisi in corso...' : 'Analizza Link'}
+                          </button>
+                        </div>
                       </section>
 
                       {/* Pulsanti manuali */}
@@ -1082,7 +1549,7 @@ export default function App() {
                         </div>
                       )}
                       
-                      <MenuEditor piatti={piatti} allergens={allergens} onChange={setPiatti} restaurantPhotos={photos} />
+                      <MenuEditor piatti={piatti} allergens={allergens} onChange={setPiatti} restaurantPhotos={photos} menus={menus} />
                       
                       <button
                         type="button"
@@ -1136,7 +1603,7 @@ export default function App() {
                           <img 
                             alt={`QR ${approved.public_code}`} 
                             className="w-48 h-48"
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=allertgy:${approved.public_code}`} 
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(window.location.origin + '/r/' + (approved.slug || approved.public_code))}`} 
                           />
                         </div>
 
@@ -1200,7 +1667,7 @@ export default function App() {
                         <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block">Galleria foto del locale</label>
                         <p className="text-[10px] text-slate-405 mt-0.5">
                           Le foto compaiono sulla pagina pubblica del locale. Limite del piano attuale:
-                          {' '}{{ free: 1, verified: 3, pro: 8, premium: 20 }[currentPlan]} foto.
+                          {' '}{{ free: 1, base: 10, pro_notify: 20 }[currentPlan]} foto.
                         </p>
                       </div>
                       <label className="inline-block px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors shadow-sm shadow-emerald-600/10">
@@ -1278,6 +1745,49 @@ export default function App() {
                       >
                         📍 Rileva posizione attuale
                       </button>
+                    </div>
+
+                    {/* Ricerca indirizzo per geolocalizzazione */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2">
+                      <label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider block">🔍 Cerca indirizzo o luogo su mappa</label>
+                      <div className="flex gap-2">
+                        <input 
+                          value={searchQuery} 
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              searchNominatim(searchQuery);
+                            }
+                          }}
+                          placeholder="es. Via Garibaldi 12 Milano o Trattoria Da Matteo" 
+                          className="border border-slate-250 rounded-xl px-3 py-2 flex-1 text-xs bg-slate-50 focus:bg-white focus:outline-none" 
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => searchNominatim(searchQuery)}
+                          disabled={isSearching || !searchQuery.trim()}
+                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-[10px] transition-colors disabled:opacity-40"
+                        >
+                          {isSearching ? 'Cerca...' : 'Cerca'}
+                        </button>
+                      </div>
+
+                      {searchSuggestions.length > 0 && (
+                        <div className="bg-white border border-slate-200 rounded-xl p-1.5 max-h-48 overflow-y-auto space-y-0.5 shadow-md relative z-30">
+                          {searchSuggestions.map((s, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleSelectSuggestionForEdit(s)}
+                              className="w-full text-left px-2 py-1.5 text-[11px] hover:bg-slate-50 rounded-lg transition-colors block border-b border-slate-100 last:border-b-0"
+                            >
+                              <div className="font-extrabold text-slate-800">{s.display_name.split(',')[0]}</div>
+                              <div className="text-slate-500 text-[9px] truncate">{s.display_name}</div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-4">
@@ -1372,6 +1882,33 @@ export default function App() {
                       />
                     </div>
                     <div>
+                      <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block mb-1">Link Menù Originale (PDF / Web)</label>
+                      <input
+                        value={settingsMenuUrl}
+                        onChange={(e) => setSettingsMenuUrl(e.target.value)}
+                        placeholder="es. https://www.trattoriadamatteo.it/menu.pdf"
+                        className="w-full border border-slate-250 rounded-2xl px-4 py-3 text-sm bg-slate-50 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block mb-1">Partita IVA (P.IVA)</label>
+                      <input
+                        value={vatNumber}
+                        onChange={(e) => setVatNumber(e.target.value)}
+                        placeholder="es. 12345678901"
+                        className="w-full border border-slate-250 rounded-2xl px-4 py-3 text-sm bg-slate-50 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block mb-1">Referente Allergeni (Responsabile HACCP)</label>
+                      <input
+                        value={allergenManager}
+                        onChange={(e) => setAllergenManager(e.target.value)}
+                        placeholder="es. Chef Mario Rossi"
+                        className="w-full border border-slate-250 rounded-2xl px-4 py-3 text-sm bg-slate-50 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
                       <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block mb-1">Descrizione del Locale (pagina pubblica)</label>
                       <textarea
                         value={description}
@@ -1380,6 +1917,52 @@ export default function App() {
                         placeholder="es. Cucina tradizionale con menù dedicato a celiaci e allergici…"
                         className="w-full border border-slate-250 rounded-2xl px-4 py-3 text-sm bg-slate-50 focus:bg-white focus:outline-none resize-none leading-relaxed"
                       />
+                    </div>
+                  </div>
+
+                  {/* Collegamenti Esterni (Recensioni) */}
+                  <div className="bg-slate-50 border border-slate-205 rounded-3xl p-5 space-y-4">
+                    <div>
+                      <label className="text-[10px] text-slate-455 uppercase font-black tracking-wider block">Collegamenti Esterni (Google & TripAdvisor)</label>
+                      <p className="text-[10px] text-slate-405 mt-0.5">Associa il tuo locale a Google e TripAdvisor per mostrare le valutazioni e recensioni sulla tua pagina pubblica.</p>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block mb-1">Google Place ID</label>
+                        <input
+                          value={googlePlaceId}
+                          onChange={(e) => setGooglePlaceId(e.target.value)}
+                          placeholder="es. ChIJP3SaNzDExokRkRXXEIQ5OIU"
+                          className="w-full border border-slate-250 rounded-2xl px-4 py-3 text-sm bg-white focus:outline-none"
+                        />
+                        {current.google_rating !== undefined && current.google_rating !== null && (
+                          <p className="text-[10px] text-emerald-800 mt-1 font-black">⭐ Valutazione Google: {current.google_rating} ({current.google_reviews_count} recensioni)</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block mb-1">TripAdvisor URL</label>
+                        <input
+                          value={tripadvisorUrl}
+                          onChange={(e) => setTripadvisorUrl(e.target.value)}
+                          placeholder="es. https://www.tripadvisor.it/Restaurant_Review..."
+                          className="w-full border border-slate-250 rounded-2xl px-4 py-3 text-sm bg-white focus:outline-none"
+                        />
+                        {current.tripadvisor_rating !== undefined && current.tripadvisor_rating !== null && (
+                          <p className="text-[10px] text-emerald-800 mt-1 font-black">⭐ Valutazione TripAdvisor: {current.tripadvisor_rating} ({current.tripadvisor_reviews_count} recensioni)</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                      <button
+                        type="button"
+                        onClick={syncExternal}
+                        disabled={busy || (!googlePlaceId.trim() && !tripadvisorUrl.trim())}
+                        className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-[10px] transition-colors disabled:opacity-40"
+                      >
+                        {busy ? 'Sincronizzazione...' : '🔄 Sincronizza Recensioni Esterne'}
+                      </button>
                     </div>
                   </div>
 
@@ -1488,7 +2071,16 @@ export default function App() {
                                 } catch (e) {
                                   const msg = (e as Error).message;
                                   if (/STRIPE|Pagamenti non ancora attivi/i.test(msg)) {
-                                    alert('I pagamenti online non sono ancora attivi. Contatta AllerTgy per attivare il piano manualmente.');
+                                    if (window.confirm(`I pagamenti online non sono ancora attivi. Vuoi attivare subito il piano "${plan.name}" (prova gratuita 14 giorni per test)?`)) {
+                                      try {
+                                        const updated = await api.billingStartTrial(current.id, plan.code);
+                                        setCurrent(updated);
+                                        setRestaurants(restaurants.map(r => r.id === updated.id ? updated : r));
+                                        alert(`Piano "${plan.name}" attivato con successo!`);
+                                      } catch (err) {
+                                        alert((err as Error).message);
+                                      }
+                                    }
                                   } else {
                                     setError(msg);
                                   }
@@ -1502,7 +2094,7 @@ export default function App() {
                                   : 'bg-slate-900 hover:bg-slate-800 text-white'
                               }`}
                             >
-                              Inizia 30 giorni gratis
+                              Inizia 14 giorni gratis
                             </button>
                           )}
                         </div>
@@ -1577,43 +2169,194 @@ export default function App() {
               {/* TAB 5: QR CODE DOWNLOAD AREA */}
               {activeSubTab === 'qr' && (
                 canUseMenu ? (
-                <section className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-6 text-center max-w-xl mx-auto">
-                  <div className="space-y-1">
-                    <h2 className="text-xl font-black text-slate-800">QR Code del Ristorante</h2>
-                    <p className="text-xs text-slate-400">Posiziona questo codice sui tavoli per consentire ai clienti di leggere il menù personalizzato.</p>
-                  </div>
-
-                  <div id="printable-qr-card" className="p-6 bg-slate-50 rounded-3xl border border-slate-200 space-y-4 inline-block">
-                    <div className="bg-white p-3 rounded-2xl shadow-inner border border-slate-200 inline-block mx-auto">
-                      <img 
-                        alt={`QR ${current.public_code}`} 
-                        className="w-48 h-48 mx-auto"
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=allertgy:${current.public_code}`} 
-                      />
+                <div className="space-y-8 max-w-3xl mx-auto">
+                  {/* Sezione 1: Stato Conformità & Esenzione Burocrazia */}
+                  <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-6 text-left">
+                    <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+                      <div>
+                        <h2 className="text-lg font-black text-slate-850 flex items-center gap-2">
+                          <span>🛡️</span> Esenzione Burocrazia Allergeni
+                        </h2>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Gestione legale conforme al Regolamento UE 1169/2011</p>
+                      </div>
+                      <span className="bg-emerald-50 text-emerald-800 text-[10px] font-black px-3 py-1 rounded-full border border-emerald-100 uppercase tracking-wider">
+                        Attivo e Conforme
+                      </span>
                     </div>
-                    <span className="font-mono font-black text-2xl text-emerald-800 block tracking-widest">#{current.public_code}</span>
-                    <p className="hidden print:block text-slate-600 text-xs font-bold mt-2">
-                      Inquadra il QR per verificare gli allergeni con AllerTgy!
-                    </p>
+
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-600 leading-relaxed space-y-2">
+                      <p>
+                        <b>Come funziona?</b> Il menu digitale di AllerTgy aggiorna in tempo reale gli ingredienti e gli allergeni di ogni piatto ad ogni tua modifica. Questo sostituisce a tutti gli effetti di legge il vecchio "registro cartaceo", a patto che nel locale sia esposto l'avviso al consumatore (tramite il QR Code qui sotto) e sia disponibile un registro cartaceo di emergenza stampato.
+                      </p>
+                    </div>
+
+                    {/* Campi dati legali ad accesso rapido */}
+                    <div className="grid md:grid-cols-2 gap-4 pt-2">
+                      <div>
+                        <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block mb-1">Partita IVA del Locale</label>
+                        <input
+                          value={vatNumber}
+                          onChange={(e) => setVatNumber(e.target.value)}
+                          placeholder="es. 12345678901"
+                          className="w-full border border-slate-250 rounded-2xl px-4 py-2.5 text-xs bg-slate-50 focus:bg-white focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-450 uppercase font-black tracking-wider block mb-1">Referente Allergeni (Responsabile HACCP)</label>
+                        <input
+                          value={allergenManager}
+                          onChange={(e) => setAllergenManager(e.target.value)}
+                          placeholder="es. Chef Mario Rossi"
+                          className="w-full border border-slate-250 rounded-2xl px-4 py-2.5 text-xs bg-slate-50 focus:bg-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-1">
+                      <button
+                        onClick={async () => {
+                          if (!current) return;
+                          setBusy(true); setError('');
+                          try {
+                            const res = await api.updateRestaurant(current.id, {
+                              name: current.name,
+                              city: current.city,
+                              address: address.trim(),
+                              phone: phone.trim(),
+                              email_contact: emailContact.trim(),
+                              opening_hours: openingHours.trim(),
+                              image_url: logoUrl || null,
+                              latitude: latitude === '' ? null : Number(latitude),
+                              longitude: longitude === '' ? null : Number(longitude),
+                              website: website.trim() || null,
+                              menu_url: settingsMenuUrl.trim() || null,
+                              description: description.trim() || null,
+                              google_place_id: googlePlaceId.trim() || null,
+                              tripadvisor_url: tripadvisorUrl.trim() || null,
+                              vat_number: vatNumber.trim() || null,
+                              allergen_manager: allergenManager.trim() || null,
+                            });
+                            setCurrent(res);
+                            setRestaurants(restaurants.map(r => r.id === res.id ? res : r));
+                            alert("Dati legali aggiornati con successo!");
+                          } catch (err) { setError((err as Error).message); }
+                          setBusy(false);
+                        }}
+                        disabled={busy}
+                        className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] shadow-sm disabled:opacity-40"
+                      >
+                        {busy ? 'Aggiornamento...' : '💾 Aggiorna Dati Legali'}
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4 border-t border-slate-100">
-                    <button 
-                      onClick={() => setPrintMode('qr')}
-                      className="px-6 py-3 rounded-2xl border border-slate-250 text-slate-700 font-extrabold text-xs hover:bg-slate-100"
-                    >
-                      🖨️ Stampa Codice
-                    </button>
-                    <a 
-                      href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=allertgy:${current.public_code}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md shadow-emerald-600/10 text-center"
-                    >
-                      💾 Scarica QR ad Alta Risoluzione
-                    </a>
+                  {/* Sezione 2: Cartello Ufficiale ed Esposizione */}
+                  <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-6 text-center">
+                    <div className="text-left border-b border-slate-100 pb-3">
+                      <h3 className="text-base font-black text-slate-850">🖨️ Cartello Legale da Esporre</h3>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Stampa questo cartello e posizionalo sui tavoli o all'ingresso per essere in regola con la legge.</p>
+                    </div>
+
+                    {/* Printable area */}
+                    <div id="printable-qr-card" className="p-8 bg-white rounded-3xl border-2 border-dashed border-slate-250 space-y-6 max-w-sm mx-auto text-center shadow-sm">
+                      <div className="space-y-1">
+                        <h3 className="text-lg font-black text-slate-900 tracking-tight">{current.name}</h3>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Registro Allergeni Digitale</p>
+                      </div>
+                      
+                      <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200 inline-block mx-auto">
+                        <img 
+                          alt={`QR ${current.public_code}`} 
+                          className="w-44 h-44 mx-auto"
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(window.location.origin + '/r/' + (current.slug || current.public_code))}`} 
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="font-mono font-black text-lg text-emerald-800 tracking-widest block">Codice Locale: #{current.public_code}</span>
+                        {vatNumber && <span className="text-[9px] font-bold text-slate-450 block">P.IVA: {vatNumber}</span>}
+                      </div>
+
+                      <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 text-left text-[10px] text-emerald-950 font-semibold leading-relaxed">
+                        <p className="font-bold text-center mb-1 text-[11px] text-emerald-900">⚠️ AVVISO AL CONSUMATORE</p>
+                        Le informazioni sulla presenza di sostanze o prodotti che provocano allergie o intolleranze sono disponibili in formato digitale. Inquadra il QR Code con la fotocamera del tuo smartphone per consultare il menù interattivo filtrato sulle tue allergie, oppure richiedi il registro cartaceo al personale. (Reg. UE n. 1169/2011)
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4 border-t border-slate-100">
+                      <button 
+                        onClick={() => setPrintMode('qr')}
+                        className="px-6 py-3 rounded-2xl border border-slate-250 text-slate-700 font-extrabold text-xs hover:bg-slate-100"
+                      >
+                        🖨️ Stampa Cartello QR
+                      </button>
+                      <a 
+                        href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(window.location.origin + '/r/' + (current.slug || current.public_code))}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md shadow-emerald-600/10 text-center"
+                      >
+                        💾 Scarica QR ad Alta Risoluzione
+                      </a>
+                    </div>
                   </div>
-                </section>
+
+                  {/* Sezione 3: Registro di Emergenza Cartaceo */}
+                  <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4 text-left">
+                    <h3 className="text-base font-black text-slate-850">📄 Registro degli Allergeni Cartaceo (Stampa di Emergenza)</h3>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      In caso di assenza temporanea di connessione a internet o qualora le autorità competenti (es. NAS, ASL) richiedessero un documento fisico, devi tenere a disposizione questo registro cartaceo stampato ed aggiornato all'ultima versione.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                      <button
+                        onClick={async () => {
+                          if (!piatti) {
+                            setBusy(true);
+                            try {
+                              const m = await api.publicMenu(current.public_code);
+                              setPiatti(m.piatti.map(({ id, ...p }) => p));
+                            } catch (e) {
+                              setError((e as Error).message);
+                            }
+                            setBusy(false);
+                          }
+                          setPrintMode('registry');
+                        }}
+                        disabled={!piatti || piatti.length === 0}
+                        className={`flex-1 text-center bg-white border border-slate-250 hover:bg-slate-50 text-slate-700 font-extrabold px-6 py-3 rounded-2xl text-xs transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer ${(!piatti || piatti.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <span>🖨️</span> Stampa Registro (Browser)
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          if (!current) return;
+                          setBusy(true);
+                          setError('');
+                          try {
+                            const blob = await api.downloadRegistryPdf(current.id);
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `registro_allergeni_${current.slug || 'locale'}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            window.URL.revokeObjectURL(url);
+                          } catch (err) {
+                            setError((err as Error).message);
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                        disabled={!piatti || piatti.length === 0}
+                        className={`flex-1 text-center bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold px-6 py-3 rounded-2xl text-xs transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer ${(!piatti || piatti.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <span>📥</span> Scarica Registro PDF Ufficiale
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 ) : (
                   <section className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-5 text-center max-w-xl mx-auto">
                     <div className="w-14 h-14 rounded-2xl bg-slate-100 text-2xl flex items-center justify-center mx-auto">🔒</div>
@@ -1641,15 +2384,28 @@ export default function App() {
       
       {/* Container di Stampa Registro Allergeni (nascosto su schermo, visibile solo in stampa) */}
       <div id="printable-allergen-registry" className="hidden p-8 bg-white text-slate-800">
-        <h1 className="text-2xl font-black mb-1">{current?.name}</h1>
-        <p className="text-xs text-slate-400 mb-6">
-          Registro degli Allergeni Alimentari (Reg. UE 1169/2011) - Generato il {new Date().toLocaleDateString('it-IT')}
-        </p>
+        <div className="border-b border-slate-350 pb-4 mb-6">
+          <h1 className="text-2xl font-black">{current?.name}</h1>
+          <p className="text-xs text-slate-500 mt-1 font-semibold">
+            {current?.address ? `📍 ${current.address}` : ''} {current?.phone ? ` | 📞 ${current.phone}` : ''}
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 pt-3 border-t border-slate-100 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+            <div>Codice Locale: #{current?.public_code}</div>
+            <div>P.IVA: {vatNumber || '—'}</div>
+            <div>Referente Allergeni: {allergenManager || '—'}</div>
+            <div>Menu Aggiornato il: {current?.menu_updated_at ? new Date(current.menu_updated_at).toLocaleDateString('it-IT') : '—'}</div>
+          </div>
+        </div>
+
+        <h2 className="text-sm font-black uppercase tracking-wider mb-3 text-slate-700">
+          Registro Ufficiale degli Allergeni Alimentari (Regolamento UE n. 1169/2011)
+        </h2>
+        
         <table className="w-full text-left border-collapse border border-slate-300">
           <thead>
             <tr className="bg-slate-100">
               <th className="border border-slate-300 p-3 text-xs font-bold w-1/4">Piatto</th>
-              <th className="border border-slate-300 p-3 text-xs font-bold w-1/4">Categoria</th>
+              <th className="border border-slate-300 p-3 text-xs font-bold w-1/5">Categoria / Sezione</th>
               <th className="border border-slate-300 p-3 text-xs font-bold w-1/4 text-rose-700">Allergeni Contenuti</th>
               <th className="border border-slate-300 p-3 text-xs font-bold w-1/4 text-amber-700">Possibili Tracce</th>
             </tr>
@@ -1660,10 +2416,16 @@ export default function App() {
                 <td className="border border-slate-300 p-3 text-xs font-semibold">{p.nome_piatto}</td>
                 <td className="border border-slate-300 p-3 text-xs text-slate-550">{p.categoria || 'Generale'}</td>
                 <td className="border border-slate-300 p-3 text-xs text-rose-700 font-bold">
-                  {p.allergeni_contenuti.filter(c => c !== 'vegano' && c !== 'vegetariano').join(', ') || 'Nessuno'}
+                  {p.allergeni_contenuti
+                    .filter(c => c !== 'vegano' && c !== 'vegetariano')
+                    .map(getAllergenName)
+                    .join(', ') || 'Nessuno'}
                 </td>
                 <td className="border border-slate-300 p-3 text-xs text-amber-700 font-semibold">
-                  {p.allergeni_tracce.join(', ') || 'Nessuna'}
+                  {p.allergeni_tracce
+                    .filter(c => c !== 'vegano' && c !== 'vegetariano')
+                    .map(getAllergenName)
+                    .join(', ') || 'Nessuna'}
                 </td>
               </tr>
             ))}
@@ -1671,8 +2433,13 @@ export default function App() {
         </table>
         
         {/* Note legali in fondo */}
-        <div className="mt-8 pt-4 border-t border-slate-200 text-[10px] text-slate-400 leading-relaxed">
-          <p>Ai sensi del Reg. UE 1169/2011, le informazioni fornite descrivono la presenza di ingredienti considerati allergeni o di possibili tracce derivanti da contaminazione crociata accidentale nei nostri piatti. Si raccomanda ai clienti di informare sempre il personale di sala circa le proprie allergie/intolleranze al momento dell'ordine.</p>
+        <div className="mt-8 pt-4 border-t border-slate-200 text-[10px] text-slate-400 leading-relaxed space-y-2">
+          <p>
+            <b>Nota Informativa:</b> Ai sensi del Regolamento UE n. 1169/2011, le informazioni fornite in questo registro descrivono l'elenco delle sostanze o dei prodotti che provocano allergie o intolleranze utilizzati nella preparazione di ciascun piatto servito all'interno del locale, incluse possibili tracce derivanti da contaminazione crociata accidentale durante la lavorazione.
+          </p>
+          <p>
+            Si raccomanda vivamente alla clientela di segnalare preventivamente qualsiasi allergia o intolleranza alimentare al personale di sala prima di effettuare l'ordinazione.
+          </p>
         </div>
       </div>
     </div>

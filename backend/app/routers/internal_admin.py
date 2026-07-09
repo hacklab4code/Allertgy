@@ -169,7 +169,7 @@ def update_restaurant_business(
         if field in update:
             setattr(restaurant, field, update[field])
 
-    if restaurant.business_plan in {"verified", "pro", "premium"} and "is_verified" not in update:
+    if restaurant.business_plan in {"verified", "pro", "premium", "base", "pro_notify"} and "is_verified" not in update:
         restaurant.is_verified = 1
     if restaurant.subscription_status in {"active", "trialing", "comped"} and not restaurant.plan_started_at:
         restaurant.plan_started_at = datetime.now(timezone.utc)
@@ -198,6 +198,9 @@ def list_reviews_for_moderation(db: Session = Depends(get_db)):
             restaurant_name=restaurant_names.get(rev.restaurant_id, "?"),
             user_email=rev.user.email if rev.user else "?",
             rating=rev.rating,
+            rating_staff=rev.rating_staff,
+            rating_menu=rev.rating_menu,
+            rating_safety=rev.rating_safety,
             comment=rev.comment,
             is_hidden=bool(rev.is_hidden),
             hidden_reason=rev.hidden_reason,
@@ -229,6 +232,9 @@ def moderate_review(
         restaurant_name=restaurant.name if restaurant else "?",
         user_email=rev.user.email if rev.user else "?",
         rating=rev.rating,
+        rating_staff=rev.rating_staff,
+        rating_menu=rev.rating_menu,
+        rating_safety=rev.rating_safety,
         comment=rev.comment,
         is_hidden=bool(rev.is_hidden),
         hidden_reason=rev.hidden_reason,

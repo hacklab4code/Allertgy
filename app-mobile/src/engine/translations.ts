@@ -678,7 +678,69 @@ const UI_STRINGS: Record<string, UIStringMap> = {
     ar: ":أدوية الطوارئ", zh: "急救药物：", ja: "緊急薬：", ko: "응급 의약품：",
     ru: "Экстренные препараты:", tr: "Acil ilaçlar:", pl: "Leki ratunkowe:", nl: "Noodmedicijnen:",
   },
+  // ----- Info Ristorante -----
+  restaurant_info: {
+    it: "Info Locale", en: "Restaurant Info", es: "Info del local", fr: "Infos restaurant",
+    de: "Lokal-Info", pt: "Info do local",
+    ar: "معلومات المطعم", zh: "餐厅信息", ja: "お店情報", ko: "레스토랑 정보",
+    ru: "О заведении", tr: "Mekan Bilgisi", pl: "Info o lokalu", nl: "Restaurantinfo",
+  },
+  opening_hours: {
+    it: "Orari di apertura", en: "Opening hours", es: "Horarios", fr: "Horaires d'ouverture",
+    de: "Öffnungszeiten", pt: "Horário de funcionamento",
+    ar: "ساعات العمل", zh: "营业时间", ja: "営業時間", ko: "영업 시간",
+    ru: "Часы работы", tr: "Çalışma saatleri", pl: "Godziny otwarcia", nl: "Openingstijden",
+  },
+  open_now: {
+    it: "🟢 Aperto ora", en: "🟢 Open now", es: "🟢 Abierto ahora", fr: "🟢 Ouvert maintenant",
+    de: "🟢 Jetzt geöffnet", pt: "🟢 Aberto agora",
+    ar: "🟢 مفتوح الآن", zh: "🟢 现在营业", ja: "🟢 営業中", ko: "🟢 지금 영업중",
+    ru: "🟢 Сейчас открыто", tr: "🟢 Şu an açık", pl: "🟢 Teraz otwarte", nl: "🟢 Nu open",
+  },
+  closed_now: {
+    it: "🔴 Chiuso ora", en: "🔴 Closed now", es: "🔴 Cerrado ahora", fr: "🔴 Fermé maintenant",
+    de: "🔴 Jetzt geschlossen", pt: "🔴 Fechado agora",
+    ar: "🔴 مغلق الآن", zh: "🔴 现在关门", ja: "🔴 閉店中", ko: "🔴 지금 폐점",
+    ru: "🔴 Сейчас закрыто", tr: "🔴 Şu an kapalı", pl: "🔴 Teraz zamknięte", nl: "🔴 Nu gesloten",
+  },
+  hours_unknown: {
+    it: "Orari non disponibili", en: "Hours not available", es: "Horarios no disponibles",
+    fr: "Horaires non disponibles", de: "Zeiten nicht verfügbar", pt: "Horário indisponível",
+    ar: "الساعات غير متاحة", zh: "营业时间未提供", ja: "営業時間不明", ko: "시간 미제공",
+    ru: "Часы не указаны", tr: "Saatler mevcut değil", pl: "Godziny niedostępne", nl: "Tijden niet beschikbaar",
+  },
+  phone: {
+    it: "Telefono", en: "Phone", es: "Teléfono", fr: "Téléphone",
+    de: "Telefon", pt: "Telefone",
+    ar: "هاتف", zh: "电话", ja: "電話", ko: "전화",
+    ru: "Телефон", tr: "Telefon", pl: "Telefon", nl: "Telefoon",
+  },
+  address: {
+    it: "Indirizzo", en: "Address", es: "Dirección", fr: "Adresse",
+    de: "Adresse", pt: "Endereço",
+    ar: "العنوان", zh: "地址", ja: "住所", ko: "주소",
+    ru: "Адрес", tr: "Adres", pl: "Adres", nl: "Adres",
+  },
+  description: {
+    it: "Descrizione", en: "Description", es: "Descripción", fr: "Description",
+    de: "Beschreibung", pt: "Descrição",
+    ar: "وصف", zh: "描述", ja: "説明", ko: "설명",
+    ru: "Описание", tr: "Açıklama", pl: "Opis", nl: "Beschrijving",
+  },
+  menu_section: {
+    it: "Menù allergeni", en: "Allergen menu", es: "Menú de alérgenos", fr: "Menu allergènes",
+    de: "Allergenmenü", pt: "Menu de alérgenos",
+    ar: "قائمة مسببات الحساسية", zh: "过敏原菜单", ja: "アレルゲンメニュー", ko: "알레르겐 메뉴",
+    ru: "Меню аллергенов", tr: "Alerjen menüsü", pl: "Menu alergenów", nl: "Allergenenmenü",
+  },
+  last_update: {
+    it: "Aggiornato il", en: "Updated on", es: "Actualizado el", fr: "Mis à jour le",
+    de: "Aktualisiert am", pt: "Atualizado em",
+    ar: "آخر تحديث", zh: "更新于", ja: "更新日", ko: "업데이트",
+    ru: "Обновлено", tr: "Güncellendi", pl: "Zaktualizowano", nl: "Bijgewerkt op",
+  },
 };
+
 
 // ---------------------------------------------------------------------------
 // Public translation function

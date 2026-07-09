@@ -34,7 +34,7 @@ export default function OwnerPiano() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<BusinessPlan | 'portal' | null>(null);
 
-  const locale = current ?? restaurants[0] ?? null;
+  const locale = current;
 
   useEffect(() => {
     Promise.all([
@@ -72,7 +72,7 @@ export default function OwnerPiano() {
       applyUpdated(updated);
       Alert.alert(
         '🎉 Prova attivata!',
-        `Hai 14 giorni gratis del piano ${plan === 'pro' ? 'Pro' : plan === 'premium' ? 'Premium' : 'Verificato'}. Ora puoi creare il menù digitale con gli allergeni.`,
+        `Hai 14 giorni gratis del piano ${plan === 'base' ? 'Base' : plan === 'pro_notify' ? 'Pro Notifiche' : plan}. Ora puoi creare il menù digitale con gli allergeni.`,
         [{ text: 'Crea il menù', onPress: () => router.push('/(owner)/menu') }, { text: 'Ok' }],
       );
     } catch (e) {
@@ -122,13 +122,18 @@ export default function OwnerPiano() {
   if (loading) return <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.brand} />;
 
   if (!locale) {
+    const hasRestaurants = restaurants.length > 0;
     return (
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.emptyBox}>
           <Text style={styles.emptyEmoji}>🏪</Text>
-          <Text style={styles.emptyTitle}>Prima crea il tuo locale</Text>
+          <Text style={styles.emptyTitle}>
+            {hasRestaurants ? 'Seleziona un locale' : 'Prima crea il tuo locale'}
+          </Text>
           <Text style={styles.emptyText}>
-            Registra il ristorante dalla scheda "Locale", poi torna qui per attivare la prova gratuita.
+            {hasRestaurants
+              ? 'Seleziona uno dei tuoi locali nella scheda "Locale" per gestirne il piano e l\'abbonamento.'
+              : 'Registra il ristorante dalla scheda "Locale", poi torna qui per attivare la prova gratuita.'}
           </Text>
           <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/(owner)/locali')}>
             <Text style={styles.emptyBtnText}>Vai a "Locale"</Text>
@@ -169,17 +174,17 @@ export default function OwnerPiano() {
       {canTrial && (
         <View style={styles.trialHero}>
           <Text style={styles.trialHeroEmoji}>🎁</Text>
-          <Text style={styles.trialHeroTitle}>14 giorni di Pro, gratis</Text>
+          <Text style={styles.trialHeroTitle}>14 giorni di Base, gratis</Text>
           <Text style={styles.trialHeroText}>
             Sblocca subito il menù digitale con allergeni per piatto, QR code e registro stampabile.
             Nessuna carta richiesta, nessun addebito automatico.
           </Text>
           <TouchableOpacity
             style={styles.trialHeroBtn}
-            onPress={() => startTrial('pro')}
-            disabled={busy === 'pro'}
+            onPress={() => startTrial('base')}
+            disabled={busy === 'base'}
           >
-            {busy === 'pro'
+            {busy === 'base'
               ? <ActivityIndicator color={colors.white} />
               : <Text style={styles.trialHeroBtnText}>Inizia la prova gratuita</Text>}
           </TouchableOpacity>
@@ -200,7 +205,7 @@ export default function OwnerPiano() {
                 <View style={styles.planNameRow}>
                   <Text style={styles.planName}>{plan.name}</Text>
                   {isCurrent && <View style={styles.currentPill}><Text style={styles.currentPillText}>Attuale</Text></View>}
-                  {plan.code === 'pro' && !isCurrent && <View style={styles.popularPill}><Text style={styles.popularPillText}>Consigliato</Text></View>}
+                  {plan.code === 'pro_notify' && !isCurrent && <View style={styles.popularPill}><Text style={styles.popularPillText}>Consigliato</Text></View>}
                 </View>
                 <Text style={styles.planTagline}>{plan.tagline}</Text>
               </View>

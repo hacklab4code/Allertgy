@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import type { SubProfile } from '../types';
 
 export interface RecentPlace {
   code: string;
@@ -39,6 +40,10 @@ interface SessionState {
   emergencyContactPhone: string | null;
   /** ingredienti da evitare esclusi manualmente dall'utente */
   ingredientiEsclusi: string[];
+  /** profili familiari del cliente */
+  subProfiles: SubProfile[];
+  /** id del profilo selezionato per la scansione (null = default utente) */
+  activeProfileId: number | null;
   setToken: (t: string | null) => void;
   setEmail: (e: string | null) => void;
   setRole: (r: Role) => void;
@@ -53,6 +58,8 @@ interface SessionState {
   setEmergencyMedicines: (m: string | null) => void;
   setEmergencyContact: (name: string | null, phone: string | null) => void;
   setIngredientiEsclusi: (ings: string[]) => void;
+  setSubProfiles: (profiles: SubProfile[]) => void;
+  setActiveProfileId: (id: number | null) => void;
   logout: () => void;
 }
 
@@ -76,6 +83,8 @@ export const useSession = create<SessionState>()(
       emergencyContactName: null,
       emergencyContactPhone: null,
       ingredientiEsclusi: [],
+      subProfiles: [],
+      activeProfileId: null,
       setToken: (token) => set({ token }),
       setEmail: (email) => set({ email }),
       setRole: (role) => set({ role }),
@@ -105,12 +114,15 @@ export const useSession = create<SessionState>()(
       setEmergencyMedicines: (emergencyMedicines) => set({ emergencyMedicines }),
       setEmergencyContact: (emergencyContactName, emergencyContactPhone) => set({ emergencyContactName, emergencyContactPhone }),
       setIngredientiEsclusi: (ingredientiEsclusi) => set({ ingredientiEsclusi }),
+      setSubProfiles: (subProfiles) => set({ subProfiles }),
+      setActiveProfileId: (activeProfileId) => set({ activeProfileId }),
       logout: () =>
         set({
           token: null, email: null, role: 'customer', allergie: [], allergyIntensities: {},
           legalAccepted: false, healthDataConsent: false, profileCompleted: false,
           disclaimerAccepted: false, recents: [], favorites: [], language: 'it', languageSelected: false, 
           emergencyMedicines: null, emergencyContactName: null, emergencyContactPhone: null, ingredientiEsclusi: [],
+          subProfiles: [], activeProfileId: null,
         }),
     }),
     {

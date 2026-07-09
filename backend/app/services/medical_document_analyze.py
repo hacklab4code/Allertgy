@@ -11,23 +11,65 @@ from pydantic import BaseModel, Field
 
 from ..config import settings
 
-# I 14 allergeni del Reg. UE 1169/2011 — codici identici al resto del progetto
+# I 14 allergeni del Reg. UE 1169/2011 di default se non forniti
 STANDARD_ALLERGEN_CODES = [
     "glutine", "crostacei", "uova", "pesce", "arachidi", "soia", "latte",
     "frutta_a_guscio", "sedano", "senape", "sesamo", "solfiti", "lupini", "molluschi",
 ]
 
-PROMPT_GEMINI = """Analizza questo documento medico (referto allergologico, prick test,
-dosaggio IgE specifiche o simile) di un paziente italiano.
-Identifica SOLO le allergie/intolleranze ALIMENTARI riconducibili ai 14 allergeni
-del Reg. UE 1169/2011, usando ESATTAMENTE questi codici: glutine, crostacei, uova,
-pesce, arachidi, soia, latte, frutta_a_guscio, sedano, senape, sesamo, solfiti,
-lupini, molluschi.
-Per ciascun allergene rilevato indica una confidenza da 0.0 a 1.0 basata su quanto
-chiaramente il documento lo indica come positivo/presente. NON includere allergeni
-negativi o solo testati. Se il documento non è un referto medico o non è leggibile,
-restituisci una lista vuota.
-Rispondi SOLO con JSON: {"allergeni":[{"codice":"","confidenza":0.0}]}"""
+PROMPT_GEMINI_TEMPLATE = """Analizza questo referto medico o test diagnostico per allergie e intolleranze (ad es. ALEX/ALEX2, ISAC, RAST test IgE specifiche, Prick Test, Breath Test al lattosio, test genetici o sierologici per celiachia, favismo, ecc.).
+
+L'obiettivo è estrarre qualsiasi allergia, intolleranza o sensibilità alimentare attiva del paziente e mapparla ESATTAMENTE sui codici degli allergeni supportati dal nostro sistema.
+
+Ecco l'elenco dei codici validi del nostro sistema (usa SOLO questi codici esatti sulla sinistra):
+{allergens_list}
+
+REGOLE DI INTERPRETAZIONE E MAPPATURA PER TIPOLOGIA DI TEST:
+
+1. TEST DI DIAGNOSTICA MOLECOLARE (ALEX, ALEX2, ISAC):
+   - Mappa le positività delle IgE specifiche (livello >= 0.3 kUA/L o ISU, oppure indicato come Basso/Moderato/Alto/Altissimo) al rispettivo alimento.
+   - Esempi di componenti molecolari alimentari comuni e relativa mappatura:
+     * ARACHIDE (arachidi): Ara h 1, Ara h 2, Ara h 3, Ara h 6, Ara h 8, Ara h 9.
+     * NOCCIOLA (nocciole): Cor a 1, Cor a 8, Cor a 9, Cor a 11, Cor a 14.
+     * NOCE (noci): Jug r 1, Jug r 2, Jug r 3, Jug r 4.
+     * PISTACCHIO (pistacchi): Pis v 1, Pis v 2, Pis v 3, Pis v 4.
+     * ANACARDIO (anacardi): Ana o 1, Ana o 2, Ana o 3.
+     * PESCA (pesca): Pru p 1, Pru p 3 (LTP), Pru p 4.
+     * MELA (mela): Mal d 1, Mal d 3.
+     * KIWI (kiwi): Act d 1, Act d 2, Act d 5, Act d 8.
+     * SOIA (soia): Gly m 4, Gly m 5, Gly m 6, Gly m 8.
+     * LATTE / LATTOSIO (latte o latticini specifici): Bos d 4 (alfa-lattoalbumina), Bos d 5 (beta-lattoglobulina), Bos d 8 (caseina), Bos d lattferrina.
+     * UOVA (uova): Gal d 1 (ovomucoide), Gal d 2 (ovalbumina), Gal d 3 (conalbumina), Gal d 4 (lisozima).
+     * GRANO / GLUTINE (glutine o cereali specifici): Tri a 14 (LTP), Tri a 19 (omega-5 gliadina), Tri a 21, Tri a gliadina, o altre proteine del frumento.
+     * PESCE (pesce / merluzzo / ecc.): Gad c 1, Cyp c 1, Sco j 1.
+     * CROSTACEI (crostacei / gamberi): Pen a 1 (tropomiosina), Pen m 1, Pen m 2.
+     * MOLLUSCHI (molluschi): Tod p 1.
+     * SESAMO (sesamo): Ses i 1, Ses i 2, Ses i 3.
+     * SENAPE (senape): Sin a 1, Bra j 1.
+
+2. RAST / IgE SPECIFICHE CLASSICHE:
+   - Identifica i codici degli estratti o i nomi degli alimenti positivi (classe >= 1 o IgE >= 0.35 kUA/L).
+   - Esempi: f1 (albume), f2 (latte), f3 (pesce/merluzzo), f4 (grano), f13 (arachide), f14 (soia), f17 (nocciola), f20 (mandorla), f24 (gambero), f31 (sesamo), f84 (kiwi), f95 (pesca). Mappali al corrispettivo alimento o categoria.
+
+3. PRICK TEST (Test cutanei):
+   - Mappa come positivo qualsiasi alimento con pomfo (wheal) >= 3mm o indicato con "+" (ad es. +, ++, +++, ++++).
+
+4. CELIACHIA (Sierologia o Genetica):
+   - Sierologia positiva: anticorpi anti-transglutaminasi (anti-tTG) IgA/IgG alti, anti-endomisio (EMA) positivi, o anti-gliadina deamidata (DGP). Mappa a "glutine" con confidenza 1.0.
+   - Test genetico: se indica forte compatibilità o presenza degli aplotipi HLA-DQ2 e/o HLA-DQ8 associati a diagnosi/sospetto attivo, mappa a "glutine" (confidenza 0.8).
+
+5. INTOLLERANZA AL LATTOSIO (Breath Test H2):
+   - Breath test positivo per malassorbimento o intolleranza al lattosio (curva dell'idrogeno espirato con incremento >= 20 ppm rispetto al basale dopo assunzione di lattosio). Mappa a "latte" con confidenza 1.0.
+
+6. FAVISMO (Deficit G6PD):
+   - Carenza dell'enzima glucosio-6-fosfato deidrogenasi (G6PD) o menzione clinica di favismo. Mappa al codice "fave" con confidenza 1.0.
+
+7. REGOLE GENERALI DI MAPPATURA:
+   - Ignora allergeni inalanti (acari, pollini, epiteli di animali) o veleni d'insetti a meno che non siano legati a reattività crociata alimentare esplicitamente menzionata nel testo (ad es. sindrome LTP o sindrome orale allergica).
+   - Sii specifico: se trovi "nocciola", usa "nocciole"; se trovi "gambero", usa "gamberi" o "crostacei". Cerca sempre la corrispondenza più stretta tra i codici abilitati nel nostro sistema.
+   - Non includere allergeni con risultati negativi (IgE < 0.3 kUA/L, classe 0, o pomfo < 3mm).
+
+Rispondi SOLO con JSON nel formato specificato: {{"allergeni":[{{"codice":"","confidenza":0.0}}]}}"""
 
 
 class ExtractedAllergen(BaseModel):
@@ -51,9 +93,11 @@ STUB_RESULT = [
 ]
 
 
-def analyze_medical_document(data: bytes, mime_type: str) -> MedicalExtractionResult:
+def analyze_medical_document(
+    data: bytes, mime_type: str, valid_allergens: list[dict] | None = None
+) -> MedicalExtractionResult:
     if settings.gemini_api_key:
-        return _analyze_with_gemini(data, mime_type)
+        return _analyze_with_gemini(data, mime_type, valid_allergens)
     return MedicalExtractionResult(
         ai_stub=True,
         allergeni=STUB_RESULT,
@@ -64,7 +108,9 @@ def analyze_medical_document(data: bytes, mime_type: str) -> MedicalExtractionRe
     )
 
 
-def _analyze_with_gemini(data: bytes, mime_type: str) -> MedicalExtractionResult:
+def _analyze_with_gemini(
+    data: bytes, mime_type: str, valid_allergens: list[dict] | None = None
+) -> MedicalExtractionResult:
     try:
         from google import genai
         from google.genai import types
@@ -75,13 +121,23 @@ def _analyze_with_gemini(data: bytes, mime_type: str) -> MedicalExtractionResult
             note="Modulo 'google-genai' non installato. (Uso stub)",
         )
 
+    # Prepara lista codici e nomi validi per il prompt
+    if not valid_allergens:
+        valid_allergens = [{"code": code, "name_it": code} for code in STANDARD_ALLERGEN_CODES]
+    
+    allergens_list_str = "\n".join(
+        f"- {a['code']}: {a['name_it']}" for a in valid_allergens
+    )
+    prompt = PROMPT_GEMINI_TEMPLATE.format(allergens_list=allergens_list_str)
+    valid_codes = {a["code"] for a in valid_allergens}
+
     try:
         client = genai.Client(api_key=settings.gemini_api_key)
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=[
                 types.Part.from_bytes(data=data, mime_type=mime_type),
-                PROMPT_GEMINI,
+                prompt,
             ],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -91,7 +147,7 @@ def _analyze_with_gemini(data: bytes, mime_type: str) -> MedicalExtractionResult
         result = response.parsed
         if result is None or not hasattr(result, "allergeni"):
             raise ValueError("Risposta da Gemini non strutturata correttamente")
-        valid = [a for a in result.allergeni if a.codice in STANDARD_ALLERGEN_CODES]
+        valid = [a for a in result.allergeni if a.codice in valid_codes]
         return MedicalExtractionResult(
             ai_stub=False,
             allergeni=valid,

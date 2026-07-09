@@ -15,9 +15,8 @@ import {
 
 const PLAN_LABELS: Record<BusinessPlan, string> = {
   free: 'Gratis',
-  verified: 'Verificato',
-  pro: 'Pro',
-  premium: 'Premium',
+  base: 'Base',
+  pro_notify: 'Pro Notifiche',
 };
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
@@ -29,7 +28,7 @@ const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   comped: 'Omaggio',
 };
 
-const PLAN_OPTIONS: BusinessPlan[] = ['free', 'verified', 'pro', 'premium'];
+const PLAN_OPTIONS: BusinessPlan[] = ['free', 'base', 'pro_notify'];
 const STATUS_OPTIONS: SubscriptionStatus[] = ['free', 'trialing', 'active', 'past_due', 'canceled', 'comped'];
 
 function euros(cents: number | null | undefined) {
@@ -44,7 +43,7 @@ function dateOnly(value: string | null | undefined) {
 function planHasMenu(r: InternalRestaurant) {
   const status = r.subscription_status ?? 'free';
   const plan = r.business_plan ?? 'free';
-  return status === 'comped' || ((plan === 'verified' || plan === 'pro' || plan === 'premium') && ['trialing', 'active'].includes(status));
+  return status === 'comped' || ((plan === 'base' || plan === 'pro_notify') && ['trialing', 'active'].includes(status));
 }
 
 export default function InternalAdmin() {

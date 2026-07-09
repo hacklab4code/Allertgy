@@ -22,6 +22,7 @@ export default function RootLayout() {
         <Stack.Screen name="(owner)" options={{ headerShown: false }} />
         <Stack.Screen name="scanner" options={{ title: 'Scansiona QR' }} />
         <Stack.Screen name="menu/[codice]" options={{ title: 'Menù' }} />
+        <Stack.Screen name="shared-profile/[token]" options={{ title: 'Profilo condiviso' }} />
       </Stack>
     </>
   );

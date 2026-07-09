@@ -7,7 +7,9 @@ import uuid
 from io import BytesIO
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
+from typing import Optional
+
+from fastapi import APIRouter, Body, Depends, File, Header, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -22,9 +24,12 @@ from ..models import (
     RestaurantPhoto,
     User,
     UserFavorite,
+    Menu,
+    DishTranslation,
 )
 from ..schemas import (
     AnalyzeOut,
+    AnalyzeUrlIn,
     ApproveMenuIn,
     DishIn,
     DishOut,
@@ -33,10 +38,12 @@ from ..schemas import (
     PhotoOut,
     RestaurantIn,
     RestaurantOut,
+    MenuIn,
+    MenuOutItem,
 )
 from ..security import require_owner
 from ..services import storage
-from ..services.menu_analyze import analyze_menu_image
+from ..services.menu_analyze import analyze_menu_image, analyze_menu_url
 from ..services.push import notify_users
 from ..services.slugs import ensure_slug
 from ..legal import MENU_CONFIRMATION_VERSION
@@ -51,10 +58,10 @@ ALLOWED_IMAGE_TYPES = {
 }
 MAX_MENU_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_DISH_IMAGE_BYTES = 5 * 1024 * 1024
-MENU_PLANS = {"verified", "pro", "premium"}
+MENU_PLANS = {"verified", "pro", "premium", "base", "pro_notify"}
 MENU_ACCESS_STATUSES = {"trialing", "active", "comped"}
 # Limiti galleria foto per piano (vedi PIANO_LANCIO.md §7)
-PLAN_PHOTO_LIMITS = {"free": 1, "verified": 3, "pro": 8, "premium": 20}
+PLAN_PHOTO_LIMITS = {"free": 1, "verified": 3, "pro": 8, "premium": 20, "base": 10, "pro_notify": 20}
 
 
 async def _read_image_upload(file: UploadFile, *, max_bytes: int) -> tuple[bytes, str]:
@@ -218,6 +225,14 @@ def update_restaurant(
     r.longitude = data.longitude
     r.website = data.website
     r.description = data.description
+    r.google_place_id = data.google_place_id
+    r.google_rating = data.google_rating
+    r.google_reviews_count = data.google_reviews_count
+    r.tripadvisor_url = data.tripadvisor_url
+    r.tripadvisor_rating = data.tripadvisor_rating
+    r.tripadvisor_reviews_count = data.tripadvisor_reviews_count
+    r.vat_number = data.vat_number
+    r.allergen_manager = data.allergen_manager
     if data.image_url is not None:
         r.image_url = data.image_url
     ensure_slug(db, r)
@@ -236,6 +251,16 @@ async def analyze_menu(
     Per ora usa lo stub; con GEMINI_API_KEY configurata userà Gemini Vision."""
     content, mime_type = await _read_image_upload(file, max_bytes=MAX_MENU_IMAGE_BYTES)
     return analyze_menu_image(content, file.filename or "menu.jpg", mime_type)
+
+
+@router.post("/menu/analyze-url", response_model=AnalyzeOut)
+def analyze_url(
+    data: AnalyzeUrlIn,
+    user: User = Depends(require_owner),
+):
+    """Riceve un link/URL di un menù online e lo analizza con Gemini Vision o Gemini Text.
+    In assenza di GEMINI_API_KEY o in caso di errore, usa lo stub."""
+    return analyze_menu_url(data.url)
 
 
 @router.post("/upload-image")
@@ -290,9 +315,24 @@ def save_menu(
             price_cents=p.prezzo_cents,
             image_url=p.image_url,
             menu_group=p.menu_group,
+            menu_id=p.menu_id,
+            kitchen_protocol_confirmed=p.kitchen_protocol_confirmed or 0,
+            cross_contamination_checked_at=p.cross_contamination_checked_at or (
+                datetime.now(timezone.utc) if p.kitchen_protocol_confirmed else None
+            ),
         )
         db.add(dish)
         db.flush()
+
+        if p.translations:
+            for tr in p.translations:
+                db.add(DishTranslation(
+                    dish_id=dish.id,
+                    lang=tr.lang,
+                    name=tr.name,
+                    description=tr.description
+                ))
+
         for c in set(p.allergeni_contenuti):
             db.add(DishAllergen(dish_id=dish.id, allergen_id=by_code[c].id, kind="contains"))
         for c in set(p.allergeni_tracce) - set(p.allergeni_contenuti):
@@ -461,14 +501,104 @@ def menu_audit(
     return db.scalars(stmt).all()
 
 
-@router.get("/restaurants/{rid}/registry.pdf")
-def export_allergen_registry(
+@router.get("/restaurants/{rid}/analytics", status_code=200)
+def get_restaurant_analytics(
     rid: int,
     user: User = Depends(require_owner),
     db: Session = Depends(get_db),
 ):
-    """Esporta il registro allergeni del locale in PDF per stampa o archivio."""
+    """Restituisce le statistiche delle visite e dei match degli allergeni per il locale."""
     r = _my_restaurant(rid, user, db)
+    from sqlalchemy import func
+    from ..models import RestaurantAnalytics, Allergen
+    
+    total_views = db.scalar(
+        select(func.count(RestaurantAnalytics.id))
+        .where(RestaurantAnalytics.restaurant_id == r.id)
+        .where(RestaurantAnalytics.allergen_code.is_(None))
+    ) or 0
+    
+    total_allergen_queries = db.scalar(
+        select(func.count(RestaurantAnalytics.id))
+        .where(RestaurantAnalytics.restaurant_id == r.id)
+        .where(RestaurantAnalytics.allergen_code.is_not(None))
+    ) or 0
+    
+    allergen_stats = db.execute(
+        select(RestaurantAnalytics.allergen_code, func.count(RestaurantAnalytics.id))
+        .where(RestaurantAnalytics.restaurant_id == r.id)
+        .where(RestaurantAnalytics.allergen_code.is_not(None))
+        .group_by(RestaurantAnalytics.allergen_code)
+        .order_by(func.count(RestaurantAnalytics.id).desc())
+    ).all()
+    
+    allergens_mapped = {a.code: a for a in db.scalars(select(Allergen)).all()}
+    distribution = []
+    for code, count in allergen_stats:
+        a_obj = allergens_mapped.get(code)
+        name = a_obj.name_it if a_obj else code
+        emoji = a_obj.emoji if a_obj else "⚠️"
+        distribution.append({
+            "code": code,
+            "name": name,
+            "emoji": emoji,
+            "count": count
+        })
+        
+    from datetime import datetime, timedelta
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    
+    views_by_day = db.execute(
+        select(func.date(RestaurantAnalytics.created_at), func.count(RestaurantAnalytics.id))
+        .where(RestaurantAnalytics.restaurant_id == r.id)
+        .where(RestaurantAnalytics.allergen_code.is_(None))
+        .where(RestaurantAnalytics.created_at >= thirty_days_ago)
+        .group_by(func.date(RestaurantAnalytics.created_at))
+        .order_by(func.date(RestaurantAnalytics.created_at))
+    ).all()
+    
+    time_series = [{"date": str(day), "count": count} for day, count in views_by_day]
+    
+    return {
+        "restaurant_id": r.id,
+        "total_views": total_views,
+        "total_allergen_queries": total_allergen_queries,
+        "distribution": distribution,
+        "time_series": time_series
+    }
+
+
+@router.get("/restaurants/{rid}/registry.pdf")
+def export_allergen_registry(
+    rid: int,
+    token: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Esporta il registro allergeni del locale in PDF per stampa o archivio."""
+    import jwt
+    from ..config import settings
+    
+    auth_user = None
+    if token:
+        try:
+            payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
+            auth_user = db.get(User, int(payload["sub"]))
+        except Exception:
+            pass
+    elif authorization:
+        try:
+            parts = authorization.split()
+            if len(parts) == 2 and parts[0].lower() == "bearer":
+                payload = jwt.decode(parts[1], settings.jwt_secret, algorithms=["HS256"])
+                auth_user = db.get(User, int(payload["sub"]))
+        except Exception:
+            pass
+
+    if not auth_user or auth_user.role != "owner":
+        raise HTTPException(401, "Token non valido o scaduto")
+
+    r = _my_restaurant(rid, auth_user, db)
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4, landscape
@@ -490,19 +620,23 @@ def export_allergen_registry(
         bottomMargin=24,
     )
     styles = getSampleStyleSheet()
+    details_str = f"Codice locale: {r.public_code} | Citta: {r.city or '-'}"
+    if r.vat_number:
+        details_str += f" | Partita IVA: {r.vat_number}"
+    if r.allergen_manager:
+        details_str += f" | Referente allergeni: {r.allergen_manager}"
+    details_str += f" | Versione menu: {r.menu_version or 0}"
+
     story = [
         Paragraph(f"Registro allergeni - {r.name}", styles["Title"]),
         Paragraph(
-            (
-                f"Codice locale: {r.public_code} | Citta: {r.city or '-'} | "
-                f"Versione menu: {r.menu_version or 0}"
-            ),
+            details_str,
             styles["Normal"],
         ),
         Paragraph(
             (
-                "Informazioni dichiarate dal ristoratore. Il cliente deve sempre "
-                "comunicare allergie e intolleranze al personale prima di ordinare."
+                "Informazioni dichiarate dal ristoratore ai sensi del Regolamento UE n. 1169/2011. "
+                "Il cliente deve sempre comunicare allergie e intolleranze al personale prima di ordinare."
             ),
             styles["Normal"],
         ),
@@ -550,3 +684,143 @@ def export_allergen_registry(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ---------- Gestione Multi-menù & Traduzione AI ----------
+
+@router.post("/restaurants/{rid}/menu/translate", status_code=200)
+def auto_translate_menu(
+    rid: int,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Chiama Gemini per tradurre tutti i piatti del menù in en, es, de, fr e li salva."""
+    r = _my_restaurant(rid, user, db)
+    _ensure_menu_access(r)
+    
+    if not r.dishes:
+        raise HTTPException(400, "Nessun piatto presente nel menù da tradurre.")
+        
+    dishes_data = [
+        {"id": d.id, "name": d.name, "description": d.description}
+        for d in r.dishes
+    ]
+    
+    from ..services.translate import translate_dishes
+    
+    translations = translate_dishes(dishes_data)
+    
+    # Cancella eventuali traduzioni precedenti per evitare duplicati
+    for d in r.dishes:
+        db.query(DishTranslation).filter(DishTranslation.dish_id == d.id).delete()
+        
+    db.commit()
+    
+    for item in translations:
+        db.add(DishTranslation(
+            dish_id=item["dish_id"],
+            lang=item["lang"],
+            name=item["name"],
+            description=item.get("description"),
+        ))
+        
+    db.commit()
+    return {"status": "ok", "count": len(translations)}
+
+
+@router.get("/restaurants/{rid}/menus", response_model=list[MenuOutItem])
+def list_menus(
+    rid: int,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Ritorna l'elenco dei menù del ristorante."""
+    r = _my_restaurant(rid, user, db)
+    return [
+        MenuOutItem(
+            id=m.id,
+            restaurant_id=m.restaurant_id,
+            name=m.name,
+            is_active=bool(m.is_active),
+            sort_order=m.sort_order,
+            created_at=m.created_at
+        )
+        for m in r.menus
+    ]
+
+
+@router.post("/restaurants/{rid}/menus", response_model=MenuOutItem, status_code=201)
+def create_menu(
+    rid: int,
+    data: MenuIn,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Crea un nuovo menù per il ristorante."""
+    r = _my_restaurant(rid, user, db)
+    _ensure_menu_access(r)
+    
+    new_menu = Menu(
+        restaurant_id=r.id,
+        name=data.name,
+        is_active=1 if data.is_active else 0,
+        sort_order=data.sort_order,
+    )
+    db.add(new_menu)
+    db.commit()
+    db.refresh(new_menu)
+    return MenuOutItem(
+        id=new_menu.id,
+        restaurant_id=new_menu.restaurant_id,
+        name=new_menu.name,
+        is_active=bool(new_menu.is_active),
+        sort_order=new_menu.sort_order,
+        created_at=new_menu.created_at
+    )
+
+
+@router.put("/restaurants/{rid}/menus/{menu_id}", response_model=MenuOutItem)
+def update_menu(
+    rid: int,
+    menu_id: int,
+    data: MenuIn,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Modifica un menù esistente."""
+    r = _my_restaurant(rid, user, db)
+    menu = db.get(Menu, menu_id)
+    if not menu or menu.restaurant_id != r.id:
+        raise HTTPException(404, "Menù non trovato")
+        
+    menu.name = data.name
+    menu.is_active = 1 if data.is_active else 0
+    menu.sort_order = data.sort_order
+    db.commit()
+    db.refresh(menu)
+    return MenuOutItem(
+        id=menu.id,
+        restaurant_id=menu.restaurant_id,
+        name=menu.name,
+        is_active=bool(menu.is_active),
+        sort_order=menu.sort_order,
+        created_at=menu.created_at
+    )
+
+
+@router.delete("/restaurants/{rid}/menus/{menu_id}", status_code=204)
+def delete_menu(
+    rid: int,
+    menu_id: int,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Rimuove un menù (i piatti associati verranno scollegati, impostando menu_id = NULL)."""
+    r = _my_restaurant(rid, user, db)
+    menu = db.get(Menu, menu_id)
+    if not menu or menu.restaurant_id != r.id:
+        raise HTTPException(404, "Menù non trovato")
+        
+    db.delete(menu)
+    db.commit()
+    return None

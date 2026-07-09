@@ -8,15 +8,16 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Restaurant, Review, ReviewReply, User
-from ..schemas import ReviewIn, ReviewOut, ReviewReplyIn
+from ..schemas import ReviewIn, ReviewOut, ReviewReplyIn, ExternalReviewOut
 from ..security import get_current_user, require_owner
 from ..rate_limit import rate_limiter
 from ..services.push import notify_users
 from .restaurants import _get_active_restaurant
+from ..services.external_reviews import get_external_reviews
 
 router = APIRouter(tags=["reviews"])
 
-REPLY_PLANS = {"verified", "pro", "premium"}
+REPLY_PLANS = {"verified", "pro", "premium", "base", "pro_notify"}
 
 
 def _review_to_out(rev: Review, current_user_id: int | None = None) -> ReviewOut:
@@ -24,6 +25,9 @@ def _review_to_out(rev: Review, current_user_id: int | None = None) -> ReviewOut
         id=rev.id,
         restaurant_id=rev.restaurant_id,
         rating=rev.rating,
+        rating_staff=rev.rating_staff,
+        rating_menu=rev.rating_menu,
+        rating_safety=rev.rating_safety,
         comment=rev.comment,
         author_name=rev.user.display_name or "Utente AllerTgy",
         is_mine=(current_user_id is not None and rev.user_id == current_user_id),
@@ -63,6 +67,12 @@ def upsert_review(
     if r.owner_user_id == user.id:
         raise HTTPException(403, "Non puoi recensire il tuo locale")
 
+    # Calcola rating complessivo
+    if data.rating_staff is not None and data.rating_menu is not None and data.rating_safety is not None:
+        overall_rating = int(round((data.rating_staff + data.rating_menu + data.rating_safety) / 3.0))
+    else:
+        overall_rating = data.rating or 5
+
     rev = db.scalar(
         select(Review).where(
             Review.restaurant_id == r.id, Review.user_id == user.id
@@ -70,7 +80,10 @@ def upsert_review(
     )
     is_new = rev is None
     if rev:
-        rev.rating = data.rating
+        rev.rating = overall_rating
+        rev.rating_staff = data.rating_staff
+        rev.rating_menu = data.rating_menu
+        rev.rating_safety = data.rating_safety
         rev.comment = data.comment
         rev.is_hidden = 0  # una modifica rimette la recensione in chiaro
         rev.hidden_reason = None
@@ -78,7 +91,10 @@ def upsert_review(
         rev = Review(
             restaurant_id=r.id,
             user_id=user.id,
-            rating=data.rating,
+            rating=overall_rating,
+            rating_staff=data.rating_staff,
+            rating_menu=data.rating_menu,
+            rating_safety=data.rating_safety,
             comment=data.comment,
         )
         db.add(rev)
@@ -92,8 +108,8 @@ def upsert_review(
             [r.owner_user_id],
             "review_received",
             f"Nuova recensione — {r.name}",
-            f"{author} ha lasciato {data.rating}★ al tuo locale.",
-            {"public_code": r.public_code, "review_id": rev.id, "rating": data.rating},
+            f"{author} ha lasciato {overall_rating}★ al tuo locale.",
+            {"public_code": r.public_code, "review_id": rev.id, "rating": overall_rating},
         )
     db.commit()
     db.refresh(rev)
@@ -178,3 +194,10 @@ def reply_to_review(
     db.commit()
     db.refresh(rev)
     return _review_to_out(rev, None)
+
+
+@router.get("/restaurants/{public_code}/external-reviews", response_model=list[ExternalReviewOut])
+def list_external_reviews(public_code: str, db: Session = Depends(get_db)):
+    """Recensioni esterne simulate da Google e TripAdvisor per il mobile."""
+    r = _get_active_restaurant(public_code, db)
+    return get_external_reviews(r.name, r.google_place_id, r.tripadvisor_url)

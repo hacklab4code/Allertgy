@@ -2,14 +2,17 @@ import { Stack, router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { api } from '../src/api/client';
-import { getFlagEmoji } from '../src/constants/languages';
 import { useSession } from '../src/store/session';
+import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
+import { useTranslation } from '../src/constants/translations';
 
 export default function Disclaimer() {
   const [talkToStaff, setTalkToStaff] = useState(false);
   const [supportOnly, setSupportOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const { setDisclaimer, language } = useSession();
+  const { t } = useTranslation();
+  const isIt = (language || 'it').toLowerCase() === 'it';
 
   const accept = async () => {
     setBusy(true);
@@ -27,37 +30,42 @@ export default function Disclaimer() {
   const ready = talkToStaff && supportOnly;
 
   return (
-    <>
-      <Stack.Screen options={{ 
-        headerRight: () => (
-          <TouchableOpacity onPress={() => router.push('/language')} style={{ marginRight: 4 }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F8A6A' }}>{getFlagEmoji(language)} {(language || 'it').toUpperCase()}</Text>
-          </TouchableOpacity>
-        ) 
-      }} />
+    <View style={{ flex: 1, backgroundColor: '#F7FAF8' }}>
+      <Stack.Screen options={{ headerRight: undefined }} />
+      <LanguageFlagsRow />
+
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.icon}>⚠️</Text>
-      <Text style={styles.title}>La tua sicurezza prima di tutto</Text>
-      <Text style={styles.text}>
-        AllerTgy ti aiuta a orientarti nel menù, ma non sostituisce la comunicazione
-        diretta con il ristorante.{'\n\n'}
-        <Text style={{ fontWeight: '700' }}>
-          Comunica SEMPRE le tue allergie al personale di sala
-        </Text>{' '}
-        prima di ordinare. Le informazioni sugli allergeni sono fornite dal ristoratore
-        e potrebbero non riflettere variazioni dell'ultimo minuto in cucina.
-      </Text>
+        <Text style={styles.title}>{t('safety_title')}</Text>
+        <Text style={styles.text}>
+          {isIt ? "AllerTgy ti aiuta a orientarti nel menù, ma non sostituisce la comunicazione diretta con il ristorante." : "AllerTgy helps you navigate the menu, but does not replace direct communication with the restaurant."}
+          {'\n\n'}
+          <Text style={{ fontWeight: '700' }}>
+            {isIt ? "Comunica SEMPRE le tue allergie al personale di sala" : "ALWAYS communicate your allergies to the staff"}
+          </Text>{' '}
+          {isIt 
+            ? "prima di ordinare. Le informazioni sugli allergeni sono fornite dal ristoratore e potrebbero non riflettere variazioni dell'ultimo minuto in cucina." 
+            : "before ordering. Allergen information is provided by the owner and may not reflect last-minute changes in the kitchen."}
+        </Text>
 
-      <View style={styles.checkBox}>
-        <Check checked={talkToStaff} onPress={() => setTalkToStaff(!talkToStaff)} text="Mi impegno a comunicare le allergie al personale prima di ordinare." />
-        <Check checked={supportOnly} onPress={() => setSupportOnly(!supportOnly)} text="Ho capito che AllerTgy è uno strumento di supporto e non sostituisce il confronto con il locale o un parere medico." />
-      </View>
+        <View style={styles.checkBox}>
+          <Check 
+            checked={talkToStaff} 
+            onPress={() => setTalkToStaff(!talkToStaff)} 
+            text={isIt ? "Mi impegno a comunicare le allergie al personale prima di ordinare." : "I promise to communicate allergies to staff before ordering."} 
+          />
+          <Check 
+            checked={supportOnly} 
+            onPress={() => setSupportOnly(!supportOnly)} 
+            text={isIt ? "Ho capito che AllerTgy è uno strumento di supporto e non sostituisce il confronto con il locale o un parere medico." : "I understand that AllerTgy is a support tool and does not replace consulting the staff or medical advice."} 
+          />
+        </View>
 
-      <TouchableOpacity style={[styles.button, (!ready || busy) && styles.disabled]} disabled={!ready || busy} onPress={accept}>
-        {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Confermo e continuo</Text>}
-      </TouchableOpacity>
-    </ScrollView>
-    </>
+        <TouchableOpacity style={[styles.button, (!ready || busy) && styles.disabled]} disabled={!ready || busy} onPress={accept}>
+          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isIt ? "Confermo e continuo" : "Confirm and continue"}</Text>}
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -73,7 +81,7 @@ function Check({ checked, onPress, text }: { checked: boolean; onPress: () => vo
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, justifyContent: 'center', padding: 28 },
+  container: { flexGrow: 1, padding: 24, justifyContent: 'center' },
   icon: { fontSize: 48, textAlign: 'center', marginBottom: 12 },
   title: { fontSize: 22, fontWeight: '800', textAlign: 'center', color: '#1e293b', marginBottom: 16 },
   text: { fontSize: 15, lineHeight: 23, color: '#475569', textAlign: 'center' },

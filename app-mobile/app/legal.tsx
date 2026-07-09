@@ -2,8 +2,9 @@ import { Stack, router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { api } from '../src/api/client';
-import { getFlagEmoji } from '../src/constants/languages';
 import { useSession } from '../src/store/session';
+import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
+import { useTranslation } from '../src/constants/translations';
 
 export default function LegalScreen() {
   const [terms, setTerms] = useState(false);
@@ -12,6 +13,8 @@ export default function LegalScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const { setLegalStatus, language } = useSession();
+  const { t } = useTranslation();
+  const isIt = (language || 'it').toLowerCase() === 'it';
 
   const accept = async () => {
     setBusy(true);
@@ -29,35 +32,40 @@ export default function LegalScreen() {
   const ready = terms && privacy && health;
 
   return (
-    <>
-      <Stack.Screen options={{ 
-        headerRight: () => (
-          <TouchableOpacity onPress={() => router.push('/language')} style={{ marginRight: 4 }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F8A6A' }}>{getFlagEmoji(language)} {(language || 'it').toUpperCase()}</Text>
-          </TouchableOpacity>
-        ) 
-      }} />
+    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      <Stack.Screen options={{ headerRight: undefined }} />
+      <LanguageFlagsRow />
+      
       <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.icon}>⚖️</Text>
-      <Text style={styles.title}>Termini, privacy e dati salute</Text>
-      <Text style={styles.text}>
-        AllerTgy usa i dati che inserisci su allergie, intolleranze e preferenze alimentari
-        solo per confrontarli con i menu dei locali e mostrarti il semaforo personalizzato.
-      </Text>
+        <Text style={styles.icon}>⚖️</Text>
+        <Text style={styles.title}>{t('legal_title')}</Text>
+        <Text style={styles.text}>{t('legal_intro')}</Text>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <View style={styles.box}>
-        <Check checked={terms} onPress={() => setTerms(!terms)} text="Accetto i Termini di servizio dell'app." />
-        <Check checked={privacy} onPress={() => setPrivacy(!privacy)} text="Ho letto l'Informativa Privacy e so che posso revocare o modificare i dati dal profilo." />
-        <Check checked={health} onPress={() => setHealth(!health)} text="Acconsento esplicitamente al trattamento dei dati su allergie, intolleranze e preferenze alimentari per personalizzare il menu." />
-      </View>
+        <View style={styles.box}>
+          <Check 
+            checked={terms} 
+            onPress={() => setTerms(!terms)} 
+            text={isIt ? "Accetto i Termini di servizio dell'app." : "I accept the App Terms of Service."} 
+          />
+          <Check 
+            checked={privacy} 
+            onPress={() => setPrivacy(!privacy)} 
+            text={isIt ? "Ho letto l'Informativa Privacy e so che posso revocare o modificare i dati dal profilo." : "I have read the Privacy Policy and know that I can revoke or modify my data in my profile."} 
+          />
+          <Check 
+            checked={health} 
+            onPress={() => setHealth(!health)} 
+            text={isIt ? "Acconsento esplicitamente al trattamento dei dati su allergie, intolleranze e preferenze alimentari per personalizzare il menu." : "I explicitly consent to the processing of data on allergies, intolerances and dietary preferences to customize the menu."} 
+          />
+        </View>
 
-      <TouchableOpacity style={[styles.button, (!ready || busy) && styles.disabled]} disabled={!ready || busy} onPress={accept}>
-        {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Accetta e continua</Text>}
-      </TouchableOpacity>
-    </ScrollView>
-    </>
+        <TouchableOpacity style={[styles.button, (!ready || busy) && styles.disabled]} disabled={!ready || busy} onPress={accept}>
+          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{t('accept_continue')}</Text>}
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -73,7 +81,7 @@ function Check({ checked, onPress, text }: { checked: boolean; onPress: () => vo
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, justifyContent: 'center', padding: 24, backgroundColor: '#f8fafc' },
+  container: { flexGrow: 1, padding: 24, justifyContent: 'center', backgroundColor: '#f8fafc' },
   icon: { fontSize: 44, textAlign: 'center', marginBottom: 12 },
   title: { fontSize: 22, fontWeight: '900', textAlign: 'center', color: '#0f172a' },
   text: { marginTop: 10, marginBottom: 18, color: '#475569', textAlign: 'center', lineHeight: 22, fontSize: 14 },

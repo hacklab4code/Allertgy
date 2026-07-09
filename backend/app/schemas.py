@@ -68,6 +68,33 @@ class LegalConsentIn(BaseModel):
 
 
 # ---------- Menù (B2C) ----------
+class DishTranslationOut(BaseModel):
+    lang: str
+    name: str
+    description: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MenuIn(BaseModel):
+    name: str
+    is_active: bool = True
+    sort_order: int = 0
+
+
+class MenuOutItem(BaseModel):
+    id: int
+    restaurant_id: int
+    name: str
+    is_active: bool
+    sort_order: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class DishOut(BaseModel):
     id: int
     nome_piatto: str
@@ -76,8 +103,15 @@ class DishOut(BaseModel):
     prezzo_cents: Optional[int]
     image_url: Optional[str] = None
     menu_group: Optional[str] = "Principale"
+    menu_id: Optional[int] = None
+    kitchen_protocol_confirmed: int = 0
+    cross_contamination_checked_at: Optional[datetime] = None
     allergeni_contenuti: list[str]
     allergeni_tracce: list[str]
+    translations: list[DishTranslationOut] = []
+
+    class Config:
+        from_attributes = True
 
 
 class MenuOut(BaseModel):
@@ -96,10 +130,15 @@ class MenuOut(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     image_url: Optional[str] = None
+    google_rating: Optional[float] = None
+    google_reviews_count: Optional[int] = None
+    tripadvisor_rating: Optional[float] = None
+    tripadvisor_reviews_count: Optional[int] = None
     safety_notice: str = (
         "Informazioni sugli allergeni dichiarate dal ristoratore. "
         "Comunica sempre allergie e intolleranze al personale prima di ordinare."
     )
+    menus: list[MenuOutItem] = []
     piatti: list[DishOut]
 
 
@@ -133,7 +172,16 @@ class RestaurantIn(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     website: Optional[str] = None
+    menu_url: Optional[str] = None
     description: Optional[str] = None
+    google_place_id: Optional[str] = None
+    google_rating: Optional[float] = None
+    google_reviews_count: Optional[int] = None
+    tripadvisor_url: Optional[str] = None
+    tripadvisor_rating: Optional[float] = None
+    tripadvisor_reviews_count: Optional[int] = None
+    vat_number: Optional[str] = None
+    allergen_manager: Optional[str] = None
 
 
 class RestaurantOut(BaseModel):
@@ -143,6 +191,7 @@ class RestaurantOut(BaseModel):
     name: str
     city: Optional[str]
     website: Optional[str] = None
+    menu_url: Optional[str] = None
     description: Optional[str] = None
     is_active: int = 1
     address: Optional[str]
@@ -165,9 +214,16 @@ class RestaurantOut(BaseModel):
     trial_ends_at: Optional[datetime] = None
     billing_email: Optional[str] = None
     vat_number: Optional[str] = None
+    allergen_manager: Optional[str] = None
     sdi_code: Optional[str] = None
     pec_email: Optional[str] = None
     commercial_notes: Optional[str] = None
+    google_place_id: Optional[str] = None
+    google_rating: Optional[float] = None
+    google_reviews_count: Optional[int] = None
+    tripadvisor_url: Optional[str] = None
+    tripadvisor_rating: Optional[float] = None
+    tripadvisor_reviews_count: Optional[int] = None
     created_at: Optional[datetime] = None
 
     class Config:
@@ -237,6 +293,12 @@ class InternalUserOut(BaseModel):
         from_attributes = True
 
 
+class DishTranslationIn(BaseModel):
+    lang: str
+    name: str
+    description: Optional[str] = None
+
+
 class DishIn(BaseModel):
     nome_piatto: str
     descrizione: Optional[str] = None
@@ -244,8 +306,12 @@ class DishIn(BaseModel):
     prezzo_cents: Optional[int] = None
     image_url: Optional[str] = None
     menu_group: Optional[str] = "Principale"
+    menu_id: Optional[int] = None
+    kitchen_protocol_confirmed: int = 0
+    cross_contamination_checked_at: Optional[datetime] = None
     allergeni_contenuti: list[str] = []
     allergeni_tracce: list[str] = []
+    translations: list[DishTranslationIn] = []
 
 
 class MenuSaveIn(BaseModel):
@@ -256,6 +322,10 @@ class MenuSaveIn(BaseModel):
 
 class ApproveMenuIn(BaseModel):
     legal_acknowledged: bool = False
+
+
+class AnalyzeUrlIn(BaseModel):
+    url: str
 
 
 class AnalyzeOut(BaseModel):
@@ -344,6 +414,14 @@ class PublicReviewOut(BaseModel):
     created_at: datetime
 
 
+class ExternalReviewOut(BaseModel):
+    source: str  # "google" o "tripadvisor"
+    author_name: str
+    rating: int
+    comment: Optional[str] = None
+    created_at: datetime
+
+
 class PublicRestaurantOut(BaseModel):
     public_code: str
     slug: Optional[str] = None
@@ -354,16 +432,27 @@ class PublicRestaurantOut(BaseModel):
     longitude: Optional[float] = None
     phone: Optional[str] = None
     website: Optional[str] = None
+    menu_url: Optional[str] = None
     description: Optional[str] = None
     opening_hours: Optional[str] = None
     image_url: Optional[str] = None
     photos: list[PhotoOut] = []
     business_plan: str = "free"
     is_verified: bool = False
+    vat_number: Optional[str] = None
+    allergen_manager: Optional[str] = None
     rating_avg: Optional[float] = None
     rating_count: int = 0
+    google_place_id: Optional[str] = None
+    google_rating: Optional[float] = None
+    google_reviews_count: Optional[int] = None
+    tripadvisor_url: Optional[str] = None
+    tripadvisor_rating: Optional[float] = None
+    tripadvisor_reviews_count: Optional[int] = None
+    external_reviews: list[ExternalReviewOut] = []
     menu_available: bool = False  # dettaglio allergeni visibile solo con piano Base o Pro Notifiche
     boost_active: bool = False     # True se il locale ha un Boost Visibilità attivo
+    menus: list[MenuOutItem] = []
     piatti: list[DishOut] = []
     safety_notice: str = (
         "Informazioni sugli allergeni dichiarate dal ristoratore. "
@@ -410,7 +499,10 @@ class ConfirmExtractionIn(BaseModel):
 
 # ---------- Recensioni ----------
 class ReviewIn(BaseModel):
-    rating: int = Field(ge=1, le=5)
+    rating: Optional[int] = Field(default=None, ge=1, le=5)
+    rating_staff: Optional[int] = Field(default=None, ge=1, le=5)
+    rating_menu: Optional[int] = Field(default=None, ge=1, le=5)
+    rating_safety: Optional[int] = Field(default=None, ge=1, le=5)
     comment: Optional[str] = Field(default=None, max_length=2000)
 
 
@@ -418,6 +510,9 @@ class ReviewOut(BaseModel):
     id: int
     restaurant_id: int
     rating: int
+    rating_staff: Optional[int] = None
+    rating_menu: Optional[int] = None
+    rating_safety: Optional[int] = None
     comment: Optional[str] = None
     author_name: str
     is_mine: bool = False
@@ -435,6 +530,9 @@ class InternalReviewOut(BaseModel):
     restaurant_name: str
     user_email: str
     rating: int
+    rating_staff: Optional[int] = None
+    rating_menu: Optional[int] = None
+    rating_safety: Optional[int] = None
     comment: Optional[str] = None
     is_hidden: bool = False
     hidden_reason: Optional[str] = None
@@ -538,3 +636,83 @@ class LegalDocOut(BaseModel):
     title: str
     version: str
     content_markdown: str
+
+
+# ---------- Annotazioni dei Clienti ----------
+class CustomerAnnotationIn(BaseModel):
+    allergen_id: int
+    ingredient: Optional[str] = Field(default=None, max_length=100)
+    notes: str = Field(min_length=1, max_length=2000)
+
+
+class CustomerAnnotationOut(BaseModel):
+    id: int
+    restaurant_id: int
+    allergen_id: int
+    allergen_code: str
+    allergen_name_it: str
+    allergen_emoji: Optional[str] = None
+    ingredient: Optional[str] = None
+    notes: str
+    author_name: str
+    is_mine: bool = False
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SubProfileAllergenItem(BaseModel):
+    code: str
+    intensity: str = "moderata"
+
+
+class SubProfileIn(BaseModel):
+    name: str
+    relationship: str = "altro"
+    allergens: list[SubProfileAllergenItem] = []
+
+
+class SubProfileAllergenOut(BaseModel):
+    code: str
+    name_it: str
+    emoji: Optional[str]
+    intensity: str
+
+
+class SubProfileOut(BaseModel):
+    id: int
+    name: str
+    relationship: str
+    allergens: list[SubProfileAllergenOut]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ProfileShareCreateIn(BaseModel):
+    profile_id: Optional[int] = None  # null = profilo principale "io"
+    duration: str = Field(default="24h", pattern="^(24h|permanent)$")
+    label: Optional[str] = Field(default=None, max_length=120)
+
+
+class ProfileShareOut(BaseModel):
+    id: int
+    token: str
+    label: str
+    scope: str
+    expires_at: Optional[datetime] = None
+    created_at: datetime
+    share_url: str
+
+
+class SharedProfileOut(BaseModel):
+    token: str
+    label: str
+    owner_display_name: Optional[str] = None
+    profile_name: str
+    relationship: str
+    expires_at: Optional[datetime] = None
+    allergens: list[SubProfileAllergenOut]
+

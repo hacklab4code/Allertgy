@@ -1,9 +1,29 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSession } from '../store/session';
-import type { Allergen, BusinessPlan, Menu, MenuValutato, PiattoIn, Plan, Restaurant } from '../types';
+import type {
+  Allergen,
+  BusinessPlan,
+  CustomerAnnotation,
+  Menu,
+  MenuValutato,
+  PiattoIn,
+  Plan,
+  ProfileShare,
+  Restaurant,
+  SharedProfile,
+  SubProfile,
+  SubProfileIn,
+} from '../types';
 
 // Su dispositivo fisico imposta EXPO_PUBLIC_API_URL=http://<IP-del-tuo-Mac>:8000
 export const API = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+
+const getWebUrl = () => {
+  if (API.includes('localhost')) return 'http://localhost:5173';
+  if (API.includes('127.0.0.1')) return 'http://127.0.0.1:5173';
+  return API.replace(':8000', ':5173');
+};
+export const WEB_URL = getWebUrl();
 
 export interface UserProfile {
   id: number;
@@ -63,11 +83,15 @@ export interface Review {
   id: number;
   restaurant_id: number;
   rating: number;
+  rating_staff?: number | null;
+  rating_menu?: number | null;
+  rating_safety?: number | null;
   comment: string | null;
   author_name: string;
   is_mine: boolean;
   reply: string | null;
   created_at: string;
+  source?: 'google' | 'tripadvisor' | null;
 }
 
 export interface AppNotification {
@@ -80,8 +104,10 @@ export interface AppNotification {
 
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = useSession.getState().token;
+  const language = useSession.getState().language || 'it';
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'Accept-Language': language,
     ...(init.headers as Record<string, string>),
   };
   if (init.body instanceof FormData) {
@@ -157,6 +183,27 @@ export const api = {
       }),
     }),
   acceptDisclaimer: () => req<void>('/profile/disclaimer', { method: 'POST' }),
+  getSubProfiles: () => req<SubProfile[]>('/profile/sub-profiles'),
+  createSubProfile: (data: SubProfileIn) =>
+    req<SubProfile>('/profile/sub-profiles', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateSubProfile: (pid: number, data: SubProfileIn) =>
+    req<SubProfile>(`/profile/sub-profiles/${pid}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteSubProfile: (pid: number) =>
+    req<{ detail: string }>(`/profile/sub-profiles/${pid}`, {
+      method: 'DELETE',
+    }),
+  createProfileShare: (profileId: number | null, duration: '24h' | 'permanent', label?: string) =>
+    req<ProfileShare>('/profile/shares', {
+      method: 'POST',
+      body: JSON.stringify({ profile_id: profileId, duration, label }),
+    }),
+  getSharedProfile: (token: string) => req<SharedProfile>(`/profile/shares/${token}`),
   menu: async (codice: string) => {
     const res = await req<Menu>(`/restaurants/${codice}/menu`);
     try {
@@ -231,11 +278,12 @@ export const api = {
   addFavorite: (code: string) => req<void>(`/restaurants/${code}/favorite`, { method: 'POST' }),
   removeFavorite: (code: string) => req<void>(`/restaurants/${code}/favorite`, { method: 'DELETE' }),
   listReviews: (code: string) => req<Review[]>(`/restaurants/${code}/reviews`),
-  upsertReview: (code: string, rating: number, comment: string) =>
+  upsertReview: (code: string, rating: number, comment: string, ratingStaff?: number, ratingMenu?: number, ratingSafety?: number) =>
     req<Review>(`/restaurants/${code}/reviews`, {
       method: 'POST',
-      body: JSON.stringify({ rating, comment }),
+      body: JSON.stringify({ rating, comment, rating_staff: ratingStaff, rating_menu: ratingMenu, rating_safety: ratingSafety }),
     }),
+  listExternalReviews: (code: string) => req<Review[]>(`/restaurants/${code}/external-reviews`),
 
   /* ---------- notifiche ---------- */
   registerDeviceToken: (expoToken: string) =>
@@ -288,5 +336,46 @@ export const api = {
     req<Restaurant>(`/admin/restaurants/${rid}/approve`, {
       method: 'POST',
       body: JSON.stringify({ legal_acknowledged: legalAcknowledged }),
+    }),
+  listAnnotations: (code: string) => req<CustomerAnnotation[]>(`/restaurants/${code}/annotations`),
+  createAnnotation: (code: string, allergenId: number, ingredient: string | null, notes: string) =>
+    req<CustomerAnnotation>(`/restaurants/${code}/annotations`, {
+      method: 'POST',
+      body: JSON.stringify({ allergen_id: allergenId, ingredient, notes }),
+    }),
+  updateRestaurant: (rid: number, data: Partial<Restaurant>) =>
+    req<Restaurant>(`/admin/restaurants/${rid}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  analyze: (formData: FormData) =>
+    req<{ ai_stub: boolean; note: string; piatti: PiattoIn[] }>('/admin/menu/analyze', {
+      method: 'POST',
+      body: formData,
+    }),
+  analyzeUrl: (url: string) =>
+    req<{ ai_stub: boolean; note: string; piatti: PiattoIn[] }>('/admin/menu/analyze-url', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    }),
+  uploadImage: (formData: FormData) =>
+    req<{ url: string }>('/admin/upload-image', {
+      method: 'POST',
+      body: formData,
+    }),
+  uploadRestaurantPhoto: (rid: number, formData: FormData) =>
+    req<{ id: number; url: string; is_cover: boolean; sort_order: number }>(`/admin/restaurants/${rid}/photos`, {
+      method: 'POST',
+      body: formData,
+    }),
+  listRestaurantPhotos: (rid: number) =>
+    req<{ id: number; url: string; is_cover: boolean; sort_order: number }[]>(`/admin/restaurants/${rid}/photos`),
+  setCoverPhoto: (rid: number, photoId: number) =>
+    req<{ id: number; url: string; is_cover: boolean; sort_order: number }[]>(`/admin/restaurants/${rid}/photos/${photoId}/cover`, {
+      method: 'POST',
+    }),
+  deleteRestaurantPhoto: (rid: number, photoId: number) =>
+    req<unknown>(`/admin/restaurants/${rid}/photos/${photoId}`, {
+      method: 'DELETE',
     }),
 };

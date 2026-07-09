@@ -72,6 +72,72 @@ App Expo / Dashboard Web ──HTTPS──> FastAPI (VPS) ──SQL──> MySQL
                                         └──> Resend (email) / Expo Push (notifiche)
 ```
 
+### Dettaglio requisiti per la messa online in produzione
+
+Per mettere l'applicazione online in produzione (pronta per il pubblico), hai bisogno di una struttura cloud minima ma sicura (soprattutto perché l'app gestisce dati sanitari come allergie e referti medici). 
+
+Ecco l'elenco dei servizi e dell'infrastruttura necessari con i relativi costi stimati (la maggior parte ha piani gratuiti all'inizio):
+
+---
+
+#### 🌐 1. Server e Hosting (Dove gira l'app)
+
+*   **Backend (FastAPI in Python)**:
+    *   **Cosa serve**: Un server **VPS economico** (es. *Hostinger VPS KVM1* o *Hetzner CX22*). L'hosting web condiviso classico non va bene per far girare processi Python sempre attivi come FastAPI. Dovrà essere configurato con Docker, Nginx e Certbot (per avere l'HTTPS gratuito).
+    *   **Costo**: ~€5 - €8 / mese.
+*   **Sito Web (Dashboard e Landing Page in React)**:
+    *   **Cosa serve**: Può essere ospitato gratuitamente su piattaforme come **Vercel** o **Netlify**, oppure caricato direttamente sullo stesso VPS del backend.
+    *   **Costo**: Gratis.
+*   **Database (MySQL)**:
+    *   **Cosa serve**: Puoi continuare a usare il database MySQL attuale su **Hostinger** (già incluso nel tuo abbonamento Hostinger).
+    *   **Costo**: Incluso nel tuo piano attuale.
+
+---
+
+#### 📦 2. Servizi Esterni (Configurabili tramite chiavi API in `.env`)
+
+Per attivare le funzionalità reali in produzione ti servono questi account:
+
+*   **Cloudflare R2 (Storage per i file)**:
+    *   **Cosa serve**: Serve per salvare in modo sicuro e privato le foto dei profili, le foto dei piatti e i documenti medici degli utenti (tramite URL protetti e temporanei).
+    *   **Costo**: Gratis fino a 10 GB di dati, poi circa $0.015/GB al mese.
+*   **Stripe (Pagamenti e Abbonamenti B2B)**:
+    *   **Cosa serve**: Per far pagare l'abbonamento mensile ai ristoranti registrati (piani da 9€, 19.90€, 39.90€). Gestisce in automatico carte di credito, scadenze e fatture.
+    *   **Costo**: Nessun costo fisso. Trattiene una percentuale sulle transazioni reali (circa 1.5% + 0.25€ a transazione).
+*   **Resend o Brevo (Invio Email)**:
+    *   **Cosa serve**: Per inviare le email di recupero password ai clienti e le ricevute di pagamento ai ristoratori.
+    *   **Costo**: Gratis fino a 3.000 email al mese (sufficiente per la fase di lancio).
+*   **Google AI Studio (Gemini API)**:
+    *   **Cosa serve**: Per far funzionare l'analisi automatica tramite intelligenza artificiale dei menù fotografati e dei referti medici degli utenti.
+    *   **Costo**: Pagamento a consumo (estremamente economico, pochi centesimi per centinaia di analisi).
+
+---
+
+#### 📱 3. Pubblicazione dell'App Mobile sui relativi Store
+
+Per fare in modo che i clienti scarichino l'app senza usare Expo Go, devi pubblicarla ufficialmente:
+
+*   **Apple App Store (iOS)**:
+    *   Richiede un account *Apple Developer Program*.
+    *   **Costo**: $99 / anno (~90€).
+*   **Google Play Store (Android)**:
+    *   Richiede un account *Google Play Console*.
+    *   **Costo**: $25 una tantum (~23€).
+
+---
+
+#### ⚖️ 4. Aspetti Legali e GDPR (Molto Importante)
+
+Poiché l'app memorizza dati sulla salute degli utenti (le allergie e i certificati medici caricati), ricade sotto le regole stringenti del **GDPR (Art. 9 - Dati particolari)**:
+*   **Cosa serve**: I testi legali completi di **Privacy Policy**, **Termini di Servizio** e **Disclaimer Medico** (la cui bozza tecnica è già presente nel file [PIANO_LANCIO.md](file:///Users/m1bookpro/Desktop/allerTgy/PIANO_LANCIO.md#L328)) devono essere rivisti e approvati da un avvocato o tramite servizi come *Iubenda* prima del lancio.
+
+---
+
+#### 💰 Riassunto Costi per Partire:
+*   **Costo fisso mensile (VPS)**: ~6€/mese.
+*   **Costi di pubblicazione store**: ~90€/anno + 23€ una tantum.
+*   **Costi variabili (Stripe, Gemini, Cloudflare, Email)**: Solo al crescere degli utenti e sulle transazioni effettive (inizialmente 0€).
+
 ---
 
 ## 3. Nuove tabelle — `schema_v5.sql` (bozza)

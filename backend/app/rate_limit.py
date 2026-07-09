@@ -6,6 +6,12 @@ from collections import defaultdict
 # La chiave include l'endpoint: ogni rotta ha il suo contatore indipendente.
 _request_history = defaultdict(list)
 
+
+def reset_rate_limit() -> None:
+    """Svuota lo storico richieste (usato nei test)."""
+    _request_history.clear()
+
+
 def rate_limiter(requests_limit: int = 5, window_seconds: int = 60):
     """FastAPI Dependency per limitare il numero di richieste per endpoint+IP."""
     def dependency(request: Request):
