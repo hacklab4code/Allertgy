@@ -10,6 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useSession } from '../src/store/session';
+import DetailSection from '../src/components/DetailSection';
 import { colors, radius, shadow, spacing, typography } from '../src/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -199,16 +200,12 @@ export default function AllergyCardScreen() {
       />
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.screenTitle}>
-            {isIt ? 'Allergy Card per i Camerieri' : 'Allergy Card for Waiters'}
-          </Text>
-          <Text style={styles.screenDesc}>
-            {isIt
-              ? 'Mostra questo tesserino digitale allo staff del ristorante quando ordini all\'estero o in locali non convenzionati.'
-              : 'Show this digital pass to restaurant staff when ordering abroad or in non-partner venues.'}
-          </Text>
-
-          {/* Selettore Lingua della Card */}
+          <DetailSection
+            title={isIt ? 'LINGUA DEL PASS' : 'PASS LANGUAGE'}
+            subtitle={isIt ? 'Scegli la lingua in cui mostrare allergie e messaggio allo staff.' : 'Choose the language for allergens and the message to staff.'}
+            style={{ marginTop: 0, width: '100%' }}
+            card={false}
+          >
           <View style={styles.langSelector}>
             <Text style={styles.langLabel}>{isIt ? 'Traduci in:' : 'Translate to:'}</Text>
             <View style={styles.langChips}>
@@ -234,8 +231,16 @@ export default function AllergyCardScreen() {
               })}
             </View>
           </View>
+          </DetailSection>
 
-          {/* CARD DIGITALE ALLERGENI (Vibrante Glassmorphism Rosso/Scuro) */}
+          <DetailSection
+            title={isIt ? 'MOSTRA ALLO STAFF' : 'SHOW TO STAFF'}
+            subtitle={isIt
+              ? 'Tesserino digitale per camerieri — utile all\'estero o in locali non convenzionati.'
+              : 'Digital pass for waiters — useful abroad or in non-partner venues.'}
+            card={false}
+            style={{ width: '100%' }}
+          >
           <View style={styles.cardFrame}>
             <View style={styles.cardGradientOverlay}>
               <View style={styles.cardHeader}>
@@ -271,6 +276,7 @@ export default function AllergyCardScreen() {
               </View>
             </View>
           </View>
+          </DetailSection>
 
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Text style={styles.backBtnText}>{isIt ? 'Torna Indietro' : 'Go Back'}</Text>

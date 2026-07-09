@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { api } from '../../src/api/client';
+import DetailSection from '../../src/components/DetailSection';
 import { useOwner } from '../../src/store/owner';
 import { colors, radius, shadow, spacing, typography } from '../../src/theme';
 
@@ -58,22 +59,32 @@ export default function OwnerStatistiche() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.heroTitle}>Statistiche</Text>
-      <Text style={styles.heroSub}>{locale.name} · scansioni QR e filtri allergici</Text>
-
       {loading ? (
         <ActivityIndicator color={colors.brand} style={{ marginTop: 24 }} />
       ) : !analytics ? (
-        <View style={styles.card}>
-          <Text style={styles.muted}>
-            Statistiche disponibili con piano Pro attivo. Passa a Pro per vedere scansioni e allergeni più cercati.
-          </Text>
-          <TouchableOpacity style={styles.btn} onPress={() => router.push('/(owner)/piano')}>
-            <Text style={styles.btnText}>Vedi piani</Text>
-          </TouchableOpacity>
-        </View>
+        <DetailSection
+          title="PANORAMICA"
+          subtitle={`${locale.name} · scansioni QR e filtri allergici sul menù.`}
+          style={{ marginTop: 0 }}
+          card={false}
+        >
+          <View style={styles.card}>
+            <Text style={styles.muted}>
+              Statistiche disponibili con piano Pro attivo. Passa a Pro per vedere scansioni e allergeni più cercati.
+            </Text>
+            <TouchableOpacity style={styles.btn} onPress={() => router.push('/(owner)/piano')}>
+              <Text style={styles.btnText}>Vedi piani</Text>
+            </TouchableOpacity>
+          </View>
+        </DetailSection>
       ) : (
         <>
+          <DetailSection
+            title="PANORAMICA"
+            subtitle={`${locale.name} · scansioni QR e filtri allergici sul menù.`}
+            style={{ marginTop: 0 }}
+            card={false}
+          >
           <View style={styles.kpiRow}>
             <View style={styles.kpi}>
               <Text style={styles.kpiVal}>{analytics.total_views}</Text>
@@ -84,7 +95,13 @@ export default function OwnerStatistiche() {
               <Text style={styles.kpiLabel}>Filtri allergici</Text>
             </View>
           </View>
+          </DetailSection>
 
+          <DetailSection
+            title="ANDAMENTO VISITE"
+            subtitle="Visualizzazioni del menù negli ultimi 30 giorni."
+            card={false}
+          >
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Visite · ultimi 30 giorni</Text>
             <View style={styles.chart}>
@@ -99,7 +116,13 @@ export default function OwnerStatistiche() {
               })}
             </View>
           </View>
+          </DetailSection>
 
+          <DetailSection
+            title="ALLERGENI PIÙ CERCATI"
+            subtitle="Cosa filtrano i clienti quando consultano il tuo menù."
+            card={false}
+          >
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Allergeni più cercati</Text>
             {analytics.distribution.length === 0 ? (
@@ -121,6 +144,7 @@ export default function OwnerStatistiche() {
               })
             )}
           </View>
+          </DetailSection>
         </>
       )}
     </ScrollView>

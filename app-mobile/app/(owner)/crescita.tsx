@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { api } from '../../src/api/client';
+import DetailSection from '../../src/components/DetailSection';
 import { useOwner } from '../../src/store/owner';
 import { colors, radius, shadow, spacing, typography } from '../../src/theme';
 import type { Restaurant, VisibilityBoost } from '../../src/types';
@@ -135,12 +136,14 @@ export default function OwnerCrescita() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.heroTitle}>Crescita</Text>
-      <Text style={styles.heroSub}>{locale.name} · Boost visibilità e notifiche ai clienti fedeli</Text>
-
       {loading && <ActivityIndicator color={colors.brand} style={{ marginVertical: 12 }} />}
 
-      {/* Boost */}
+      <DetailSection
+        title="BOOST VISIBILITÀ"
+        subtitle={`${locale.name} · metti il locale in cima alla ricerca clienti per 30 giorni (€9,90).`}
+        style={{ marginTop: 0 }}
+        card={false}
+      >
       <View style={styles.card}>
         <Text style={styles.cardEmoji}>🚀</Text>
         <Text style={styles.cardTitle}>Boost Visibilità · €9,90</Text>
@@ -160,10 +163,15 @@ export default function OwnerCrescita() {
           )}
         </TouchableOpacity>
       </View>
+      </DetailSection>
 
       {boosts.length > 0 && (
+        <DetailSection
+          title="STORICO BOOST"
+          subtitle="Attivazioni passate e date di scadenza."
+          card={false}
+        >
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Storico Boost</Text>
           {boosts.map((b) => {
             const active = b.expires_at && new Date(b.expires_at).getTime() > Date.now();
             return (
@@ -178,8 +186,14 @@ export default function OwnerCrescita() {
             );
           })}
         </View>
+        </DetailSection>
       )}
 
+      <DetailSection
+        title="STRUMENTI COLLEGATI"
+        subtitle="Recensioni dei clienti e statistiche sul menù digitale."
+        card={false}
+      >
       <View style={styles.quickRow}>
         <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(owner)/recensioni')}>
           <Text style={styles.quickEmoji}>⭐</Text>
@@ -190,8 +204,13 @@ export default function OwnerCrescita() {
           <Text style={styles.quickLabel}>Statistiche</Text>
         </TouchableOpacity>
       </View>
+      </DetailSection>
 
-      {/* Push */}
+      <DetailSection
+        title="NOTIFICHE PUSH"
+        subtitle="Solo con piano Pro · messaggi ai clienti che hanno salvato il locale."
+        card={false}
+      >
       <View style={[styles.card, !pushEnabled && styles.cardLocked]}>
         <Text style={styles.cardEmoji}>🔔</Text>
         <Text style={styles.cardTitle}>Notifiche push · Piano Pro</Text>
@@ -248,6 +267,7 @@ export default function OwnerCrescita() {
           </>
         )}
       </View>
+      </DetailSection>
     </ScrollView>
   );
 }

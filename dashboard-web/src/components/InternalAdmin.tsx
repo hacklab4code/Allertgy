@@ -13,10 +13,29 @@ import {
   type SubscriptionStatus,
 } from '../api';
 
+import InternalCustomersPanel from './InternalCustomersPanel';
+
+type AdminTab = 'overview' | 'restaurants' | 'customers' | 'moderation';
+
+const TAB_LABELS: Record<AdminTab, string> = {
+  overview: 'Panoramica',
+  restaurants: 'Ristoratori',
+  customers: 'Clienti',
+  moderation: 'Moderazione',
+};
+
+interface DocumentAccessLogRow {
+  id: number;
+  document_id: number;
+  document_owner_user_id: number;
+  accessed_by_user_id: number;
+  accessed_at: string;
+}
+
 const PLAN_LABELS: Record<BusinessPlan, string> = {
   free: 'Gratis',
   base: 'Base',
-  pro_notify: 'Pro Notifiche',
+  pro_notify: 'Pro',
 };
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
@@ -53,10 +72,12 @@ export default function InternalAdmin() {
   const [restaurants, setRestaurants] = useState<InternalRestaurant[]>([]);
   const [users, setUsers] = useState<InternalUser[]>([]);
   const [reviews, setReviews] = useState<InternalReview[]>([]);
+  const [docAccessLog, setDocAccessLog] = useState<DocumentAccessLogRow[]>([]);
   const [selected, setSelected] = useState<InternalRestaurant | null>(null);
   const [query, setQuery] = useState('');
   const [busyId, setBusyId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState<AdminTab>('overview');
   const [error, setError] = useState('');
 
   const [draft, setDraft] = useState({
@@ -69,6 +90,11 @@ export default function InternalAdmin() {
     plan_price_cents: 0,
     trial_ends_at: '',
   });
+
+  const customerUsers = useMemo(
+    () => users.filter((u) => u.role === 'customer'),
+    [users],
+  );
 
   const filteredRestaurants = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -91,16 +117,18 @@ export default function InternalAdmin() {
     setLoading(true);
     setError('');
     try {
-      const [nextSummary, nextRestaurants, nextUsers, nextReviews] = await Promise.all([
+      const [nextSummary, nextRestaurants, nextUsers, nextReviews, nextDocLog] = await Promise.all([
         api.internalSummary(),
         api.internalRestaurants(),
         api.internalUsers(),
         api.internalReviews().catch(() => [] as InternalReview[]),
+        api.internalDocumentAccessLog().catch(() => [] as DocumentAccessLogRow[]),
       ]);
       setSummary(nextSummary);
       setRestaurants(nextRestaurants);
       setUsers(nextUsers);
       setReviews(nextReviews);
+      setDocAccessLog(nextDocLog);
       if (selected) {
         const updatedSelected = nextRestaurants.find((r) => r.id === selected.id) ?? null;
         setSelected(updatedSelected);
@@ -240,11 +268,31 @@ export default function InternalAdmin() {
       <main className="max-w-7xl mx-auto p-6 space-y-6">
         {error && <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">{error}</div>}
 
-        <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <nav className="flex flex-wrap gap-2">
+          {(Object.keys(TAB_LABELS) as AdminTab[]).map((key) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition-colors ${
+                tab === key
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {TAB_LABELS[key]}
+            </button>
+          ))}
+        </nav>
+
+        {tab === 'overview' && (
+          <>
+        <section className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
           <Metric label="Utenti totali" value={summary?.total_users ?? 0} helper={`${summary?.total_customers ?? 0} clienti, ${summary?.total_owners ?? 0} commercianti`} />
           <Metric label="Locali" value={summary?.total_restaurants ?? 0} helper={`${summary?.active_restaurants ?? 0} attivi`} />
           <Metric label="Menu pubblicati" value={summary?.published_menus ?? 0} helper="con versione e conferma legale" />
-          <Metric label="MRR stimato" value={euros(summary?.monthly_recurring_cents ?? 0)} helper={`${summary?.paid_restaurants ?? 0} locali a pagamento/prova`} />
+          <Metric label="MRR ristoratori" value={euros(summary?.monthly_recurring_cents ?? 0)} helper={`${summary?.paid_restaurants ?? 0} locali a pagamento/prova`} />
+          <Metric label="Plus clienti" value={(summary?.customers_plus_active ?? 0) + (summary?.customers_plus_comped ?? 0)} helper={`${summary?.customers_plus_active ?? 0} paganti, ${summary?.customers_plus_comped ?? 0} omaggio`} />
+          <Metric label="MRR clienti" value={euros(summary?.customer_mrr_cents ?? 0)} helper="€3,99/mese per abbonato attivo" />
         </section>
 
         <section className="grid lg:grid-cols-4 gap-3">
@@ -264,8 +312,24 @@ export default function InternalAdmin() {
               </div>
             </div>
           ))}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-black text-sm">Plus Famiglia</h2>
+                <p className="text-xs text-slate-500 mt-1">Abbonamento clienti app</p>
+              </div>
+              <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-2 py-1 rounded-lg">€3,99</span>
+            </div>
+            <div className="text-[11px] text-slate-500 font-bold space-y-1">
+              <div>{summary?.customers_by_plan?.customer_plus ?? 0} con Plus</div>
+              <div>{summary?.customers_by_plan?.customer_free ?? 0} gratis</div>
+            </div>
+          </div>
         </section>
+          </>
+        )}
 
+        {tab === 'restaurants' && (
         <section className="grid lg:grid-cols-12 gap-6 items-start">
           <div className="lg:col-span-8 bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
             <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -419,34 +483,20 @@ export default function InternalAdmin() {
                 </div>
               )}
             </section>
-
-            <section className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <div>
-                  <h2 className="font-black text-lg">Utenti</h2>
-                  <p className="text-xs text-slate-500">Ultimi account registrati.</p>
-                </div>
-                <span className="text-xs font-black bg-slate-100 px-2 py-1 rounded-lg">{users.length}</span>
-              </div>
-              <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
-                {users.slice(0, 15).map((user) => (
-                  <div key={user.id} className="py-3 text-xs">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-black text-slate-800 truncate">{user.email}</div>
-                      <span className={`px-2 py-0.5 rounded-lg font-black ${user.role === 'owner' ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
-                        {user.role === 'owner' ? 'Commerciante' : 'Cliente'}
-                      </span>
-                    </div>
-                    <div className="text-slate-400 mt-1">
-                      {user.restaurant_count} locali · {dateOnly(user.created_at)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
           </aside>
         </section>
+        )}
 
+        {tab === 'customers' && (
+          <InternalCustomersPanel
+            customers={customerUsers}
+            onRefresh={load}
+            onError={setError}
+          />
+        )}
+
+        {tab === 'moderation' && (
+          <>
         {/* Moderazione recensioni */}
         <section className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between gap-3">
@@ -512,6 +562,49 @@ export default function InternalAdmin() {
             </div>
           )}
         </section>
+
+        {/* Log accessi documenti medici (GDPR) */}
+        <section className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-black text-lg">Log accessi documenti medici</h2>
+              <p className="text-xs text-slate-500">
+                Tracciamento GDPR degli accessi ai referti (solo metadati: chi, quando, quale documento).
+              </p>
+            </div>
+            <span className="text-xs font-black bg-slate-100 px-2 py-1 rounded-lg">{docAccessLog.length}</span>
+          </div>
+          {docAccessLog.length === 0 ? (
+            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-5 text-xs text-slate-500 font-semibold">
+              Nessun accesso registrato.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-slate-400 border-b border-slate-100">
+                    <th className="py-2 pr-3 font-black">Documento</th>
+                    <th className="py-2 pr-3 font-black">Proprietario (user id)</th>
+                    <th className="py-2 pr-3 font-black">Accesso da (user id)</th>
+                    <th className="py-2 font-black">Data/ora</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {docAccessLog.slice(0, 50).map((row) => (
+                    <tr key={row.id}>
+                      <td className="py-2.5 pr-3 font-semibold text-slate-700">#{row.document_id}</td>
+                      <td className="py-2.5 pr-3 text-slate-500">{row.document_owner_user_id}</td>
+                      <td className="py-2.5 pr-3 text-slate-500">{row.accessed_by_user_id}</td>
+                      <td className="py-2.5 text-slate-500">{new Date(row.accessed_at).toLocaleString('it-IT')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+          </>
+        )}
       </main>
     </div>
   );

@@ -18,7 +18,7 @@ Decisioni prese come base di questo piano:
 | 4 — Recensioni + moderazione | ✅ | Upsert 1-per-utente, risposta ristoratore (piano Pro+), segnalazioni, moderazione in InternalAdmin, UI web e mobile |
 | 5 — Stripe end-to-end | ✅ (codice) | Checkout/Portal/webhook/fatture implementati; si attivano inserendo le chiavi `STRIPE_*` in `backend/.env` (senza chiavi: 503 con messaggio chiaro) |
 | 6 — Notifiche | ✅ (parziale) | Tabelle + push Expo su "menù aggiornato" (preferiti server-side) e "risposta a recensione"; email transazionali via Resend (fallback log). Manca il wiring `expo-notifications` nell'app (richiede dev build) |
-| 7 — Hardening + beta | ⏳ | Smoke test end-to-end backend superato (25/25). Restano: deploy VPS+HTTPS, Stripe live, revisione legale, beta con ristoranti reali |
+| 7 — Hardening + beta | 🔄 | Codice produzione pronto (Docker, security headers, push deep links, CI). Restano: deploy VPS reale, Stripe live, revisione legale, submit store |
 
 Testi legali (§8): integrali in `backend/app/legal.py`, serviti da `GET /legal/{doc}`, pubblicati su web (`/termini`, `/privacy`, `/cookie`, `/sicurezza`) e in app (`legal-docs.tsx`). **Da far rivedere a un legale prima del lancio.**
 
@@ -28,7 +28,7 @@ Testi legali (§8): integrali in `backend/app/legal.py`, serviti da `GET /legal/
 3. **Resend**: crea l'account, verifica il dominio, compila `RESEND_API_KEY` (senza: le email finiscono nel log del server).
 4. **Stripe**: crea i 3 prodotti/prezzi mensili, il webhook verso `{API}/billing/webhook`, compila `STRIPE_*`.
 5. **Gemini**: `GEMINI_API_KEY` per menù + referti (senza: stub dimostrativo).
-6. **VPS**: deploy del backend con HTTPS (Docker + Nginx + Certbot) e `PUBLIC_WEB_URL`/`PUBLIC_API_URL` reali.
+6. **VPS**: deploy del backend con HTTPS — vedi **PRODUZIONE.md** (Docker + Nginx + Certbot già pronti in `deploy/`).
 
 ---
 

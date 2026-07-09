@@ -33,6 +33,12 @@ class User(Base):
     emergency_contact_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     emergency_contact_phone: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     photo_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    invite_code: Mapped[Optional[str]] = mapped_column(String(12), unique=True, nullable=True)
+    customer_plan: Mapped[str] = mapped_column(String(30), default="customer_free")
+    customer_subscription_status: Mapped[str] = mapped_column(String(30), default="free")
+    customer_plan_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    customer_stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    customer_stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=text("CURRENT_TIMESTAMP")
     )
@@ -59,6 +65,14 @@ class User(Base):
     @property
     def onboarding_completed(self) -> bool:
         return self.onboarding_completed_at is not None
+
+    @property
+    def has_customer_plus(self) -> bool:
+        return (
+            (self.customer_plan or "customer_free") == "customer_plus"
+            and (self.customer_subscription_status or "free")
+            in {"active", "comped", "trialing"}
+        )
 
 
 class Allergen(Base):
@@ -103,6 +117,9 @@ class Restaurant(Base):
     is_active: Mapped[int] = mapped_column(Integer, default=1)
     owner_user_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
+    )
+    referred_by_user_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -521,6 +538,20 @@ class RestaurantAnalytics(Base):
     )
 
 
+class CustomerUsage(Base):
+    """Tracciamento mensile scansioni barcode e analisi AI menù per utente."""
+    __tablename__ = "customer_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    usage_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
 class UserProfile(Base):
     __tablename__ = "user_profiles"
 
@@ -569,6 +600,30 @@ class ProfileAllergen(Base):
     allergen: Mapped["Allergen"] = relationship(lazy="joined")
 
 
+class MerchantReferral(Base):
+    """Traccia quando un cliente porta un commerciante con il proprio codice invito."""
+    __tablename__ = "merchant_referrals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    referrer_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    referred_owner_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    restaurant_id: Mapped[int] = mapped_column(
+        ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False
+    )
+    reward_granted_at: Mapped[datetime] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+    referrer = relationship("User", foreign_keys=[referrer_user_id], lazy="joined")
+    referred_owner = relationship("User", foreign_keys=[referred_owner_user_id], lazy="joined")
+    restaurant = relationship("Restaurant", lazy="joined")
+
+
 class ProfileShare(Base):
     """Token privacy-safe per condividere un profilo allergie.
 
@@ -589,10 +644,14 @@ class ProfileShare(Base):
     scope: Mapped[str] = mapped_column(String(30), default="24h")
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    recipient_user_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=text("CURRENT_TIMESTAMP")
     )
 
-    owner = relationship("User", lazy="joined")
+    owner = relationship("User", foreign_keys=[owner_user_id], lazy="joined")
+    recipient = relationship("User", foreign_keys=[recipient_user_id], lazy="joined")
     source_profile = relationship("UserProfile", lazy="joined")
 

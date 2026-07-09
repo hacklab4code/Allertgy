@@ -8,12 +8,15 @@ from ..models import Allergen, Dish, Restaurant, Review, User, UserFavorite, Cus
 from ..schemas import (
     DishEvaluationOut,
     DishOut,
+    FavoriteOut,
     MenuEvaluationIn,
     MenuEvaluationOut,
     MenuOut,
     PhotoOut,
     PublicRestaurantOut,
     RestaurantOut,
+    RestaurantSummaryOut,
+    DishSummaryOut,
     CustomerAnnotationIn,
     CustomerAnnotationOut,
     MenuOutItem,
@@ -22,6 +25,8 @@ from ..schemas import (
 from ..security import get_current_user
 from ..services import storage
 from ..services.external_reviews import get_external_reviews
+from ..services.visibility import active_boost_expires_map, restaurant_has_active_boost
+from ..services.analytics_buffer import enqueue_scan
 
 router = APIRouter(prefix="/restaurants", tags=["restaurants"])
 
@@ -65,7 +70,33 @@ def dish_to_out(d: Dish, lang: str = "it") -> DishOut:
     )
 
 
-def restaurant_to_menu_out(r: Restaurant, lang: str = "it") -> MenuOut:
+def restaurant_to_summary_out(r: Restaurant, *, boost_active: bool = False) -> RestaurantSummaryOut:
+    return RestaurantSummaryOut(
+        restaurant_id=r.id,
+        public_code=r.public_code,
+        nome_ristorante=r.name,
+        citta=r.city,
+        latitude=r.latitude,
+        longitude=r.longitude,
+        boost_active=boost_active,
+        piatti=[
+            DishSummaryOut(
+                id=d.id,
+                nome_piatto=d.name,
+                descrizione=d.description,
+                allergeni_contenuti=[
+                    da.allergen.code for da in d.dish_allergens if da.kind == "contains"
+                ],
+                allergeni_tracce=[
+                    da.allergen.code for da in d.dish_allergens if da.kind == "traces"
+                ],
+            )
+            for d in r.dishes if d.is_available
+        ],
+    )
+
+
+def restaurant_to_menu_out(r: Restaurant, lang: str = "it", *, boost_active: bool = False) -> MenuOut:
     return MenuOut(
         restaurant_id=r.id,
         public_code=r.public_code,
@@ -86,6 +117,7 @@ def restaurant_to_menu_out(r: Restaurant, lang: str = "it") -> MenuOut:
         google_reviews_count=r.google_reviews_count,
         tripadvisor_rating=r.tripadvisor_rating,
         tripadvisor_reviews_count=r.tripadvisor_reviews_count,
+        boost_active=boost_active,
         menus=[
             MenuOutItem(
                 id=m.id,
@@ -165,13 +197,7 @@ def _get_active_restaurant(public_code: str, db: Session) -> Restaurant:
 
 
 def log_restaurant_scan(restaurant_id: int, db: Session, allergen_code: Optional[str] = None):
-    try:
-        record = RestaurantAnalytics(restaurant_id=restaurant_id, allergen_code=allergen_code)
-        db.add(record)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        print(f"Errore salvataggio analytics: {e}")
+    enqueue_scan(restaurant_id, allergen_code)
 
 
 @router.get("/{public_code}/menu", response_model=MenuOut)
@@ -304,6 +330,7 @@ def public_restaurant_page(
         tripadvisor_reviews_count=r.tripadvisor_reviews_count,
         external_reviews=ext_revs,
         menu_available=menu_available,
+        boost_active=restaurant_has_active_boost(db, r.id),
         menus=[
             MenuOutItem(
                 id=m.id,
@@ -321,16 +348,18 @@ def public_restaurant_page(
 
 # ---------- Preferiti (server-side, per notifiche menù aggiornato) ----------
 
-@router.get("/favorites/mine", response_model=list[str])
+@router.get("/favorites/mine", response_model=list[FavoriteOut])
 def my_favorites(
     user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
-    """Codici pubblici dei locali preferiti dell'utente (per sincronizzare l'app)."""
-    return list(db.scalars(
-        select(Restaurant.public_code)
+    """Locali preferiti dell'utente con codice e nome per sincronizzare l'app."""
+    rows = db.execute(
+        select(Restaurant.public_code, Restaurant.name)
         .join(UserFavorite, UserFavorite.restaurant_id == Restaurant.id)
         .where(UserFavorite.user_id == user.id)
-    ).all())
+        .order_by(Restaurant.name)
+    ).all()
+    return [FavoriteOut(public_code=code, name=name) for code, name in rows]
 
 
 @router.post("/{public_code}/favorite", status_code=204)
@@ -358,6 +387,23 @@ def remove_favorite(
         db.commit()
 
 
+@router.get("/summary", response_model=list[RestaurantSummaryOut])
+def list_restaurants_summary(db: Session = Depends(get_db)):
+    """Elenco leggero locali attivi (senza traduzioni, foto, prezzi) per mappa e geofencing."""
+    rs = db.scalars(
+        select(Restaurant).where(Restaurant.is_active == 1)
+    ).all()
+    boost_map = active_boost_expires_map(db, [r.id for r in rs])
+    rs_sorted = sorted(
+        rs,
+        key=lambda r: (0 if r.id in boost_map else 1, r.name.lower()),
+    )
+    return [
+        restaurant_to_summary_out(r, boost_active=r.id in boost_map)
+        for r in rs_sorted
+    ]
+
+
 @router.get("", response_model=list[MenuOut])
 def list_restaurants(db: Session = Depends(get_db)):
     """Endpoint B2C: elenco di tutti i ristoranti attivi per consentire al cliente
@@ -365,7 +411,15 @@ def list_restaurants(db: Session = Depends(get_db)):
     rs = db.scalars(
         select(Restaurant).where(Restaurant.is_active == 1)
     ).all()
-    return [restaurant_to_menu_out(r) for r in rs]
+    boost_map = active_boost_expires_map(db, [r.id for r in rs])
+    rs_sorted = sorted(
+        rs,
+        key=lambda r: (0 if r.id in boost_map else 1, r.name.lower()),
+    )
+    return [
+        restaurant_to_menu_out(r, boost_active=r.id in boost_map)
+        for r in rs_sorted
+    ]
 
 
 @router.post("/{public_code}/sync-external", response_model=RestaurantOut)

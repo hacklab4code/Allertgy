@@ -2,6 +2,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
+from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import delete, func, select
@@ -39,13 +40,26 @@ from ..schemas import (
     SubProfileAllergenOut,
     ProfileShareCreateIn,
     ProfileShareOut,
+    ReferralStatsOut,
     SharedProfileOut,
+    ContactLookupIn,
+    ContactLookupOut,
+    AppContactMatch,
+    RecentAppContactOut,
+    BarcodeScanOut,
 )
 from ..security import get_current_user
 from ..rate_limit import rate_limiter
 from ..legal import LEGAL_TERMS_VERSION, PRIVACY_VERSION, SAFETY_DISCLAIMER_VERSION
 from ..services import storage
 from ..services.medical_document_analyze import analyze_medical_document
+from ..services.push import notify_users
+from ..services.plan_limits import ensure_barcode_scan_allowed, remaining_barcode_scans
+from ..services.referrals import (
+    customer_has_plus,
+    ensure_customer_invite_code,
+    referral_stats,
+)
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
@@ -65,7 +79,12 @@ _MAGIC_SIGNATURES = {
     "image/png": [b"\x89PNG"],
     "image/webp": [b"RIFF"],
 }
-EXTRACTIONS_PER_MONTH = 5  # limite AI per utente (il cliente è gratuito)
+EXTRACTIONS_PER_MONTH_FREE = 0
+EXTRACTIONS_PER_MONTH_PLUS = 5
+
+
+def _medical_ai_limit(user: User) -> int:
+    return EXTRACTIONS_PER_MONTH_PLUS if customer_has_plus(user) else EXTRACTIONS_PER_MONTH_FREE
 MEDICAL_URL_TTL_SECONDS = 300  # 5 minuti, mai link permanenti
 
 
@@ -76,9 +95,51 @@ def _validate_magic(content: bytes, mime_type: str) -> None:
 
 
 @router.get("", response_model=UserProfileOut)
-def get_profile(user: User = Depends(get_current_user)):
+def get_profile(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Restituisce il profilo completo dell'utente corrente (inclusi dati Apple Salute)."""
+    if user.role == "customer" and not user.invite_code:
+        ensure_customer_invite_code(user, db)
+        db.commit()
+        db.refresh(user)
     return user
+
+
+@router.get("/referral", response_model=ReferralStatsOut)
+def get_referral_stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Codice invito e statistiche referral per clienti che portano commercianti."""
+    if user.role != "customer":
+        raise HTTPException(403, "Il programma inviti è riservato agli utenti cliente")
+    stats = referral_stats(user, db)
+    db.commit()
+    reward_message = (
+        "Porta un ristoratore con il tuo codice: quando crea il locale, "
+        "sblocchi gratis Plus Famiglia e gli regali 1 mese di piano Pro."
+    )
+    return ReferralStatsOut(**stats, reward_message=reward_message)
+
+
+@router.post("/barcode-scan", response_model=BarcodeScanOut)
+def record_barcode_scan(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Verifica e registra una scansione barcode (limite 20/mese su piano free)."""
+    if user.role != "customer":
+        raise HTTPException(403, "Solo i clienti possono usare lo scanner spesa")
+    remaining = ensure_barcode_scan_allowed(user, db)
+    from ..services.plan_limits import customer_barcode_limit
+    limit = customer_barcode_limit(user)
+    db.commit()
+    return BarcodeScanOut(allowed=True, remaining=remaining, limit=limit)
+
+
+@router.get("/barcode-scan/remaining", response_model=BarcodeScanOut)
+def barcode_scans_remaining(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    from ..services.plan_limits import customer_barcode_limit
+    remaining = remaining_barcode_scans(user, db)
+    limit = customer_barcode_limit(user)
+    return BarcodeScanOut(allowed=True, remaining=remaining, limit=limit)
 
 
 @router.get("/allergens", response_model=list[AllergenOut])
@@ -367,10 +428,17 @@ def extract_allergens_from_document(
             "Ricaricalo spuntando il consenso specifico.",
         )
     used = _extractions_used_this_month(user, db)
-    if used >= EXTRACTIONS_PER_MONTH:
+    limit = _medical_ai_limit(user)
+    if limit <= 0:
+        raise HTTPException(
+            403,
+            "Le analisi AI sui documenti medici sono incluse nel piano Plus Famiglia. "
+            "Porta un ristoratore con il tuo codice invito per sbloccarlo gratis.",
+        )
+    if used >= limit:
         raise HTTPException(
             429,
-            f"Hai raggiunto il limite di {EXTRACTIONS_PER_MONTH} analisi AI questo mese. "
+            f"Hai raggiunto il limite di {limit} analisi AI questo mese. "
             "Puoi comunque inserire le allergie manualmente dal profilo.",
         )
 
@@ -408,7 +476,7 @@ def extract_allergens_from_document(
         document_id=doc.id,
         status=doc.status,
         extractions=[ExtractionOut.model_validate(r) for r in rows],
-        remaining_this_month=max(0, EXTRACTIONS_PER_MONTH - _extractions_used_this_month(user, db)),
+        remaining_this_month=max(0, _medical_ai_limit(user) - _extractions_used_this_month(user, db)),
         note=result.note,
     )
 
@@ -607,6 +675,13 @@ def create_sub_profile(
 ):
     """Crea un nuovo sottoprofilo (es. figlio, coniuge)."""
     from ..models import UserProfile, ProfileAllergen, Allergen
+
+    if not customer_has_plus(user):
+        raise HTTPException(
+            403,
+            "I profili famiglia sono inclusi nel piano Plus Famiglia. "
+            "Porta un ristoratore con il tuo codice invito per sbloccarlo gratis.",
+        )
     
     p = UserProfile(user_id=user.id, name=data.name, relationship=data.relationship)
     db.add(p)
@@ -747,6 +822,67 @@ def _share_allergens_from_profile(profile) -> list[SubProfileAllergenOut]:
     ]
 
 
+def _email_hint(email: str) -> str:
+    local, _, domain = email.partition("@")
+    if not domain:
+        return email
+    masked = (local[:1] + "***") if local else "***"
+    return f"{masked}@{domain}"
+
+
+def _resolve_share_recipient(
+    data: ProfileShareCreateIn,
+    owner: User,
+    db: Session,
+) -> Optional[User]:
+    if data.recipient_user_id:
+        recipient = db.get(User, data.recipient_user_id)
+        if (
+            not recipient
+            or recipient.role != "customer"
+            or recipient.id == owner.id
+        ):
+            raise HTTPException(404, "Contatto AllerTgy non trovato")
+        return recipient
+
+    if data.recipient_email:
+        recipient = db.scalar(
+            select(User).where(
+                User.email == str(data.recipient_email).lower(),
+                User.role == "customer",
+            )
+        )
+        if not recipient or recipient.id == owner.id:
+            return None
+        return recipient
+
+    return None
+
+
+def _deliver_profile_share_in_app(
+    share: ProfileShare,
+    owner: User,
+    recipient: User,
+    db: Session,
+) -> None:
+    owner_name = owner.display_name or "Un contatto"
+    duration_label = "24 ore" if share.scope == "24h" else "sempre"
+    payload = {
+        "token": share.token,
+        "label": share.label,
+        "scope": share.scope,
+        "owner_display_name": owner_name,
+    }
+    notify_users(
+        db,
+        [recipient.id],
+        "profile_share",
+        "Profilo allergie condiviso",
+        f"{owner_name} ha condiviso il profilo «{share.label}» ({duration_label}).",
+        payload,
+    )
+
+
 @router.post("/shares", response_model=ProfileShareOut, status_code=201)
 def create_profile_share(
     data: ProfileShareCreateIn,
@@ -757,9 +893,18 @@ def create_profile_share(
 
     `duration=24h` è pensato per festa/spesa temporanea. `permanent` è per
     famiglia o caregiver abituali. Il token espone solo allergeni e intensità.
+    Se `recipient_user_id` o `recipient_email` punta a un utente AllerTgy,
+    invia anche notifica in-app e push.
     """
     if user.role != "customer":
         raise HTTPException(403, "La condivisione profilo è riservata agli utenti cliente")
+
+    if data.duration == "permanent" and not customer_has_plus(user):
+        raise HTTPException(
+            403,
+            "La condivisione permanente è inclusa nel piano Plus Famiglia. "
+            "Porta un ristoratore con il tuo codice invito per sbloccarlo gratis.",
+        )
 
     label = (data.label or "").strip()
     source_profile_id = None
@@ -774,18 +919,28 @@ def create_profile_share(
     else:
         label = label or (user.display_name or "Io")
 
+    recipient = _resolve_share_recipient(data, user, db)
+
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(hours=24) if data.duration == "24h" else None
     token = secrets.token_urlsafe(24)
     share = ProfileShare(
         owner_user_id=user.id,
         source_profile_id=source_profile_id,
+        recipient_user_id=recipient.id if recipient else None,
         token=token,
         label=label[:120],
         scope=data.duration,
         expires_at=expires_at,
     )
     db.add(share)
+    db.flush()
+
+    delivered = False
+    if recipient:
+        _deliver_profile_share_in_app(share, user, recipient, db)
+        delivered = True
+
     db.commit()
     db.refresh(share)
     return ProfileShareOut(
@@ -796,7 +951,90 @@ def create_profile_share(
         expires_at=share.expires_at,
         created_at=share.created_at,
         share_url=f"/shared-profile/{share.token}",
+        delivered_in_app=delivered,
+        recipient_display_name=recipient.display_name if recipient else None,
     )
+
+
+@router.post("/contacts/lookup", response_model=ContactLookupOut)
+def lookup_app_contacts(
+    data: ContactLookupIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Verifica quali email della rubrica corrispondono a utenti AllerTgy."""
+    if user.role != "customer":
+        raise HTTPException(403, "Funzione riservata agli utenti cliente")
+
+    normalized = {
+        str(email).strip().lower()
+        for email in data.emails
+        if str(email).strip()
+    }
+    if not normalized:
+        return ContactLookupOut(matches=[])
+
+    rows = db.scalars(
+        select(User).where(
+            User.email.in_(normalized),
+            User.role == "customer",
+            User.id != user.id,
+        )
+    ).all()
+    return ContactLookupOut(
+        matches=[
+            AppContactMatch(
+                user_id=u.id,
+                display_name=u.display_name,
+                email=u.email,
+                email_hint=_email_hint(u.email),
+            )
+            for u in rows
+        ]
+    )
+
+
+@router.get("/contacts/recent", response_model=list[RecentAppContactOut])
+def list_recent_app_contacts(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Utenti AllerTgy con cui hai condiviso di recente un profilo allergie."""
+    if user.role != "customer":
+        raise HTTPException(403, "Funzione riservata agli utenti cliente")
+
+    shares = db.scalars(
+        select(ProfileShare)
+        .where(
+            ProfileShare.owner_user_id == user.id,
+            ProfileShare.recipient_user_id.isnot(None),
+        )
+        .order_by(ProfileShare.created_at.desc())
+        .limit(50)
+    ).all()
+
+    seen: set[int] = set()
+    recent: list[RecentAppContactOut] = []
+    for share in shares:
+        recipient_id = share.recipient_user_id
+        if not recipient_id or recipient_id in seen:
+            continue
+        recipient = share.recipient or db.get(User, recipient_id)
+        if not recipient:
+            continue
+        seen.add(recipient_id)
+        recent.append(
+            RecentAppContactOut(
+                user_id=recipient.id,
+                display_name=recipient.display_name,
+                email_hint=_email_hint(recipient.email),
+                last_shared_at=share.created_at,
+            )
+        )
+        if len(recent) >= 20:
+            break
+
+    return recent
 
 
 @router.get("/shares/{token}", response_model=SharedProfileOut)

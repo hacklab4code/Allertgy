@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import threading
 import urllib.request
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -34,6 +35,30 @@ def _post_expo(messages: list[dict]) -> None:
         print(f"❌ Invio push fallito: {e}")
 
 
+def send_expo_push(
+    tokens: list[str],
+    *,
+    title: str,
+    body: str,
+    data: dict[str, Any] | None = None,
+) -> int:
+    messages = [
+        {
+            "to": token,
+            "sound": "default",
+            "title": title,
+            "body": body,
+            "data": data or {},
+        }
+        for token in tokens
+        if token.startswith("ExponentPushToken[") or token.startswith("ExpoPushToken[")
+    ]
+    if not messages:
+        return 0
+    threading.Thread(target=_post_expo, args=(messages,), daemon=True).start()
+    return len(messages)
+
+
 def notify_users(
     db: Session,
     user_ids: list[int],
@@ -53,7 +78,7 @@ def notify_users(
         select(DeviceToken.expo_token).where(DeviceToken.user_id.in_(user_ids))
     ).all()
     messages = [
-        {"to": t, "title": title, "body": body, "data": payload or {}}
+        {"to": t, "title": title, "body": body, "sound": "default", "data": {**(payload or {}), "type": notif_type}}
         for t in tokens
     ]
     if messages:

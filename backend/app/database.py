@@ -221,6 +221,9 @@ def run_migrations():
         _run_v9_migrations(db)
         _run_v10_migrations(db)
         _run_v11_migrations(db)
+        _run_v12_migrations(db)
+        _run_v13_migrations(db)
+        _run_v14_migrations(db)
         _seed_allergens(db)
     finally:
         db.close()
@@ -692,4 +695,99 @@ def _run_v11_migrations(db) -> None:
           FOREIGN KEY (source_profile_id) REFERENCES user_profiles(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     """)
+
+
+def _run_v12_migrations(db) -> None:
+    """Migrazione v12: destinatario in-app per condivisione profilo allergie."""
+    _add_column_if_missing(db, "profile_shares", "recipient_user_id", "INT UNSIGNED NULL")
+
+
+def _run_v13_migrations(db) -> None:
+    """Migrazione v13: codice invito clienti, piano cliente e referral commercianti."""
+    from sqlalchemy import text
+
+    _add_column_if_missing(db, "users", "invite_code", "VARCHAR(12) NULL UNIQUE")
+    _add_column_if_missing(db, "users", "customer_plan", "VARCHAR(30) NOT NULL DEFAULT 'customer_free'")
+    _add_column_if_missing(db, "users", "customer_subscription_status", "VARCHAR(30) NOT NULL DEFAULT 'free'")
+    _add_column_if_missing(db, "users", "customer_plan_started_at", "DATETIME NULL")
+    _add_column_if_missing(db, "restaurants", "referred_by_user_id", "INT UNSIGNED NULL")
+
+    _create_table_if_missing(db, "merchant_referrals", """
+        CREATE TABLE IF NOT EXISTS merchant_referrals (
+          id                      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          referrer_user_id        INT UNSIGNED NOT NULL,
+          referred_owner_user_id  INT UNSIGNED NOT NULL UNIQUE,
+          restaurant_id           INT UNSIGNED NOT NULL,
+          reward_granted_at       DATETIME NOT NULL,
+          created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_merchant_referrals_referrer (referrer_user_id),
+          FOREIGN KEY (referrer_user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (referred_owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    """)
+
+    # Backfill codici invito per clienti esistenti
+    try:
+        from .services.referrals import generate_invite_code
+
+        rows = db.execute(
+            text("SELECT id FROM users WHERE role = 'customer' AND (invite_code IS NULL OR invite_code = '')")
+        ).all()
+        for (user_id,) in rows:
+            code = generate_invite_code(db)
+            db.execute(
+                text("UPDATE users SET invite_code = :code WHERE id = :uid"),
+                {"code": code, "uid": user_id},
+            )
+        if rows:
+            db.commit()
+            print(f"🚀 Database Migrazione v13: generati {len(rows)} codici invito clienti")
+    except Exception as e:
+        print(f"❌ Errore backfill codici invito: {e}")
+        db.rollback()
+
+
+def _run_v14_migrations(db) -> None:
+    """Migrazione v14: Stripe cliente, usage limits, indici performance."""
+    from sqlalchemy import text
+
+    _add_column_if_missing(db, "users", "customer_stripe_customer_id", "VARCHAR(100) NULL")
+    _add_column_if_missing(db, "users", "customer_stripe_subscription_id", "VARCHAR(100) NULL")
+
+    _create_table_if_missing(db, "customer_usage", """
+        CREATE TABLE IF NOT EXISTS customer_usage (
+          id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          user_id     INT UNSIGNED NOT NULL,
+          usage_type  VARCHAR(30) NOT NULL,
+          created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_customer_usage_user_type_month (user_id, usage_type, created_at),
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    """)
+
+    _create_table_if_missing(db, "visibility_boosts", """
+        CREATE TABLE IF NOT EXISTS visibility_boosts (
+          id                      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          restaurant_id           INT UNSIGNED NOT NULL,
+          stripe_payment_intent_id VARCHAR(100) NULL UNIQUE,
+          amount_cents            INT NOT NULL DEFAULT 990,
+          duration_days           INT NOT NULL DEFAULT 30,
+          activated_at            DATETIME NULL,
+          expires_at              DATETIME NULL,
+          created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    """)
+
+    for ddl in (
+        "CREATE INDEX idx_restaurant_analytics_rest_created ON restaurant_analytics (restaurant_id, created_at)",
+        "CREATE INDEX idx_notifications_user_created ON notifications (user_id, created_at)",
+        "CREATE INDEX idx_restaurants_active ON restaurants (is_active)",
+    ):
+        try:
+            db.execute(text(ddl))
+            db.commit()
+        except Exception:
+            db.rollback()
 

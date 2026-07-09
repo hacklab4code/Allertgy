@@ -13,6 +13,8 @@ allerTgy/
 
 > Lo stato di avanzamento del piano di lancio e le istruzioni per attivare i
 > servizi esterni (R2, Resend, Stripe, Gemini) sono in **PIANO_LANCIO.md**.
+> La guida passo-passo per il **deploy in produzione** (VPS, Vercel, EAS, Stripe live)
+> è in **PRODUZIONE.md**.
 
 ## Funzioni principali
 

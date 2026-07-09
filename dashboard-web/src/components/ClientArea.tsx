@@ -71,6 +71,12 @@ export default function ClientArea({ onBack, onLogout }: { onBack: () => void; o
 
   // Note SOS e documenti
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [referral, setReferral] = useState<{
+    invite_code: string | null;
+    referrals_count: number;
+    has_plus: boolean;
+    reward_message?: string | null;
+  } | null>(null);
   const [documents, setDocuments] = useState<any[]>([]);
   const [emergencyDraft, setEmergencyDraft] = useState('');
   const [showAllergenPicker, setShowAllergenPicker] = useState(false);
@@ -126,8 +132,12 @@ export default function ClientArea({ onBack, onLogout }: { onBack: () => void; o
 
   const fetchProfileAndDocs = async () => {
     try {
-      const prof = await api.getProfile();
+      const [prof, ref] = await Promise.all([
+        api.getProfile(),
+        api.getReferralStats().catch(() => null),
+      ]);
       setUserProfile(prof);
+      setReferral(ref);
       setEmergencyDraft(prof.emergency_medicines || '');
       const docs = await api.getDocuments();
       setDocuments(docs);
@@ -1048,6 +1058,40 @@ export default function ClientArea({ onBack, onLogout }: { onBack: () => void; o
                         )}
                       </div>
                     </div>
+
+                    {referral?.invite_code && (
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider ml-1 mb-1 block">Invita un ristoratore</span>
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 space-y-3">
+                          <p className="text-[11px] text-emerald-800 leading-relaxed">
+                            Condividi il tuo codice con un commerciante: quando registra il locale, sblocchi gratis <b>Plus Famiglia</b> e gli regali <b>1 mese di Pro</b>.
+                          </p>
+                          <div className="bg-white border border-emerald-200 rounded-xl py-3 text-center">
+                            <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">Il tuo codice</span>
+                            <span className="font-mono font-black text-2xl tracking-[0.2em] text-emerald-800">{referral.invite_code}</span>
+                          </div>
+                          <p className="text-[10px] font-bold text-emerald-700">
+                            {referral.referrals_count} ristorator{referral.referrals_count === 1 ? 'e portato' : 'i portati'}
+                            {referral.has_plus ? ' · Plus attivo in omaggio' : ''}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const msg = `Registra il tuo locale su AllerTgy con il mio codice invito ${referral.invite_code}: tu ricevi 1 mese di Pro omaggio e io sblocco Plus Famiglia. I clienti con allergie scoprono subito cosa possono mangiare.`;
+                              if (navigator.share) {
+                                navigator.share({ text: msg }).catch(() => {});
+                              } else {
+                                navigator.clipboard.writeText(msg);
+                                alert('Messaggio copiato negli appunti.');
+                              }
+                            }}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 rounded-xl text-xs transition-colors"
+                          >
+                            Condividi codice invito
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Section 3: Actions */}
                     <div className="pt-2">

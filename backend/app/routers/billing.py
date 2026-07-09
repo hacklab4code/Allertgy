@@ -35,6 +35,8 @@ from ..schemas import (
     BoostSessionOut,
     CheckoutSessionIn,
     CheckoutSessionOut,
+    CustomerCheckoutOut,
+    CustomerPortalOut,
     InvoiceOut,
     PlanDefinitionOut,
     PortalSessionIn,
@@ -46,7 +48,7 @@ from ..schemas import (
     StartTrialIn,
     VisibilityBoostOut,
 )
-from ..security import require_owner
+from ..security import require_owner, get_current_user
 from ..services.push import notify_users
 from ..services.emailer import send_payment_confirmation, send_payment_failed
 
@@ -69,6 +71,70 @@ def list_plans():
 def list_customer_plans():
     """Piani cliente freemium: scan/semaforo restano gratuiti, Plus sblocca famiglia e condivisione."""
     return CUSTOMER_PLAN_DEFINITIONS
+
+
+@router.post("/customer-checkout", response_model=CustomerCheckoutOut)
+def create_customer_checkout(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Checkout Stripe per Plus Famiglia (€3,99/mese)."""
+    if user.role != "customer":
+        raise HTTPException(403, "Solo i clienti possono acquistare Plus Famiglia")
+    if user.has_customer_plus and user.customer_subscription_status in {"active", "trialing"}:
+        raise HTTPException(400, "Hai già Plus Famiglia attivo")
+
+    if not settings.stripe_configured:
+        now = datetime.now(timezone.utc)
+        user.customer_plan = "customer_plus"
+        user.customer_subscription_status = "active"
+        user.customer_plan_started_at = now
+        db.commit()
+        return CustomerCheckoutOut(
+            checkout_url=f"{settings.public_web_url}/dashboard?customer_billing=success"
+        )
+
+    stripe = _stripe()
+    if not settings.stripe_price_customer_plus:
+        raise HTTPException(503, "Prezzo Stripe Plus Famiglia non configurato (STRIPE_PRICE_CUSTOMER_PLUS)")
+
+    if not user.customer_stripe_customer_id:
+        customer = stripe.Customer.create(
+            email=user.email,
+            name=user.display_name or user.email,
+            metadata={"user_id": str(user.id), "type": "customer_plus"},
+        )
+        user.customer_stripe_customer_id = customer.id
+        db.commit()
+
+    session = stripe.checkout.Session.create(
+        customer=user.customer_stripe_customer_id,
+        mode="subscription",
+        line_items=[{"price": settings.stripe_price_customer_plus, "quantity": 1}],
+        success_url=f"{settings.public_web_url}/?customer_billing=success",
+        cancel_url=f"{settings.public_web_url}/?customer_billing=cancel",
+        metadata={"user_id": str(user.id), "type": "customer_plus"},
+        subscription_data={"metadata": {"user_id": str(user.id), "type": "customer_plus"}},
+    )
+    return CustomerCheckoutOut(checkout_url=session.url)
+
+
+@router.post("/customer-portal", response_model=CustomerPortalOut)
+def create_customer_portal(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Portale Stripe per gestire abbonamento Plus Famiglia."""
+    if user.role != "customer":
+        raise HTTPException(403, "Solo i clienti possono gestire Plus Famiglia")
+    stripe = _stripe()
+    if not user.customer_stripe_customer_id:
+        raise HTTPException(400, "Nessun abbonamento Plus attivo")
+    session = stripe.billing_portal.Session.create(
+        customer=user.customer_stripe_customer_id,
+        return_url=f"{settings.public_web_url}/",
+    )
+    return CustomerPortalOut(portal_url=session.url)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -106,6 +172,18 @@ def _plan_for_price_id(price_id: str) -> str | None:
     return mapping.get(price_id)
 
 
+def _customer_plan_for_price_id(price_id: str) -> str | None:
+    if price_id and price_id == settings.stripe_price_customer_plus:
+        return "customer_plus"
+    return None
+
+
+def _user_by_customer(customer_id: str, db: Session) -> User | None:
+    return db.scalar(
+        select(User).where(User.customer_stripe_customer_id == customer_id)
+    )
+
+
 def _my_restaurant(rid: int, user: User, db: Session) -> Restaurant:
     r = db.get(Restaurant, rid)
     if not r or r.owner_user_id != user.id:
@@ -114,7 +192,7 @@ def _my_restaurant(rid: int, user: User, db: Session) -> Restaurant:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Trial gratuito 30 giorni
+# Trial gratuito 14 giorni
 # ──────────────────────────────────────────────────────────────────────────────
 @router.post("/start-trial", response_model=RestaurantOut)
 def start_trial(
@@ -122,7 +200,7 @@ def start_trial(
     user: User = Depends(require_owner),
     db: Session = Depends(get_db),
 ):
-    """Avvia la prova gratuita di 30 giorni senza pagamento.
+    """Avvia la prova gratuita di 14 giorni senza pagamento.
 
     Non richiede Stripe: sblocca subito le funzioni del piano scelto. Alla
     scadenza il locale resta in prova finché non attiva un abbonamento reale
@@ -215,11 +293,14 @@ def create_boost_session(
             restaurant_id=r.id,
             stripe_payment_intent_id=f"mock_boost_{r.id}_{int(now.timestamp())}",
             amount_cents=990,
-            created_at=now,
+            activated_at=now,
             expires_at=now + timedelta(days=30),
         ))
         db.commit()
-        return BoostSessionOut(checkout_url=f"{settings.public_web_url}/dashboard?boost=success")
+        return BoostSessionOut(
+            activated=True,
+            message="Boost Visibilità attivato per 30 giorni.",
+        )
 
     stripe = _stripe()
 
@@ -253,7 +334,6 @@ def create_boost_session(
         },
     )
     return BoostSessionOut(checkout_url=session.url)
-
 
 @router.get("/boosts/{restaurant_id}", response_model=list[VisibilityBoostOut])
 def list_boosts(
@@ -290,8 +370,8 @@ def send_push_notification(
     if r.business_plan not in NOTIFY_PLANS or r.subscription_status not in {"trialing", "active", "comped"}:
         raise HTTPException(
             403,
-            "Il piano Pro Notifiche è richiesto per inviare notifiche push. "
-            "Passa al piano Pro Notifiche (€19/mese)."
+            "Il piano Pro è richiesto per inviare notifiche push. "
+            "Passa al piano Pro (€19/mese)."
         )
 
     # Recupera tutti i device token degli utenti che hanno messo il locale nei preferiti
@@ -466,6 +546,39 @@ def _apply_subscription_state(r: Restaurant, subscription, db: Session) -> None:
     db.commit()
 
 
+def _apply_customer_subscription_state(user: User, subscription, db: Session) -> None:
+    """Allinea piano Plus Famiglia allo stato subscription Stripe."""
+    status_map = {
+        "trialing": "trialing",
+        "active": "active",
+        "past_due": "past_due",
+        "canceled": "free",
+        "unpaid": "past_due",
+        "incomplete": "past_due",
+        "incomplete_expired": "free",
+        "paused": "free",
+    }
+    price_id = None
+    items = subscription.get("items", {}).get("data", [])
+    if items:
+        price_id = items[0].get("price", {}).get("id")
+    plan = _customer_plan_for_price_id(price_id) if price_id else None
+
+    user.customer_stripe_subscription_id = subscription.get("id")
+    new_status = status_map.get(subscription.get("status"), "free")
+    user.customer_subscription_status = new_status
+
+    if new_status in {"trialing", "active"} and plan:
+        user.customer_plan = plan
+        if not user.customer_plan_started_at:
+            user.customer_plan_started_at = datetime.now(timezone.utc)
+    elif new_status in {"free", "canceled"} or subscription.get("status") == "canceled":
+        user.customer_plan = "customer_free"
+        user.customer_subscription_status = "free"
+        user.customer_stripe_subscription_id = None
+    db.commit()
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Webhook Stripe
 # ──────────────────────────────────────────────────────────────────────────────
@@ -489,12 +602,24 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         r = _restaurant_by_customer(obj.get("customer", ""), db)
         if r:
             _apply_subscription_state(r, obj, db)
+        else:
+            u = _user_by_customer(obj.get("customer", ""), db)
+            if u:
+                _apply_customer_subscription_state(u, obj, db)
 
     elif event["type"] == "checkout.session.completed":
-        r = _restaurant_by_customer(obj.get("customer", ""), db)
-        if r and obj.get("subscription"):
-            subscription = stripe.Subscription.retrieve(obj["subscription"])
-            _apply_subscription_state(r, subscription, db)
+        meta = obj.get("metadata", {})
+        if meta.get("type") == "customer_plus":
+            uid = int(meta.get("user_id", 0))
+            u = db.get(User, uid) if uid else _user_by_customer(obj.get("customer", ""), db)
+            if u and obj.get("subscription"):
+                subscription = stripe.Subscription.retrieve(obj["subscription"])
+                _apply_customer_subscription_state(u, subscription, db)
+        else:
+            r = _restaurant_by_customer(obj.get("customer", ""), db)
+            if r and obj.get("subscription"):
+                subscription = stripe.Subscription.retrieve(obj["subscription"])
+                _apply_subscription_state(r, subscription, db)
 
     elif event["type"] == "invoice.paid":
         r = _restaurant_by_customer(obj.get("customer", ""), db)

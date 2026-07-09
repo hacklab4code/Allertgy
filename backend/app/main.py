@@ -1,12 +1,16 @@
 import os
-from fastapi import FastAPI
+import threading
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 
 from .config import settings
-from .database import SessionLocal, run_migrations
+from .database import SessionLocal, get_db, run_migrations
+from .middleware.security import SecurityHeadersMiddleware
 from .routers import (
     admin,
     allergens,
@@ -19,15 +23,43 @@ from .routers import (
     restaurants,
     reviews,
 )
+from .services.analytics_buffer import flush_buffer, start_analytics_flusher
+from .services.subscription_maintenance import (
+    run_maintenance_once,
+    start_subscription_maintenance,
+)
 
-# Esegue le migrazioni automatiche per il DB
-run_migrations()
+
+def _bootstrap_background() -> None:
+    try:
+        run_migrations()
+        run_maintenance_once()
+        start_subscription_maintenance()
+        start_analytics_flusher()
+        print("✅ Background bootstrap completato (migrazioni, maintenance, analytics)")
+    except Exception as e:
+        print(f"❌ Background bootstrap error: {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    threading.Thread(target=_bootstrap_background, daemon=True, name="app-bootstrap").start()
+    yield
+    flush_buffer()
+
 
 app = FastAPI(
     title="AllerTgy API",
     version="0.5.0",
     description="Backend — app allergie per ristoranti",
+    lifespan=lifespan,
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
+    openapi_url=None if settings.is_production else "/openapi.json",
 )
+
+if settings.is_production:
+    app.add_middleware(SecurityHeadersMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,8 +88,19 @@ app.include_router(files.router)
 
 
 @app.get("/health")
-def health():
-    return {"status": "ok"}
+def health(db=Depends(get_db)):
+    from sqlalchemy import text
+    db_ok = False
+    try:
+        db.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        pass
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "env": settings.app_env,
+        "db": db_ok,
+    }
 
 
 @app.get("/sitemap.xml", include_in_schema=False)

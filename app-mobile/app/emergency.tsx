@@ -1,10 +1,12 @@
 import { Stack, router } from 'expo-router';
 import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import DetailSection from '../src/components/DetailSection';
 import { useSession } from '../src/store/session';
 import { getAllergenName, t } from '../src/engine/translations';
 
 export default function EmergencyScreen() {
   const { allergie, emergencyMedicines, language, emergencyContactName, emergencyContactPhone } = useSession();
+  const isIt = (language || 'it').toLowerCase() === 'it';
 
   const handleCall112 = () => {
     Linking.openURL('tel:112').catch(() => {
@@ -56,46 +58,61 @@ export default function EmergencyScreen() {
           </Text>
         </View>
 
-        {/* Informazioni sulle allergie */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionHeader}>
-            {t('allergies_section', language)}
-          </Text>
-          {allergie.length === 0 ? (
-            <Text style={styles.emptyText}>
-              {t('no_allergies', language)}
+        <DetailSection
+          title={isIt ? 'ALLERGIE ATTIVE' : 'ACTIVE ALLERGIES'}
+          subtitle={isIt ? 'Dati dal tuo profilo AllerTgy — mostra allo staff in caso di emergenza.' : 'From your AllerTgy profile — show staff in an emergency.'}
+          style={{ marginTop: 0 }}
+          card={false}
+        >
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionHeader}>
+              {t('allergies_section', language)}
             </Text>
-          ) : (
-            <View style={styles.badgeContainer}>
-              {allergie.map((code) => {
-                const name = getAllergenName(code, language);
-                return (
-                  <View key={code} style={styles.allergenBadge}>
-                    <Text style={styles.allergenBadgeText}>⚠️ {name.toUpperCase()}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-        </View>
+            {allergie.length === 0 ? (
+              <Text style={styles.emptyText}>
+                {t('no_allergies', language)}
+              </Text>
+            ) : (
+              <View style={styles.badgeContainer}>
+                {allergie.map((code) => {
+                  const name = getAllergenName(code, language);
+                  return (
+                    <View key={code} style={styles.allergenBadge}>
+                      <Text style={styles.allergenBadgeText}>⚠️ {name.toUpperCase()}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        </DetailSection>
 
-        {/* Farmaci Salvavita */}
-        <View style={[styles.sectionCard, { borderColor: '#fca5a5', backgroundColor: '#fef2f2' }]}>
-          <Text style={[styles.sectionHeader, { color: '#991b1b' }]}>
-            {t('emergency_drugs_section', language)}
-          </Text>
-          <Text style={styles.medicineText}>
-            {emergencyMedicines || t('no_drugs', language)}
-          </Text>
-          {emergencyMedicines && (
-            <Text style={styles.medicineWarning}>
-              {t('drug_warning', language)}
+        <DetailSection
+          title={isIt ? 'FARMACI SOS' : 'EMERGENCY MEDICATION'}
+          subtitle={isIt ? 'Antistaminici, autoiniettore o farmaci salvavita dichiarati nel profilo.' : 'Antihistamines, auto-injector or life-saving meds from your profile.'}
+          card={false}
+        >
+          <View style={[styles.sectionCard, { borderColor: '#fca5a5', backgroundColor: '#fef2f2' }]}>
+            <Text style={[styles.sectionHeader, { color: '#991b1b' }]}>
+              {t('emergency_drugs_section', language)}
             </Text>
-          )}
-        </View>
+            <Text style={styles.medicineText}>
+              {emergencyMedicines || t('no_drugs', language)}
+            </Text>
+            {emergencyMedicines && (
+              <Text style={styles.medicineWarning}>
+                {t('drug_warning', language)}
+              </Text>
+            )}
+          </View>
+        </DetailSection>
 
-        {/* Azioni Rapide */}
-        <View style={{ gap: 14, marginTop: 10 }}>
+        <DetailSection
+          title={isIt ? 'AZIONI RAPIDE' : 'QUICK ACTIONS'}
+          subtitle={isIt ? 'Chiama i soccorsi o invia un SMS con allergie e farmaci già compilati.' : 'Call emergency services or send an SMS with allergies and meds pre-filled.'}
+          card={false}
+        >
+        <View style={{ gap: 14 }}>
           {/* Pulsante Chiamata Contatto di Emergenza (se configurato) */}
           {emergencyContactPhone && (
             <TouchableOpacity style={[styles.sosButton, { backgroundColor: '#059669', shadowColor: '#059669' }]} onPress={handleCallContact}>
@@ -137,6 +154,7 @@ export default function EmergencyScreen() {
             </View>
           </TouchableOpacity>
         </View>
+        </DetailSection>
 
         {/* Chiusura */}
         <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>

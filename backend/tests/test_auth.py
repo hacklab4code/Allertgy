@@ -175,4 +175,6 @@ class TestHealth:
         """Endpoint /health funziona."""
         res = client.get("/health")
         assert res.status_code == status.HTTP_200_OK
-        assert res.json() == {"status": "ok"}
+        body = res.json()
+        assert body["status"] == "ok"
+        assert body["db"] is True

@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { api } from '../../src/api/client';
+import DetailSection from '../../src/components/DetailSection';
 import { useOwner } from '../../src/store/owner';
 import { colors, radius, shadow, spacing, typography } from '../../src/theme';
 import type { BusinessPlan, Plan, Restaurant } from '../../src/types';
@@ -151,7 +152,12 @@ export default function OwnerPiano() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Stato piano corrente */}
+      <DetailSection
+        title="PIANO ATTUALE"
+        subtitle="Stato abbonamento, prova gratuita e gestione pagamenti per questo locale."
+        style={{ marginTop: 0 }}
+        card={false}
+      >
       <View style={[styles.statusCard, isTrialing && styles.statusTrial, isActive && styles.statusActive]}>
         <Text style={styles.statusFor}>{locale.name}</Text>
         <View style={styles.statusRow}>
@@ -175,9 +181,14 @@ export default function OwnerPiano() {
           </TouchableOpacity>
         )}
       </View>
+      </DetailSection>
 
-      {/* CTA prova gratuita in evidenza per chi non ha ancora un piano */}
       {canTrial && (
+        <DetailSection
+          title="PROVA GRATUITA"
+          subtitle="14 giorni di piano Base senza carta — sblocca menù, QR e registro allergeni."
+          card={false}
+        >
         <View style={styles.trialHero}>
           <Text style={styles.trialHeroEmoji}>🎁</Text>
           <Text style={styles.trialHeroTitle}>14 giorni di Base, gratis</Text>
@@ -195,12 +206,14 @@ export default function OwnerPiano() {
               : <Text style={styles.trialHeroBtnText}>Inizia la prova gratuita</Text>}
           </TouchableOpacity>
         </View>
+        </DetailSection>
       )}
 
-      {/* Confronto piani con specifiche */}
-      <Text style={styles.sectionTitle}>Tutti i piani</Text>
-      <Text style={styles.sectionSub}>Puoi cambiare o disdire in qualsiasi momento.</Text>
-
+      <DetailSection
+        title="CONFRONTO PIANI"
+        subtitle="Puoi cambiare o disdire in qualsiasi momento dal portale abbonamenti."
+        card={false}
+      >
       {plans.map((plan) => {
         const isCurrent = plan.code === currentPlan && status !== 'free';
         const isFree = plan.code === 'free';
@@ -249,10 +262,14 @@ export default function OwnerPiano() {
           </View>
         );
       })}
+      </DetailSection>
 
       {invoices.length > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>Storico fatture</Text>
+        <DetailSection
+          title="STORICO FATTURE"
+          subtitle="Fatture emesse per questo locale — scarica il PDF quando disponibile."
+          card={false}
+        >
           {invoices.map((inv) => (
             <View key={inv.id} style={styles.invoiceRow}>
               <View>
@@ -271,7 +288,7 @@ export default function OwnerPiano() {
               </View>
             </View>
           ))}
-        </>
+        </DetailSection>
       )}
 
       <Text style={styles.footnote}>

@@ -14,6 +14,7 @@ from ..security import create_token, hash_password, verify_password
 from ..rate_limit import rate_limiter
 from ..legal import LEGAL_TERMS_VERSION, PRIVACY_VERSION
 from ..services.emailer import send_password_reset
+from ..services.referrals import ensure_customer_invite_code
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -56,6 +57,9 @@ def register(data: RegisterIn, db: Session = Depends(get_db)):
         privacy_version=PRIVACY_VERSION,
     )
     db.add(user)
+    db.flush()
+    if data.role == "customer":
+        ensure_customer_invite_code(user, db)
     db.commit()
     db.refresh(user)
     return TokenOut(access_token=create_token(user), role=user.role)

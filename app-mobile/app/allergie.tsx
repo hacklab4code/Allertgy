@@ -9,6 +9,7 @@ import { useSession } from '../src/store/session';
 import { getSectionTitle, groupAllergensBySection, getLang, TRANSLATED_ALLERGENS } from '../src/engine/translations';
 import type { Allergen } from '../src/types';
 import ShareProfileModal from '../src/components/ShareProfileModal';
+import DetailSection from '../src/components/DetailSection';
 import { useTranslation } from '../src/constants/translations';
 
 export default function Allergie() {
@@ -164,6 +165,12 @@ export default function Allergie() {
         <Text style={styles.subtitle}>{t('select_allergies_subtitle')}</Text>
 
         {token && (
+          <>
+            <DetailSection
+              title={isIt ? 'CONDIVISIONE' : 'SHARING'}
+              subtitle={isIt ? 'Invia il profilo aggiornato a contatti o utenti AllerTgy.' : 'Send your updated profile to contacts or AllerTgy users.'}
+              card={false}
+            />
           <TouchableOpacity style={styles.shareCard} onPress={openShare}>
             <Text style={styles.shareCardIcon}>🔗</Text>
             <View style={{ flex: 1 }}>
@@ -178,13 +185,19 @@ export default function Allergie() {
             </View>
             <Text style={styles.shareChevron}>›</Text>
           </TouchableOpacity>
+          </>
         )}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {all.length === 0 && !error ? <ActivityIndicator style={{ marginTop: 40 }} /> : null}
 
-        {/* Barra di ricerca */}
         {all.length > 0 && (
+          <>
+            <DetailSection
+              title={isIt ? 'CERCA E SELEZIONA' : 'SEARCH & SELECT'}
+              subtitle={isIt ? 'Tocca per selezionare. Tieni premuto per impostare l\'intensità (lieve, moderata, grave).' : 'Tap to select. Long press to set severity (mild, moderate, severe).'}
+              card={false}
+            />
           <View style={styles.searchBox}>
             <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
@@ -203,15 +216,21 @@ export default function Allergie() {
               </TouchableOpacity>
             )}
           </View>
-        )}
 
-        {/* Counter risultati ricerca */}
         {search.trim() !== '' && (
           <Text style={styles.searchCount}>
             {totalFiltered > 0
               ? (isIt ? `${totalFiltered} risultati per "${search}"` : `${totalFiltered} results for "${search}"`)
               : (isIt ? `Nessun risultato per "${search}"` : `No results for "${search}"`)}
           </Text>
+        )}
+
+        {sections.length > 0 && (
+          <DetailSection
+            title={isIt ? 'REGISTRO ALLERGENI' : 'ALLERGEN REGISTRY'}
+            subtitle={isIt ? 'Allergie UE in rosso, preferenze alimentari in blu.' : 'EU allergens in red, dietary preferences in blue.'}
+            card={false}
+          />
         )}
 
         {sections.map((section) => (
@@ -227,6 +246,8 @@ export default function Allergie() {
             </View>
           </View>
         ))}
+          </>
+        )}
       </ScrollView>
 
       <TouchableOpacity

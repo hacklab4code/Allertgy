@@ -9,6 +9,11 @@ import NotificationsPanel from './components/NotificationsPanel';
 import PushNotificationPanel from './components/PushNotificationPanel';
 import PublicRestaurant from './components/PublicRestaurant';
 import ResetPassword from './components/ResetPassword';
+import TimeSeriesChart from './components/TimeSeriesChart';
+import OwnerReviewsPanel from './components/OwnerReviewsPanel';
+import InvoicesPanel from './components/InvoicesPanel';
+import BoostHistoryPanel from './components/BoostHistoryPanel';
+import MenuAuditPanel from './components/MenuAuditPanel';
 import Landing from './Landing';
 
 // Rotte pubbliche gestite per pathname (nessun router: stesso pattern di /internal-admin)
@@ -22,7 +27,7 @@ const LEGAL_ROUTES: Record<string, string> = {
 const PLAN_LABELS = {
   free: 'Gratis',
   base: 'Base',
-  pro_notify: 'Pro Notifiche',
+  pro_notify: 'Pro',
 } as const;
 
 const PLAN_PRICES = {
@@ -36,37 +41,35 @@ const PLAN_FEATURES = [
     code: 'free',
     name: 'Gratis',
     price: '€0',
-    description: 'Scheda base sulla mappa per essere trovato dai clienti.',
-    features: ['Nome, città, indirizzo e contatti', 'Presenza nell’elenco clienti'],
+    description: 'Scheda mappa.',
+    features: ['Scheda locale sulla mappa', 'Nome, città, indirizzo e 1 foto'],
     highlight: false,
   },
   {
     code: 'base',
     name: 'Base',
     price: '€9/mese',
-    description: 'Carica il tuo menù e gestisci il locale con tutti gli strumenti.',
+    description: 'Semaforo clienti + QR + PDF.',
     trial: '14 giorni gratis',
     features: [
-      'Menù digitale con allergeni e tracce',
-      'Badge "Locale verificato"',
-      'Fino a 10 foto in galleria',
-      'QR code per tavoli e banco',
-      'Registro allergeni PDF stampabile',
-      'Rispondi alle recensioni',
+      'Semaforo personalizzato per ogni cliente',
+      'QR code al tavolo',
+      'Registro allergeni PDF',
+      'Menù digitale con allergeni per piatto',
     ],
     highlight: false,
   },
   {
     code: 'pro_notify',
-    name: 'Pro Notifiche',
+    name: 'Pro',
     price: '€19/mese',
-    description: 'Come Base, più la possibilità di inviare notifiche push ai clienti fedeli.',
+    description: 'Come Base + Push, AI e statistiche.',
     trial: '14 giorni gratis',
     features: [
       'Tutto del piano Base',
-      'Notifiche push agli utenti che ti hanno preferito',
-      'Promuovi sconti, novità e offerte speciali',
-      'Fino a 20 foto in galleria',
+      'Notifiche push ai clienti fedeli',
+      'Analisi AI menù illimitate',
+      'Statistiche scansioni e allergeni cercati',
     ],
     highlight: true,
   },
@@ -127,6 +130,7 @@ export default function App() {
   const [approved, setApproved] = useState<Restaurant | null>(null);
   const [newName, setNewName] = useState('');
   const [newCity, setNewCity] = useState('');
+  const [newInviteCode, setNewInviteCode] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [newLatitude, setNewLatitude] = useState<number | ''>('');
   const [newLongitude, setNewLongitude] = useState<number | ''>('');
@@ -177,7 +181,7 @@ export default function App() {
   };
 
   // Navigazione interna Ristorante (SaaS tabs)
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'menu' | 'settings' | 'plan' | 'qr'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'menu' | 'settings' | 'plan' | 'crescita' | 'qr' | 'recensioni'>('overview');
 
   // Campi form Impostazioni Ristorante
   const [address, setAddress] = useState('');
@@ -734,6 +738,20 @@ export default function App() {
                   />
                 </div>
 
+                {restaurants.length === 0 && (
+                  <div className="space-y-1">
+                    <input
+                      value={newInviteCode}
+                      onChange={(e) => setNewInviteCode(e.target.value.toUpperCase())}
+                      placeholder="Codice invito cliente (opzionale)"
+                      className="border border-slate-250 rounded-2xl px-4 py-3 w-full text-sm bg-slate-50 focus:bg-white focus:outline-none font-mono tracking-wider"
+                    />
+                    <p className="text-[11px] text-slate-500 px-1">
+                      Se un cliente AllerTgy ti ha invitato, inserisci il suo codice: tu ricevi 1 mese di Pro omaggio e al cliente regaliamo Plus Famiglia.
+                    </p>
+                  </div>
+                )}
+
                 {newAddress && (
                   <div className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-2xl p-3 flex flex-wrap gap-x-4 gap-y-1 items-center">
                     <span>📍 <b>Indirizzo:</b> {newAddress}</span>
@@ -757,13 +775,18 @@ export default function App() {
                           undefined, 
                           undefined, 
                           newLatitude !== '' ? Number(newLatitude) : undefined, 
-                          newLongitude !== '' ? Number(newLongitude) : undefined
+                          newLongitude !== '' ? Number(newLongitude) : undefined,
+                          newInviteCode || undefined,
                         );
                         setRestaurants([...restaurants, r]); 
                         selectRestaurant(r);
+                        if (newInviteCode.trim() && r.business_plan === 'pro_notify') {
+                          window.alert(`${r.name} ha il piano Pro gratis per 30 giorni grazie al codice invito del cliente.`);
+                        }
                         // Reset form di creazione
                         setNewName('');
                         setNewCity('');
+                        setNewInviteCode('');
                         setNewAddress('');
                         setNewLatitude('');
                         setNewLongitude('');
@@ -835,6 +858,22 @@ export default function App() {
                 >
                   <span>💳</span>
                   <span>Piano e funzioni</span>
+                </button>
+                <button
+                  onClick={() => { setApproved(null); setActiveSubTab('crescita'); }}
+                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2
+                    ${activeSubTab === 'crescita' ? 'bg-emerald-800 text-white shadow shadow-emerald-700/10' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <span>🚀</span>
+                  <span>Crescita</span>
+                </button>
+                <button
+                  onClick={() => { setApproved(null); setActiveSubTab('recensioni'); }}
+                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2
+                    ${activeSubTab === 'recensioni' ? 'bg-emerald-800 text-white shadow shadow-emerald-700/10' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <span>⭐</span>
+                  <span>Recensioni</span>
                 </button>
                 <button
                   onClick={() => { setApproved(null); setActiveSubTab('qr'); }}
@@ -1161,6 +1200,25 @@ export default function App() {
                           </div>
                         )}
                       </div>
+
+                      {/* Serie temporale visite */}
+                      <div className="space-y-3">
+                        <h5 className="font-extrabold text-xs text-slate-700 uppercase tracking-wider">Visite menù · ultimi 30 giorni</h5>
+                        <TimeSeriesChart data={analytics.time_series} label="Visite" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Storico modifiche menù */}
+                  {current && restaurantCanUseMenu(current) && (
+                    <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+                      <div className="border-b border-slate-100 pb-2">
+                        <h4 className="font-extrabold text-sm text-slate-800 flex items-center gap-1.5">
+                          <span>📜</span> Storico modifiche menù
+                        </h4>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Audit log per conformità e tracciabilità</p>
+                      </div>
+                      <MenuAuditPanel restaurantId={current.id} />
                     </div>
                   )}
 
@@ -2102,68 +2160,102 @@ export default function App() {
                     })}
                   </div>
 
-                  {/* Boost Visibilità — add-on one-time */}
+                  {current && (
+                    <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+                      <div>
+                        <h3 className="font-black text-lg text-slate-800">Storico fatture</h3>
+                        <p className="text-xs text-slate-500 mt-1">Fatture emesse da Stripe per questo locale.</p>
+                      </div>
+                      <InvoicesPanel restaurantId={current.id} />
+                    </div>
+                  )}
+
+                </section>
+              )}
+
+              {/* TAB: CRESCITA — Boost + Notifiche push */}
+              {activeSubTab === 'crescita' && (
+                <section className="space-y-6">
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-800">Crescita</h2>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Boost visibilità e messaggi ai clienti che hanno salvato il locale nei preferiti.
+                    </p>
+                  </div>
+
                   <div className="rounded-3xl border border-dashed border-amber-300 bg-amber-50/60 p-6 flex flex-col sm:flex-row items-start sm:items-center gap-5">
                     <div className="w-14 h-14 rounded-2xl bg-amber-100 flex items-center justify-center text-3xl shrink-0">🚀</div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-black text-lg text-slate-800">Boost Visibilità</h3>
-                        <span className="text-[10px] font-black bg-amber-200 text-amber-900 px-2.5 py-1 rounded-full uppercase">Add-on · Una tantum</span>
+                        <span className="text-[10px] font-black bg-amber-200 text-amber-900 px-2.5 py-1 rounded-full uppercase">€9,90 · 30 giorni</span>
                       </div>
                       <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        Metti il tuo locale <strong>in cima ai risultati di ricerca per 30 giorni</strong>.
-                        Pagamento singolo senza abbonamento — attivabile quando vuoi, anche più volte.
+                        Metti il locale <strong>in cima ai risultati</strong> nell&apos;app clienti. Disponibile con qualsiasi piano.
                       </p>
                     </div>
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <div className="text-2xl font-black text-amber-800">€9,90</div>
-                      <div className="text-[10px] text-amber-600 font-semibold">per 30 giorni</div>
-                      <button
-                        onClick={async () => {
-                          if (!current) return;
-                          setBusy(true);
-                          try {
-                            const res = await api.billingBoost(current.id);
+                    <button
+                      onClick={async () => {
+                        if (!current) return;
+                        setBusy(true);
+                        try {
+                          const res = await api.billingBoost(current.id);
+                          if (res.activated) {
+                            alert(res.message || 'Boost attivato per 30 giorni.');
+                          } else if (res.checkout_url) {
                             window.location.href = res.checkout_url;
-                          } catch (e) {
-                            const msg = (e as Error).message;
-                            if (/STRIPE|Pagamenti non ancora attivi/i.test(msg)) {
-                              alert('I pagamenti online non sono ancora attivi. Contatta AllerTgy.');
-                            } else {
-                              alert(msg);
-                            }
                           }
-                          setBusy(false);
-                        }}
-                        disabled={busy}
-                        className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-2xl text-xs font-black disabled:opacity-40 whitespace-nowrap"
-                      >
-                        🚀 Attiva Boost
-                      </button>
-                    </div>
+                        } catch (e) {
+                          const msg = (e as Error).message;
+                          if (/STRIPE|Pagamenti non ancora attivi/i.test(msg)) {
+                            alert('I pagamenti online non sono ancora attivi. In test il Boost si attiva se Stripe non è configurato.');
+                          } else {
+                            alert(msg);
+                          }
+                        }
+                        setBusy(false);
+                      }}
+                      disabled={busy}
+                      className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-2xl text-xs font-black disabled:opacity-40 whitespace-nowrap shrink-0"
+                    >
+                      🚀 Attiva Boost
+                    </button>
                   </div>
 
-                  {/* Sezione Notifiche push (solo Pro Notifiche) */}
-                  {restaurantCanPushNotify(current) && (
-                    <PushNotificationPanel restaurantId={current!.id} />
+                  {current && (
+                    <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+                      <div>
+                        <h3 className="font-black text-lg text-slate-800">Storico Boost</h3>
+                        <p className="text-xs text-slate-500 mt-1">Boost attivi e scaduti per questo locale.</p>
+                      </div>
+                      <BoostHistoryPanel restaurantId={current.id} />
+                    </div>
                   )}
-                  {!restaurantCanPushNotify(current) && (
+
+                  {restaurantCanPushNotify(current) ? (
+                    <PushNotificationPanel restaurantId={current!.id} />
+                  ) : (
                     <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
                         <h3 className="font-black text-lg">🔔 Notifiche push ai clienti fedeli</h3>
                         <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-                          Invia promozioni, sconti e novità direttamente ai clienti che ti hanno salvato nei preferiti. Disponibile con il piano Pro Notifiche.
+                          Invia promozioni e novità ai clienti che ti hanno salvato nei preferiti. Richiede il piano Pro (€19/mese).
                         </p>
                       </div>
                       <button
                         onClick={() => setActiveSubTab('plan')}
                         className="bg-white text-slate-900 hover:bg-slate-100 px-5 py-3 rounded-2xl text-xs font-black whitespace-nowrap"
                       >
-                        Passa a Pro Notifiche
+                        Passa a Pro
                       </button>
                     </div>
                   )}
                 </section>
+              )}
+
+              {/* TAB: RECENSIONI */}
+              {activeSubTab === 'recensioni' && current && (
+                <OwnerReviewsPanel restaurant={current} />
               )}
 
               {/* TAB 5: QR CODE DOWNLOAD AREA */}

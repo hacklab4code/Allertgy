@@ -76,16 +76,23 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
   if (internalAdminKey) headers['X-Admin-Key'] = internalAdminKey;
   if (init.body && typeof init.body === 'string') headers['Content-Type'] = 'application/json';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
   let res: Response;
   try {
-    res = await fetch(`${API}${path}`, { ...init, headers });
-  } catch {
+    res = await fetch(`${API}${path}`, { ...init, headers, signal: controller.signal });
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error('Richiesta scaduta: il server non ha risposto entro 15 secondi.');
+    }
     throw new Error(
       `Impossibile contattare il server AllerTgy (${API}). ` +
       'Verifica che il backend sia avviato: apri il Terminale nella cartella backend ed esegui ' +
       '"source .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0". ' +
       `Poi controlla che ${API}/docs si apra nel browser.`,
     );
+  } finally {
+    clearTimeout(timer);
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -134,9 +141,13 @@ export interface InternalSummary {
   published_menus: number;
   paid_restaurants: number;
   monthly_recurring_cents: number;
+  customers_plus_active: number;
+  customers_plus_comped: number;
+  customer_mrr_cents: number;
   plans: PlanDefinition[];
   restaurants_by_plan: Record<string, number>;
   restaurants_by_status: Record<string, number>;
+  customers_by_plan: Record<string, number>;
 }
 
 export interface InternalRestaurant extends Restaurant {
@@ -154,6 +165,23 @@ export interface InternalUser {
   restaurant_count: number;
   legal_consents_ok: boolean;
   onboarding_completed: boolean;
+  customer_plan: 'customer_free' | 'customer_plus';
+  customer_subscription_status: string;
+  has_customer_plus: boolean;
+  invite_code: string | null;
+  referrals_count: number;
+  allergen_count: number;
+  sub_profile_count: number;
+  favorites_count: number;
+  barcode_scans_month: number;
+  reviews_count: number;
+}
+
+export interface InternalCustomerDetail extends InternalUser {
+  allergen_codes: string[];
+  medical_documents_count: number;
+  customer_plan_started_at: string | null;
+  customer_stripe_subscription_id: string | null;
 }
 
 export type InternalRestaurantBusinessPatch = Partial<Pick<
@@ -250,6 +278,14 @@ export const api = {
       method: 'PUT', body: JSON.stringify({ allergen_codes: codes }),
     }),
   getProfile: () => req<UserProfile>('/profile'),
+  getReferralStats: () => req<{
+    invite_code: string | null;
+    referrals_count: number;
+    customer_plan: 'customer_free' | 'customer_plus';
+    customer_subscription_status: string;
+    has_plus: boolean;
+    reward_message?: string | null;
+  }>('/profile/referral'),
   updateAppleHealth: (
     apple_health_connected: number,
     emergency_medicines: string | null,
@@ -274,8 +310,31 @@ export const api = {
     }),
   allergens: () => req<Allergen[]>('/allergens'),
   myRestaurants: () => req<Restaurant[]>('/admin/restaurants'),
-  createRestaurant: (name: string, city: string, address?: string, phone?: string, email_contact?: string, opening_hours?: string, latitude?: number, longitude?: number) =>
-    req<Restaurant>('/admin/restaurants', { method: 'POST', body: JSON.stringify({ name, city, address, phone, email_contact, opening_hours, latitude, longitude }) }),
+  createRestaurant: (
+    name: string,
+    city: string,
+    address?: string,
+    phone?: string,
+    email_contact?: string,
+    opening_hours?: string,
+    latitude?: number,
+    longitude?: number,
+    invite_code?: string,
+  ) =>
+    req<Restaurant>('/admin/restaurants', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        city,
+        address,
+        phone,
+        email_contact,
+        opening_hours,
+        latitude,
+        longitude,
+        ...(invite_code?.trim() ? { invite_code: invite_code.trim() } : {}),
+      }),
+    }),
   updateRestaurant: (id: number, data: Partial<Restaurant>) =>
     req<Restaurant>(`/admin/restaurants/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   analyze: (file: File) => {
@@ -399,9 +458,13 @@ export const api = {
       method: 'POST', body: JSON.stringify({ restaurant_id: restaurantId, title, body }),
     }),
   billingBoost: (restaurantId: number) =>
-    req<{ checkout_url: string }>('/billing/boost', {
+    req<{ checkout_url?: string; activated?: boolean; message?: string }>('/billing/boost', {
       method: 'POST', body: JSON.stringify({ restaurant_id: restaurantId }),
     }),
+  billingBoosts: (restaurantId: number) =>
+    req<{ id: number; restaurant_id: number; expires_at: string | null; activated_at: string | null }[]>(
+      `/billing/boosts/${restaurantId}`,
+    ),
 
   // --- Notifiche ristoratore (stesso account/JWT) ---
   notifications: () => req<OwnerNotification[]>('/profile/notifications'),
@@ -426,6 +489,15 @@ export const api = {
   internalSummary: () => req<InternalSummary>('/internal-admin/summary'),
   internalRestaurants: () => req<InternalRestaurant[]>('/internal-admin/restaurants'),
   internalUsers: () => req<InternalUser[]>('/internal-admin/users'),
+  internalCustomerDetail: (id: number) => req<InternalCustomerDetail>(`/internal-admin/users/${id}`),
+  updateInternalCustomer: (
+    id: number,
+    data: Partial<Pick<InternalUser, 'customer_plan' | 'customer_subscription_status'>>,
+  ) =>
+    req<InternalCustomerDetail>(`/internal-admin/users/${id}/customer`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
   updateInternalRestaurantBusiness: (id: number, data: InternalRestaurantBusinessPatch) =>
     req<InternalRestaurant>(`/internal-admin/restaurants/${id}/business`, {
       method: 'PATCH',

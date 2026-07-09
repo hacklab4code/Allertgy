@@ -11,7 +11,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Body, Depends, File, Header, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -46,6 +46,12 @@ from ..services import storage
 from ..services.menu_analyze import analyze_menu_image, analyze_menu_url
 from ..services.push import notify_users
 from ..services.slugs import ensure_slug
+from ..services.referrals import (
+    owner_already_referred,
+    process_merchant_referral,
+    resolve_referrer,
+)
+from ..services.plan_limits import ensure_analytics_access, ensure_owner_ai_menu_scan_allowed
 from ..legal import MENU_CONFIRMATION_VERSION
 from .restaurants import dish_to_out
 
@@ -201,6 +207,18 @@ def create_restaurant(
     )
     ensure_slug(db, r)
     db.add(r)
+    db.flush()
+
+    if data.invite_code and not owner_already_referred(user.id, db):
+        referrer = resolve_referrer(data.invite_code, db)
+        if referrer and referrer.id != user.id:
+            process_merchant_referral(
+                referrer=referrer,
+                owner=user,
+                restaurant=r,
+                db=db,
+            )
+
     db.commit()
     db.refresh(r)
     return r
@@ -246,9 +264,11 @@ def update_restaurant(
 async def analyze_menu(
     file: UploadFile = File(...),
     user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
 ):
-    """Riceve la foto del menù cartaceo e restituisce piatti+allergeni.
-    Per ora usa lo stub; con GEMINI_API_KEY configurata userà Gemini Vision."""
+    """Riceve la foto del menù cartaceo e restituisce piatti+allergeni."""
+    ensure_owner_ai_menu_scan_allowed(user, db)
+    db.commit()
     content, mime_type = await _read_image_upload(file, max_bytes=MAX_MENU_IMAGE_BYTES)
     return analyze_menu_image(content, file.filename or "menu.jpg", mime_type)
 
@@ -257,9 +277,11 @@ async def analyze_menu(
 def analyze_url(
     data: AnalyzeUrlIn,
     user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
 ):
-    """Riceve un link/URL di un menù online e lo analizza con Gemini Vision o Gemini Text.
-    In assenza di GEMINI_API_KEY o in caso di errore, usa lo stub."""
+    """Riceve un link/URL di un menù online e lo analizza con Gemini."""
+    ensure_owner_ai_menu_scan_allowed(user, db)
+    db.commit()
     return analyze_menu_url(data.url)
 
 
@@ -509,6 +531,7 @@ def get_restaurant_analytics(
 ):
     """Restituisce le statistiche delle visite e dei match degli allergeni per il locale."""
     r = _my_restaurant(rid, user, db)
+    ensure_analytics_access(r)
     from sqlalchemy import func
     from ..models import RestaurantAnalytics, Allergen
     

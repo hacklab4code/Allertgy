@@ -1,67 +1,39 @@
 import { motion } from "framer-motion";
-import { Check, Rocket, Star, Gift } from "lucide-react";
+import { Rocket, Gift } from "lucide-react";
 
-interface Plan {
-  name: string;
+interface PricingRow {
+  tier: string;
   price: string;
-  period: string;
-  desc: string;
-  features: string[];
-  cta: string;
-  dark: boolean;
-  highlight: boolean;
-  trial: boolean;
+  restaurant: string;
+  customer: string;
+  highlight?: boolean;
 }
 
-const PLANS: Plan[] = [
+const ROWS: PricingRow[] = [
   {
-    name: "Gratis",
+    tier: "Gratis",
     price: "€0",
-    period: "",
-    desc: "Scheda base sulla mappa per essere trovato dai clienti.",
-    features: ["Nome, città, indirizzo", "Presenza sulla mappa", "1 foto del locale"],
-    cta: "Inizia ora",
-    dark: false,
-    highlight: false,
-    trial: false,
+    restaurant: "Scheda mappa",
+    customer: "Scan + semaforo + 1 profilo",
   },
   {
-    name: "Base",
-    price: "€9",
-    period: "/mese",
-    desc: "I clienti scoprono cosa possono mangiare al tuo tavolo, personalizzato sulle loro allergie.",
-    features: [
-      "Semaforo personalizzato per ogni cliente con allergie",
-      'Badge "Locale verificato"',
-      "Fino a 10 foto in galleria",
-      "QR code per tavoli e banco",
-      "Registro allergeni PDF stampabile",
-      "Rispondi alle recensioni",
-    ],
-    cta: "Prova gratis 14 giorni",
-    dark: false,
-    highlight: false,
-    trial: true,
+    tier: "Base",
+    price: "€9/mese",
+    restaurant: "Semaforo clienti + QR + PDF",
+    customer: "—",
   },
   {
-    name: "Pro Crescita",
-    price: "€19",
-    period: "/mese",
-    desc: "Come Base, più strumenti per far tornare i clienti allergy-friendly.",
-    features: [
-      "Tutto del piano Base",
-      "Notifiche push ai clienti che ti preferiscono",
-      "Promuovi sconti, novità e offerte",
-      "Analisi AI menù illimitate",
-      "Traduzioni automatiche in 15 lingue",
-      "Statistiche avanzate su scansioni e allergeni cercati",
-      'Badge "Allergy-friendly" in evidenza',
-      "Fino a 20 foto in galleria",
-    ],
-    cta: "Prova gratis 14 giorni",
-    dark: true,
+    tier: "Pro",
+    price: "€19/mese",
+    restaurant: "+ Push + AI + stats",
+    customer: "—",
     highlight: true,
-    trial: true,
+  },
+  {
+    tier: "Boost",
+    price: "€9,90",
+    restaurant: "Visibilità 30 gg",
+    customer: "—",
   },
 ];
 
@@ -72,151 +44,110 @@ interface PricingSectionProps {
 
 export const PricingSection = ({ scrollTo, onSelectPlan }: PricingSectionProps) => (
   <section id="prezzi" className="py-24 md:py-32 bg-[#EFEBE1]/50 border-y border-[#EFEBE1]">
-    <div className="max-w-7xl mx-auto px-6 md:px-12">
+    <div className="max-w-5xl mx-auto px-6 md:px-12">
       <div className="max-w-2xl mx-auto text-center">
         <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#16A34A]">Prezzi</span>
         <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-[#1C221F] mt-3 font-heading">
-          Un piano per ogni ristorante
+          Semplice per tutti
         </h2>
+        <p className="text-[#5C6B61] mt-4 text-sm md:text-base leading-relaxed">
+          I clienti usano gratis il semaforo al tavolo. I ristoratori pagano solo per attivare
+          menù, QR e registro allergeni — o per crescere con Pro e Boost.
+        </p>
         <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-white border border-[#EFEBE1] px-4 py-2 text-[#4A524D] text-xs font-semibold">
           <Gift className="w-4 h-4 text-[#16A34A]" />
-          14 giorni gratis sui piani a pagamento — nessuna carta richiesta
+          14 giorni gratis su Base e Pro — nessuna carta richiesta
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6 md:gap-8 mt-14 items-stretch">
-        {PLANS.map((p, i) => (
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-60px" }}
+        transition={{ duration: 0.5 }}
+        className="mt-14 card-clay-white overflow-hidden"
+      >
+        <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)] gap-0 text-sm border-b border-[#EFEBE1] bg-[#F8FAF9] font-bold uppercase tracking-wider text-[10px] text-[#64748B]">
+          <div className="p-4 md:p-5" />
+          <div className="p-4 md:p-5">Prezzo</div>
+          <div className="p-4 md:p-5 text-[#166534]">Ristoratori</div>
+          <div className="p-4 md:p-5 text-[#166534]">Clienti</div>
+        </div>
+
+        {ROWS.map((row, i) => (
           <motion.div
-            key={p.name}
-            initial={{ opacity: 0, y: 28 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.5, delay: i * 0.1 }}
-            data-testid={`pricing-card-${p.name.toLowerCase().replace(/\s+/g, "-")}`}
-            className={`relative p-8 flex flex-col ${
-              p.dark
-                ? "card-clay-dark md:-translate-y-4"
-                : "card-clay-white"
+            key={row.tier}
+            initial={{ opacity: 0, x: -12 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.35, delay: i * 0.05 }}
+            className={`grid grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)] gap-0 border-b border-[#EFEBE1] last:border-b-0 ${
+              row.highlight ? "bg-[#ECFDF5]/60" : "bg-white"
             }`}
           >
-            {p.highlight && (
-              <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 bg-[#16A34A] text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">
-                <Star className="w-3 h-3 fill-white" /> Più scelto
-              </span>
-            )}
-
-            <div className="flex items-start justify-between gap-3">
-              <h3 className={`text-2xl font-extrabold font-heading ${p.dark ? "text-white" : "text-[#1C221F]"}`}>
-                {p.name}
-              </h3>
-              {p.trial && (
-                <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg ${p.dark ? "bg-white/10 text-[#86EFAC]" : "bg-[#DCFCE7] text-[#166534]"}`}>
-                  14 gg gratis
+            <div className="p-4 md:p-5 flex items-center gap-2">
+              <span className="font-extrabold text-[#1C221F] text-base font-heading">{row.tier}</span>
+              {row.highlight && (
+                <span className="text-[9px] font-black bg-[#16A34A] text-white px-2 py-0.5 rounded-full uppercase">
+                  Top
                 </span>
               )}
             </div>
-            <p className={`text-sm mt-2 leading-relaxed ${p.dark ? "text-white/70" : "text-[#5C6B61]"}`}>
-              {p.desc}
-            </p>
-
-            <div className="flex items-end gap-1 mt-6">
-              <span className={`text-5xl font-extrabold font-heading ${p.dark ? "text-white" : "text-[#1C221F]"}`}>
-                {p.price}
-              </span>
-              {p.period && (
-                <span className={`text-sm font-medium mb-1.5 ${p.dark ? "text-white/60" : "text-[#5C6B61]"}`}>
-                  {p.period}
-                </span>
-              )}
+            <div className="p-4 md:p-5 font-extrabold text-[#1C221F] text-base font-heading flex items-center">
+              {row.price}
             </div>
-
-            <ul className={`space-y-3 mt-6 pt-6 flex-1 border-t ${p.dark ? "border-white/10" : "border-[#EFEBE1]"}`}>
-              {p.features.map((f) => (
-                <li key={f} className="flex items-start gap-2.5 text-sm">
-                  <Check className={`w-4 h-4 mt-0.5 shrink-0 ${p.dark ? "text-[#86EFAC]" : "text-[#16A34A]"}`} strokeWidth={2.5} />
-                  <span className={p.dark ? "text-white/85" : "text-[#4A524D]"}>{f}</span>
-                </li>
-              ))}
-            </ul>
-
-            <button
-              onClick={() => {
-                if (onSelectPlan) {
-                  const code = p.name === "Gratis" ? "free" : p.name === "Base" ? "base" : "pro_notify";
-                  onSelectPlan(code);
-                } else {
-                  scrollTo("top");
-                }
-              }}
-              data-testid={`pricing-cta-${p.name.toLowerCase().replace(/\s+/g, "-")}`}
-              className={`mt-8 w-full font-semibold py-3.5 rounded-full ${
-                p.dark
-                  ? "btn-clay-green"
-                  : p.name === "Gratis"
-                  ? "btn-clay-white"
-                  : "btn-clay-dark"
-              }`}
-            >
-              {p.cta}
-            </button>
+            <div className="p-4 md:p-5 text-[#4A524D] font-medium leading-snug flex items-center">
+              {row.restaurant}
+            </div>
+            <div className="p-4 md:p-5 text-[#4A524D] font-medium leading-snug flex items-center">
+              {row.customer}
+            </div>
           </motion.div>
+        ))}
+      </motion.div>
+
+      <div className="mt-8 grid sm:grid-cols-3 gap-4">
+        {[
+          { code: "free", label: "Gratis", cta: "Scheda mappa" },
+          { code: "base", label: "Base €9", cta: "Prova 14 gg" },
+          { code: "pro_notify", label: "Pro €19", cta: "Prova 14 gg" },
+        ].map((p) => (
+          <button
+            key={p.code}
+            type="button"
+            onClick={() => (onSelectPlan ? onSelectPlan(p.code) : scrollTo("top"))}
+            className={`py-3.5 rounded-full font-semibold text-sm ${
+              p.code === "pro_notify" ? "btn-clay-green" : p.code === "base" ? "btn-clay-dark" : "btn-clay-white"
+            }`}
+          >
+            {p.label} · {p.cta}
+          </button>
         ))}
       </div>
 
-      {/* Add-on Boost */}
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-60px" }}
         transition={{ duration: 0.5 }}
         data-testid="pricing-addon-boost"
-        className="mt-8 rounded-3xl border-2 border-[#EAB308]/60 bg-[#FEF9C3] p-6 md:p-7 flex flex-col sm:flex-row items-start sm:items-center gap-5 shadow-[0_12px_24px_-4px_rgba(234,179,8,0.08),inset_0_-4px_6px_rgba(0,0,0,0.03),inset_0_4px_6px_rgba(255,255,255,0.6)]"
+        className="mt-6 rounded-3xl border-2 border-[#EAB308]/60 bg-[#FEF9C3] p-6 md:p-7 flex flex-col sm:flex-row items-start sm:items-center gap-5"
       >
         <div className="grid place-items-center w-14 h-14 rounded-2xl badge-clay-yellow shrink-0">
           <Rocket className="w-7 h-7" strokeWidth={1.75} />
         </div>
         <div className="flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-lg font-extrabold text-[#1C221F] font-heading">Boost Visibilità</h3>
-            <span className="text-[10px] font-black bg-[#FDE047] text-[#854D0E] px-2.5 py-1 rounded-full uppercase">
-              Add-on · Una tantum
-            </span>
-          </div>
-          <p className="text-sm text-[#4A524D] mt-1 leading-relaxed">
-            Metti il tuo locale <strong>in cima ai risultati di ricerca per 30 giorni</strong>.
-            Pagamento singolo, senza abbonamento — attivabile quando vuoi.
+          <h3 className="text-lg font-extrabold text-[#1C221F] font-heading">Boost · €9,90 una tantum</h3>
+          <p className="text-sm text-[#4A524D] mt-1">
+            Visibilità in cima alla ricerca per <strong>30 giorni</strong>. Solo ristoratori, senza abbonamento.
           </p>
-        </div>
-        <div className="text-right shrink-0">
-          <div className="text-2xl font-extrabold text-[#854D0E] font-heading">€9,90</div>
-          <div className="text-[11px] text-[#854D0E]/70 font-semibold">per 30 giorni</div>
         </div>
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-60px" }}
-        transition={{ duration: 0.5 }}
-        className="mt-8 card-clay-white p-6 md:p-7 flex flex-col md:flex-row items-start md:items-center gap-5"
-      >
-        <div className="flex-1">
-          <span className="text-[10px] font-black bg-[#DCFCE7] text-[#166534] px-2.5 py-1 rounded-full uppercase">
-            Clienti · Plus Famiglia
-          </span>
-          <h3 className="text-xl font-extrabold text-[#1C221F] font-heading mt-3">
-            Il semaforo resta gratis. Plus sblocca famiglia, spesa e profili condivisi.
-          </h3>
-          <p className="text-sm text-[#4A524D] mt-2 leading-relaxed">
-            Per chi gestisce allergie di figli, nonni o feste: sottoprofili illimitati,
-            condivisione profilo 24h/permanente, scanner spesa illimitato e documenti AI.
-          </p>
-        </div>
-        <div className="text-left md:text-right shrink-0">
-          <div className="text-3xl font-extrabold text-[#166534] font-heading">€3,99</div>
-          <div className="text-[11px] text-[#166534]/70 font-semibold">/mese · opzionale</div>
-        </div>
-      </motion.div>
+      <p className="text-center text-xs text-[#94A3B8] mt-8 leading-relaxed max-w-xl mx-auto">
+        Plus Famiglia (€3,99/mese) opzionale per i clienti: sottoprofili, condivisione permanente e scanner spesa illimitato.
+        Il semaforo al QR resta sempre gratuito.
+      </p>
     </div>
   </section>
 );

@@ -13,11 +13,11 @@ PLAN_DEFINITIONS = [
         "code": "free",
         "name": "Gratis",
         "price_cents": 0,
-        "tagline": "Scheda base per farti trovare sulla mappa.",
+        "tagline": "Scheda mappa.",
         "features": [
-            "Scheda locale con nome, indirizzo e orari",
+            "Scheda locale sulla mappa",
+            "Nome, città, indirizzo e orari",
             "1 foto del locale",
-            "Presenza nell'elenco e nella ricerca clienti",
         ],
         "photo_limit": 1,
         "has_menu": False,
@@ -29,18 +29,14 @@ PLAN_DEFINITIONS = [
         "code": "base",
         "name": "Base",
         "price_cents": 900,           # €9,00/mese
-        "tagline": "Carica il menù: i clienti scoprono cosa possono mangiare da te.",
+        "tagline": "Semaforo clienti + QR + PDF.",
         "trial_days": TRIAL_DAYS,
         "features": [
             "14 giorni di prova gratuita",
-            "Badge \"Locale verificato\"",
             "Semaforo personalizzato per ogni cliente con allergie",
-            "Fino a 10 foto in galleria",
-            "QR code per tavoli e banco",
-            "Registro allergeni stampabile (PDF)",
-            "Rispondi alle recensioni dei clienti",
-            "5 analisi AI menù/mese",
-            "Traduzioni menù in 2 lingue",
+            "QR code al tavolo e al banco",
+            "Registro allergeni PDF stampabile",
+            "Menù digitale con allergeni per piatto",
         ],
         "photo_limit": 10,
         "has_menu": True,
@@ -53,19 +49,15 @@ PLAN_DEFINITIONS = [
     },
     {
         "code": "pro_notify",
-        "name": "Pro Crescita",
+        "name": "Pro",
         "price_cents": 1900,          # €19,00/mese
-        "tagline": "Come Base, più strumenti per far tornare i clienti allergy-friendly.",
+        "tagline": "Come Base + Push, AI e statistiche.",
         "trial_days": TRIAL_DAYS,
         "features": [
             "Tutto del piano Base",
-            "Invia notifiche push agli utenti che ti hanno aggiunto ai preferiti",
-            "Promuovi sconti, novità e offerte speciali direttamente sul loro telefono",
+            "Notifiche push ai clienti che ti preferiscono",
             "Analisi AI menù illimitate",
-            "Traduzioni automatiche in 15 lingue",
-            "Statistiche avanzate su scansioni e allergeni cercati",
-            "Badge \"Allergy-friendly\" in evidenza",
-            "Fino a 20 foto in galleria",
+            "Statistiche su scansioni e allergeni cercati",
         ],
         "photo_limit": 20,
         "has_menu": True,
@@ -81,14 +73,13 @@ PLAN_DEFINITIONS = [
 CUSTOMER_PLAN_DEFINITIONS = [
     {
         "code": "customer_free",
-        "name": "Cliente Gratis",
+        "name": "Gratis",
         "price_cents": 0,
-        "tagline": "Il semaforo al tavolo resta sempre gratuito.",
+        "tagline": "Scan + semaforo + 1 profilo.",
         "features": [
-            "Scansione QR ristorante e semaforo personalizzato",
-            "1 profilo allergie personale",
-            "Preferiti locali limitati",
-            "Recensioni allergy-focused",
+            "Scansione QR ristorante",
+            "Semaforo personalizzato",
+            "1 profilo allergie",
         ],
         "sub_profile_limit": 0,
         "barcode_scan_limit_month": 20,
@@ -98,15 +89,13 @@ CUSTOMER_PLAN_DEFINITIONS = [
     {
         "code": "customer_plus",
         "name": "Plus Famiglia",
-        "price_cents": 399,           # €3,99/mese
-        "tagline": "Per famiglie, feste e spesa quotidiana con profili condivisi.",
+        "price_cents": 399,           # €3,99/mese · opzionale
+        "tagline": "Famiglia, spesa e profili condivisi.",
         "features": [
             "Sottoprofili famiglia illimitati",
             "Condivisione profilo 24h o permanente",
-            "Scanner spesa illimitato e cronologia cloud",
-            "Notifiche menù aggiornati e locali vicini",
+            "Scanner spesa illimitato",
             "5 analisi AI documenti medici/mese",
-            "Carta allergie esportabile",
         ],
         "sub_profile_limit": None,
         "barcode_scan_limit_month": None,
@@ -119,12 +108,11 @@ BOOST_VISIBILITY = {
     "code": "visibility_boost",
     "name": "Boost Visibilità",
     "price_cents": 990,              # €9,90 pagamento singolo
-    "duration_days": 30,             # 30 giorni di priorità elevata
-    "tagline": "Metti il tuo locale in cima ai risultati di ricerca per 30 giorni.",
+    "duration_days": 30,
+    "tagline": "Visibilità 30 giorni.",
     "description": (
-        "Pagamento unico senza abbonamento. Attivabile in qualsiasi momento, "
-        "anche più volte. Aumenta la tua posizione nei risultati di ricerca "
-        "e nella lista locali vicini."
+        "Pagamento unico senza abbonamento. Il locale compare in cima ai risultati "
+        "di ricerca e nella lista locali vicini per 30 giorni."
     ),
 }
 

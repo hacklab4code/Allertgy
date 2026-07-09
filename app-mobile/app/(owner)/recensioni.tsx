@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { api, type Review } from '../../src/api/client';
+import DetailSection from '../../src/components/DetailSection';
 import { useOwner } from '../../src/store/owner';
 import { colors, radius, shadow, spacing, typography } from '../../src/theme';
 import type { Restaurant } from '../../src/types';
@@ -79,9 +80,12 @@ export default function OwnerRecensioni() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.heroTitle}>Recensioni</Text>
-      <Text style={styles.heroSub}>{locale.name} · feedback dei clienti AllerTgy</Text>
-
+      <DetailSection
+        title="FEEDBACK CLIENTI"
+        subtitle={`${locale.name} · recensioni lasciate in app da chi ha mangiato da te.`}
+        style={{ marginTop: 0 }}
+        card={false}
+      >
       {!replyEnabled && (
         <View style={styles.warnBox}>
           <Text style={styles.warnText}>
@@ -137,6 +141,7 @@ export default function OwnerRecensioni() {
           </View>
         ))
       )}
+      </DetailSection>
     </ScrollView>
   );
 }

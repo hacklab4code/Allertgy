@@ -114,6 +114,38 @@ class DishOut(BaseModel):
         from_attributes = True
 
 
+class DishSummaryOut(BaseModel):
+    """Piatto compatto per lista locali (solo dati necessari al semaforo)."""
+    id: int
+    nome_piatto: str
+    descrizione: Optional[str] = None
+    allergeni_contenuti: list[str]
+    allergeni_tracce: list[str]
+
+
+class RestaurantSummaryOut(BaseModel):
+    """Lista leggera locali per mappa/home/geofencing."""
+    restaurant_id: int
+    public_code: str
+    nome_ristorante: str
+    citta: Optional[str]
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    boost_active: bool = False
+    piatti: list[DishSummaryOut]
+
+
+class FavoriteOut(BaseModel):
+    public_code: str
+    name: str
+
+
+class BarcodeScanOut(BaseModel):
+    allowed: bool
+    remaining: Optional[int] = None
+    limit: Optional[int] = None
+
+
 class MenuOut(BaseModel):
     restaurant_id: int
     public_code: str
@@ -134,6 +166,7 @@ class MenuOut(BaseModel):
     google_reviews_count: Optional[int] = None
     tripadvisor_rating: Optional[float] = None
     tripadvisor_reviews_count: Optional[int] = None
+    boost_active: bool = False
     safety_notice: str = (
         "Informazioni sugli allergeni dichiarate dal ristoratore. "
         "Comunica sempre allergie e intolleranze al personale prima di ordinare."
@@ -182,6 +215,7 @@ class RestaurantIn(BaseModel):
     tripadvisor_reviews_count: Optional[int] = None
     vat_number: Optional[str] = None
     allergen_manager: Optional[str] = None
+    invite_code: Optional[str] = Field(default=None, max_length=12)
 
 
 class RestaurantOut(BaseModel):
@@ -253,9 +287,13 @@ class InternalSummaryOut(BaseModel):
     published_menus: int
     paid_restaurants: int
     monthly_recurring_cents: int
+    customers_plus_active: int = 0
+    customers_plus_comped: int = 0
+    customer_mrr_cents: int = 0
     plans: list[PlanDefinitionOut]
     restaurants_by_plan: dict[str, int]
     restaurants_by_status: dict[str, int]
+    customers_by_plan: dict[str, int] = {}
 
 
 class InternalRestaurantOut(RestaurantOut):
@@ -288,9 +326,36 @@ class InternalUserOut(BaseModel):
     restaurant_count: int = 0
     legal_consents_ok: bool
     onboarding_completed: bool
+    customer_plan: str = "customer_free"
+    customer_subscription_status: str = "free"
+    has_customer_plus: bool = False
+    invite_code: Optional[str] = None
+    referrals_count: int = 0
+    allergen_count: int = 0
+    sub_profile_count: int = 0
+    favorites_count: int = 0
+    barcode_scans_month: int = 0
+    reviews_count: int = 0
 
     class Config:
         from_attributes = True
+
+
+class InternalCustomerDetailOut(InternalUserOut):
+    allergen_codes: list[str] = []
+    medical_documents_count: int = 0
+    customer_plan_started_at: Optional[datetime] = None
+    customer_stripe_subscription_id: Optional[str] = None
+
+
+class InternalCustomerBusinessIn(BaseModel):
+    customer_plan: Optional[str] = Field(
+        default=None, pattern="^(customer_free|customer_plus)$"
+    )
+    customer_subscription_status: Optional[str] = Field(
+        default=None,
+        pattern="^(free|active|comped|trialing|past_due|canceled)$",
+    )
 
 
 class DishTranslationIn(BaseModel):
@@ -387,9 +452,23 @@ class UserProfileOut(BaseModel):
     emergency_medicines: Optional[str] = None
     emergency_contact_name: Optional[str] = None
     emergency_contact_phone: Optional[str] = None
+    invite_code: Optional[str] = None
+    customer_plan: str = "customer_free"
+    customer_subscription_status: str = "free"
+    customer_plan_started_at: Optional[datetime] = None
+    has_customer_plus: bool = False
 
     class Config:
         from_attributes = True
+
+
+class ReferralStatsOut(BaseModel):
+    invite_code: Optional[str] = None
+    referrals_count: int = 0
+    customer_plan: str = "customer_free"
+    customer_subscription_status: str = "free"
+    has_plus: bool = False
+    reward_message: Optional[str] = None
 
 
 # ---------- Foto (storage privato, URL firmati) ----------
@@ -571,6 +650,14 @@ class CheckoutSessionOut(BaseModel):
     checkout_url: str
 
 
+class CustomerCheckoutOut(BaseModel):
+    checkout_url: str
+
+
+class CustomerPortalOut(BaseModel):
+    portal_url: str
+
+
 class PortalSessionIn(BaseModel):
     restaurant_id: int
 
@@ -602,7 +689,9 @@ class StartBoostIn(BaseModel):
 
 
 class BoostSessionOut(BaseModel):
-    checkout_url: str
+    checkout_url: Optional[str] = None
+    activated: bool = False
+    message: Optional[str] = None
 
 
 class VisibilityBoostOut(BaseModel):
@@ -695,6 +784,8 @@ class ProfileShareCreateIn(BaseModel):
     profile_id: Optional[int] = None  # null = profilo principale "io"
     duration: str = Field(default="24h", pattern="^(24h|permanent)$")
     label: Optional[str] = Field(default=None, max_length=120)
+    recipient_user_id: Optional[int] = None
+    recipient_email: Optional[EmailStr] = None
 
 
 class ProfileShareOut(BaseModel):
@@ -705,6 +796,30 @@ class ProfileShareOut(BaseModel):
     expires_at: Optional[datetime] = None
     created_at: datetime
     share_url: str
+    delivered_in_app: bool = False
+    recipient_display_name: Optional[str] = None
+
+
+class ContactLookupIn(BaseModel):
+    emails: list[EmailStr] = Field(default_factory=list, max_length=50)
+
+
+class AppContactMatch(BaseModel):
+    user_id: int
+    display_name: Optional[str] = None
+    email: str
+    email_hint: str
+
+
+class ContactLookupOut(BaseModel):
+    matches: list[AppContactMatch]
+
+
+class RecentAppContactOut(BaseModel):
+    user_id: int
+    display_name: Optional[str] = None
+    email_hint: str
+    last_shared_at: datetime
 
 
 class SharedProfileOut(BaseModel):
