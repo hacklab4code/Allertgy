@@ -30,7 +30,7 @@ TERMS_MARKDOWN = """
 
 **5. Obblighi del Ristoratore** — Il Ristoratore garantisce l'accuratezza e l'aggiornamento dei dati su allergeni inseriti per ciascun piatto, si impegna ad aggiornare il menù ad ogni variazione di ricetta o fornitore, e riconosce che l'inserimento errato di un allergene può causare un danno grave alla salute di un Cliente.
 
-**6. Piani a pagamento** — I piani Verificato, Pro e Premium sono abbonamenti mensili a rinnovo automatico, gestiti tramite Stripe. Il Ristoratore può disdire in qualsiasi momento dal Customer Portal; la disdetta ha effetto alla fine del periodo di fatturazione in corso, senza rimborso della quota già pagata salvo diversa previsione di legge.
+**6. Piani a pagamento** — I piani Base e Pro sono abbonamenti mensili a rinnovo automatico, gestiti tramite Stripe. Il Ristoratore può disdire in qualsiasi momento dal Customer Portal; la disdetta ha effetto alla fine del periodo di fatturazione in corso, senza rimborso della quota già pagata salvo diversa previsione di legge.
 
 **7. Proprietà intellettuale** — Il software, il marchio e i contenuti editoriali di AllerTgy restano di proprietà di AllerTgy. I Contenuti del Locale restano di proprietà del Ristoratore, che concede ad AllerTgy licenza d'uso per mostrarli sulla piattaforma.
 

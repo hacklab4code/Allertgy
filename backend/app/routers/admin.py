@@ -64,10 +64,10 @@ ALLOWED_IMAGE_TYPES = {
 }
 MAX_MENU_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_DISH_IMAGE_BYTES = 5 * 1024 * 1024
-MENU_PLANS = {"verified", "pro", "premium", "base", "pro_notify"}
-MENU_ACCESS_STATUSES = {"trialing", "active", "comped"}
-# Limiti galleria foto per piano (vedi PIANO_LANCIO.md §7)
-PLAN_PHOTO_LIMITS = {"free": 1, "verified": 3, "pro": 8, "premium": 20, "base": 10, "pro_notify": 20}
+from ..plans import (
+    PLAN_PHOTO_LIMITS,
+    restaurant_has_menu_access,
+)
 
 
 async def _read_image_upload(file: UploadFile, *, max_bytes: int) -> tuple[bytes, str]:
@@ -91,12 +91,10 @@ def _my_restaurant(rid: int, user: User, db: Session) -> Restaurant:
 
 
 def _ensure_menu_access(r: Restaurant) -> None:
-    has_plan = (r.business_plan or "free") in MENU_PLANS
-    has_status = (r.subscription_status or "free") in MENU_ACCESS_STATUSES
-    if not ((has_plan and has_status) or r.subscription_status == "comped"):
+    if not restaurant_has_menu_access(r.business_plan, r.subscription_status):
         raise HTTPException(
             402,
-            "Il menù digitale con allergeni per piatto è incluso nel piano Pro o Premium.",
+            "Il menù digitale con allergeni per piatto è incluso nei piani Base e Pro.",
         )
 
 

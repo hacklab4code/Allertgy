@@ -5,6 +5,7 @@ checkout, endpoint pubblico /billing/plans). I limiti qui devono restare
 allineati al gating applicato negli endpoint (es. PLAN_PHOTO_LIMITS in
 routers/admin.py).
 """
+from __future__ import annotations
 
 TRIAL_DAYS = 14
 
@@ -120,3 +121,43 @@ PLAN_PRICES = {p["code"]: int(p["price_cents"]) for p in PLAN_DEFINITIONS}
 PAID_PLANS = {"base", "pro_notify"}
 NOTIFY_PLANS = {"pro_notify"}
 CUSTOMER_PLAN_PRICES = {p["code"]: int(p["price_cents"]) for p in CUSTOMER_PLAN_DEFINITIONS}
+
+# Alias legacy (DB esistenti): verified→base, pro/premium→pro_notify
+LEGACY_PLAN_ALIASES: dict[str, str] = {
+    "verified": "base",
+    "pro": "pro_notify",
+    "premium": "pro_notify",
+}
+
+MENU_PLANS = {"free", "base", "pro_notify", *LEGACY_PLAN_ALIASES}
+MENU_ACCESS_STATUSES = {"trialing", "active", "comped"}
+REPLY_PLANS = {"base", "pro_notify", "verified", "pro", "premium"}
+
+PLAN_PHOTO_LIMITS: dict[str, int] = {
+    "free": 1,
+    "base": 10,
+    "pro_notify": 20,
+    # legacy
+    "verified": 3,
+    "pro": 8,
+    "premium": 20,
+}
+
+
+def normalize_plan(code: str | None) -> str:
+    """Mappa codici piano legacy ai codici canonici."""
+    if not code:
+        return "free"
+    return LEGACY_PLAN_ALIASES.get(code, code)
+
+
+def restaurant_has_menu_access(business_plan: str | None, subscription_status: str | None) -> bool:
+    plan = normalize_plan(business_plan)
+    status = subscription_status or "free"
+    return status == "comped" or (plan in PAID_PLANS and status in MENU_ACCESS_STATUSES)
+
+
+def restaurant_can_reply_to_reviews(business_plan: str | None, subscription_status: str | None) -> bool:
+    plan = business_plan or "free"
+    status = subscription_status or "free"
+    return plan in REPLY_PLANS and status in MENU_ACCESS_STATUSES

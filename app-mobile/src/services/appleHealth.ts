@@ -1,6 +1,10 @@
 import { Platform, Alert, Linking, Share } from 'react-native';
 
-/** Integrazione Apple Salute — su iOS salva lo stato e offre export allergie. */
+/**
+ * Export profilo allergie verso Apple Salute.
+ * NON usa HealthKit: genera un riepilogo testuale da condividere manualmente
+ * in Salute > Note mediche.
+ */
 export function isAppleHealthAvailable(): boolean {
   return Platform.OS === 'ios';
 }
@@ -12,7 +16,7 @@ function buildAllergySummary(allergenLabels: string[], medicines?: string | null
     allergenLabels.length ? `Allergie: ${allergenLabels.join(', ')}` : 'Allergie: nessuna registrata',
     medicines ? `Farmaci emergenza: ${medicines}` : '',
     '',
-    'Generato da AllerTgy. Aggiungi in Salute > Note mediche.',
+    'Generato da AllerTgy. Aggiungi manualmente in Salute > Note mediche.',
   ].filter(Boolean);
   return lines.join('\n');
 }
@@ -23,24 +27,24 @@ export async function connectAppleHealth(
   medicines?: string | null,
 ): Promise<void> {
   if (!isAppleHealthAvailable()) {
-    Alert.alert('Non disponibile', 'Apple Salute è disponibile solo su iPhone.');
+    Alert.alert('Non disponibile', 'L\'export verso Apple Salute è disponibile solo su iPhone.');
     return;
   }
 
   Alert.alert(
-    'Collega Apple Salute',
-    'AllerTgy salverà lo stato di connessione. Potrai condividere un riepilogo delle allergie da incollare in Salute > Note mediche.',
+    'Esporta in Apple Salute',
+    'AllerTgy non legge né scrive dati in HealthKit. Potrai condividere un riepilogo testuale delle allergie da incollare manualmente in Salute > Note mediche.',
     [
       { text: 'Annulla', style: 'cancel' },
       {
-        text: 'Collega',
+        text: 'Esporta',
         onPress: async () => {
           try {
             await updateApi(1);
             const summary = buildAllergySummary(allergenLabels, medicines);
             Alert.alert(
-              'Collegato',
-              'Profilo collegato. Condividi il riepilogo allergie o apri l\'app Salute.',
+              'Riepilogo pronto',
+              'Condividi il testo e incollalo in Salute > Note mediche.',
               [
                 {
                   text: 'Condividi riepilogo',
@@ -62,7 +66,7 @@ export async function connectAppleHealth(
 export async function disconnectAppleHealth(updateApi: (connected: number) => Promise<void>): Promise<void> {
   try {
     await updateApi(0);
-    Alert.alert('Disconnesso', 'Apple Salute non è più collegato ad AllerTgy.');
+    Alert.alert('Disattivato', 'L\'export verso Apple Salute non è più attivo.');
   } catch (e) {
     Alert.alert('Errore', (e as Error).message);
   }

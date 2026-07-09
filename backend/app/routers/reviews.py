@@ -17,7 +17,7 @@ from ..services.external_reviews import get_external_reviews
 
 router = APIRouter(tags=["reviews"])
 
-REPLY_PLANS = {"verified", "pro", "premium", "base", "pro_notify"}
+from ..plans import restaurant_can_reply_to_reviews
 
 
 def _review_to_out(rev: Review, current_user_id: int | None = None) -> ReviewOut:
@@ -167,17 +167,17 @@ def reply_to_review(
     user: User = Depends(require_owner),
     db: Session = Depends(get_db),
 ):
-    """Risposta del ristoratore — riservata ai piani Verificato, Pro e Premium."""
+    """Risposta del ristoratore — riservata ai piani Base e Pro."""
     rev = db.get(Review, review_id)
     if not rev:
         raise HTTPException(404, "Recensione non trovata")
     restaurant = db.get(Restaurant, rev.restaurant_id)
     if not restaurant or restaurant.owner_user_id != user.id:
         raise HTTPException(403, "Puoi rispondere solo alle recensioni dei tuoi locali")
-    if (restaurant.business_plan or "free") not in REPLY_PLANS:
+    if not restaurant_can_reply_to_reviews(restaurant.business_plan, restaurant.subscription_status):
         raise HTTPException(
             402,
-            "La risposta alle recensioni è inclusa dal piano Verificato in su.",
+            "La risposta alle recensioni è inclusa nei piani Base e Pro.",
         )
     if rev.reply:
         rev.reply.reply = data.reply

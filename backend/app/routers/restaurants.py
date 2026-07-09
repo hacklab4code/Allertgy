@@ -30,8 +30,7 @@ from ..services.analytics_buffer import enqueue_scan
 
 router = APIRouter(prefix="/restaurants", tags=["restaurants"])
 
-MENU_PLANS = {"verified", "pro", "premium", "base", "pro_notify"}
-MENU_ACCESS_STATUSES = {"trialing", "active", "comped"}
+from ..plans import restaurant_has_menu_access
 
 
 def dish_to_out(d: Dish, lang: str = "it") -> DishOut:
@@ -133,11 +132,29 @@ def restaurant_to_menu_out(r: Restaurant, lang: str = "it", *, boost_active: boo
     )
 
 
+INGREDIENTI_ANIMALI = {
+    'carne', 'pollo', 'manzo', 'maiale', 'agnello', 'vitello', 'prosciutto', 'speck', 'pancetta', 'guanciale',
+    'pesce', 'salmone', 'tonno', 'acciughe', 'alici', 'gamberi', 'gamberetti', 'aragosta', 'polpo', 'calamari', 'seppia', 'molluschi', 'crostacei',
+    'uova', 'uovo', 'latte', 'panna', 'burro', 'formaggio', 'parmigiano', 'pecorino', 'mozzarella', 'gorgonzola', 'ricotta', 'stracchino', 'mascarpone',
+    'miele', 'gelatina animale', 'strutto', 'lardo',
+}
+
+VIETATI_VEGETARIANO = {
+    'carne', 'pollo', 'manzo', 'maiale', 'agnello', 'vitello', 'prosciutto', 'speck', 'pancetta', 'guanciale',
+    'pesce', 'salmone', 'tonno', 'acciughe', 'alici', 'gamberi', 'gamberetti', 'aragosta', 'polpo', 'calamari', 'seppia', 'molluschi', 'crostacei',
+}
+
+DIETA_REGOLE = {
+    "vegano": INGREDIENTI_ANIMALI,
+    "vegetariano": VIETATI_VEGETARIANO,
+}
+
 def _evaluate_dish(
     dish: DishOut,
     allergen_codes: set[str],
     excluded_ingredients: list[str],
 ) -> DishEvaluationOut:
+    import re
     diet_codes = {c for c in allergen_codes if c in {"vegano", "vegetariano"}}
     true_allergen_codes = allergen_codes - diet_codes
 
@@ -148,15 +165,23 @@ def _evaluate_dish(
         c for c in dish.allergeni_tracce if c in true_allergen_codes
     ]
 
+    # Calcolo diete con lo stesso algoritmo del client (semaforo.ts)
+    parole_nome = [w.strip().lower() for w in re.split(r'\s+', dish.nome_piatto or '') if w.strip()]
+    parole_desc = [w.strip().lower() for w in re.split(r'\s+', dish.descrizione or '') if w.strip()]
+    
+    tutti_ingredienti_piatto = set(
+        dish.allergeni_contenuti +
+        dish.allergeni_tracce +
+        parole_nome +
+        parole_desc
+    )
+
     diet_mismatches: list[str] = []
-    if "vegano" in diet_codes and "vegano" not in dish.allergeni_contenuti:
-        diet_mismatches.append("vegano")
-    if (
-        "vegetariano" in diet_codes
-        and "vegetariano" not in dish.allergeni_contenuti
-        and "vegano" not in dish.allergeni_contenuti
-    ):
-        diet_mismatches.append("vegetariano")
+    for dieta in diet_codes:
+        ingredienti_vietati = DIETA_REGOLE.get(dieta)
+        if ingredienti_vietati:
+            if any(ing in tutti_ingredienti_piatto for ing in ingredienti_vietati):
+                diet_mismatches.append(dieta)
 
     haystack = f"{dish.nome_piatto} {dish.descrizione or ''}".lower()
     match_esclusi = [
@@ -286,10 +311,7 @@ def public_restaurant_page(
         )
     ).one()
 
-    has_menu_plan = (
-        (r.business_plan or "free") in MENU_PLANS
-        and (r.subscription_status or "free") in MENU_ACCESS_STATUSES
-    ) or r.subscription_status == "comped"
+    has_menu_plan = restaurant_has_menu_access(r.business_plan, r.subscription_status)
     menu_available = bool(has_menu_plan and (r.menu_version or 0) > 0)
 
     ext_revs = get_external_reviews(r.name, r.google_place_id, r.tripadvisor_url)
