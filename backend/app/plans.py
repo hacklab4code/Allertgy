@@ -4,19 +4,10 @@ Fonte unica usata da internal_admin (KPI/MRR) e billing (prova gratuita,
 checkout, endpoint pubblico /billing/plans). I limiti qui devono restare
 allineati al gating applicato negli endpoint (es. PLAN_PHOTO_LIMITS in
 routers/admin.py).
-
-Struttura piani (aggiornata luglio 2026):
-  free        → scheda base, nessun pagamento
-  base        → €9/mese  | trial 30 gg | menu + tutte le funzioni
-  pro_notify  → €19/mese | trial 30 gg | tutto Base + notifiche push ai preferiti
-  [add-on] visibility_boost → one-time €9,90 / 30 giorni di priorità
 """
 
-TRIAL_DAYS = 30
+TRIAL_DAYS = 14
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Abbonamenti mensili
-# ──────────────────────────────────────────────────────────────────────────────
 PLAN_DEFINITIONS = [
     {
         "code": "free",
@@ -38,12 +29,12 @@ PLAN_DEFINITIONS = [
         "code": "base",
         "name": "Base",
         "price_cents": 900,           # €9,00/mese
-        "tagline": "Carica il tuo menù e gestisci il locale con tutti gli strumenti.",
+        "tagline": "Carica il menù: i clienti scoprono cosa possono mangiare da te.",
         "trial_days": TRIAL_DAYS,
         "features": [
-            "30 giorni di prova gratuita",
+            "14 giorni di prova gratuita",
             "Badge \"Locale verificato\"",
-            "Menù digitale con allergeni e tracce",
+            "Semaforo personalizzato per ogni cliente con allergie",
             "Fino a 10 foto in galleria",
             "QR code per tavoli e banco",
             "Registro allergeni stampabile (PDF)",
@@ -75,9 +66,6 @@ PLAN_DEFINITIONS = [
     },
 ]
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Add-on una-tantum: Boost Visibilità
-# ──────────────────────────────────────────────────────────────────────────────
 BOOST_VISIBILITY = {
     "code": "visibility_boost",
     "name": "Boost Visibilità",
@@ -91,9 +79,6 @@ BOOST_VISIBILITY = {
     ),
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Dizionari di supporto
-# ──────────────────────────────────────────────────────────────────────────────
-PLAN_PRICES: dict[str, int] = {p["code"]: int(p["price_cents"]) for p in PLAN_DEFINITIONS}
-PAID_PLANS: set[str] = {"base", "pro_notify"}
-NOTIFY_PLANS: set[str] = {"pro_notify"}
+PLAN_PRICES = {p["code"]: int(p["price_cents"]) for p in PLAN_DEFINITIONS}
+PAID_PLANS = {"base", "pro_notify"}
+NOTIFY_PLANS = {"pro_notify"}

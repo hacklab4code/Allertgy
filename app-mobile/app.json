@@ -10,7 +10,7 @@
     "android": { "package": "com.allertgy.app" },
     "plugins": [
       "expo-router",
-      ["expo-camera", { "cameraPermission": "AllerTgy usa la fotocamera solo per leggere il QR code sul tavolo del ristorante." }]
+      ["expo-camera", { "cameraPermission": "AllerTgy usa la fotocamera per scansionare il QR al tavolo e scoprire cosa puoi mangiare in quel ristorante, o i codici a barre per la spesa." }]
     ]
   }
 }
