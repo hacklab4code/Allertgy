@@ -3,6 +3,7 @@ import { useSession } from '../store/session';
 import type {
   Allergen,
   BusinessPlan,
+  CustomerPlan,
   CustomerAnnotation,
   Menu,
   MenuValutato,
@@ -10,6 +11,8 @@ import type {
   Plan,
   ProfileShare,
   Restaurant,
+  RestaurantSummary,
+  FavoriteItem,
   SharedProfile,
   SubProfile,
   SubProfileIn,
@@ -45,6 +48,19 @@ export interface UserProfile {
   emergency_medicines: string | null;
   emergency_contact_name?: string | null;
   emergency_contact_phone?: string | null;
+  invite_code?: string | null;
+  customer_plan?: 'customer_free' | 'customer_plus';
+  customer_subscription_status?: string;
+  has_customer_plus?: boolean;
+}
+
+export interface ReferralStats {
+  invite_code: string | null;
+  referrals_count: number;
+  customer_plan: 'customer_free' | 'customer_plus';
+  customer_subscription_status: string;
+  has_plus: boolean;
+  reward_message?: string | null;
 }
 
 interface RegisterConsents {
@@ -102,6 +118,23 @@ export interface AppNotification {
   created_at: string;
 }
 
+const REQUEST_TIMEOUT_MS = 15000;
+
+async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error('Richiesta scaduta: il server non ha risposto entro 15 secondi.');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = useSession.getState().token;
   const language = useSession.getState().language || 'it';
@@ -116,8 +149,9 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
   let res: Response;
   try {
-    res = await fetch(`${API}${path}`, { ...init, headers });
-  } catch {
+    res = await fetchWithTimeout(`${API}${path}`, { ...init, headers });
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('scaduta')) throw e;
     throw new Error(
       `Server non raggiungibile (${API}).\n` +
       'Controlla che il backend sia avviato sul computer e che il telefono sia ' +
@@ -163,6 +197,7 @@ export const api = {
 
   /* ---------- cliente ---------- */
   listRestaurants: () => req<Menu[]>('/restaurants'),
+  listRestaurantsSummary: () => req<RestaurantSummary[]>('/restaurants/summary'),
   allergens: () => req<Allergen[]>('/allergens'),
   myAllergens: () => req<Allergen[]>('/profile/allergens'),
   saveAllergens: (codes: string[], intensities: Record<string, 'lieve'|'moderata'|'grave'> = {}) =>
@@ -198,11 +233,30 @@ export const api = {
     req<{ detail: string }>(`/profile/sub-profiles/${pid}`, {
       method: 'DELETE',
     }),
-  createProfileShare: (profileId: number | null, duration: '24h' | 'permanent', label?: string) =>
+  createProfileShare: (
+    profileId: number | null,
+    duration: '24h' | 'permanent',
+    label?: string,
+    recipientUserId?: number,
+    recipientEmail?: string,
+  ) =>
     req<ProfileShare>('/profile/shares', {
       method: 'POST',
-      body: JSON.stringify({ profile_id: profileId, duration, label }),
+      body: JSON.stringify({
+        profile_id: profileId,
+        duration,
+        label,
+        recipient_user_id: recipientUserId ?? null,
+        recipient_email: recipientEmail ?? null,
+      }),
     }),
+  lookupAppContacts: (emails: string[]) =>
+    req<{ matches: import('../types').AppContactMatch[] }>('/profile/contacts/lookup', {
+      method: 'POST',
+      body: JSON.stringify({ emails }),
+    }),
+  getRecentAppContacts: () =>
+    req<import('../types').RecentAppContact[]>('/profile/contacts/recent'),
   getSharedProfile: (token: string) => req<SharedProfile>(`/profile/shares/${token}`),
   menu: async (codice: string) => {
     const res = await req<Menu>(`/restaurants/${codice}/menu`);
@@ -222,6 +276,7 @@ export const api = {
       }),
     }),
   getProfile: () => req<UserProfile>('/profile'),
+  getReferralStats: () => req<import('../types').ReferralStats>('/profile/referral'),
   updateAppleHealth: (
     apple_health_connected: number,
     emergency_medicines: string | null,
@@ -274,7 +329,7 @@ export const api = {
     req<void>(`/profile/medical-documents/${docId}`, { method: 'DELETE' }),
 
   /* ---------- preferiti server-side + recensioni ---------- */
-  myFavorites: () => req<string[]>('/restaurants/favorites/mine'),
+  myFavorites: () => req<FavoriteItem[]>('/restaurants/favorites/mine'),
   addFavorite: (code: string) => req<void>(`/restaurants/${code}/favorite`, { method: 'POST' }),
   removeFavorite: (code: string) => req<void>(`/restaurants/${code}/favorite`, { method: 'DELETE' }),
   listReviews: (code: string) => req<Review[]>(`/restaurants/${code}/reviews`),
@@ -284,6 +339,11 @@ export const api = {
       body: JSON.stringify({ rating, comment, rating_staff: ratingStaff, rating_menu: ratingMenu, rating_safety: ratingSafety }),
     }),
   listExternalReviews: (code: string) => req<Review[]>(`/restaurants/${code}/external-reviews`),
+  replyToReview: (reviewId: number, reply: string) =>
+    req<Review>(`/reviews/${reviewId}/reply`, {
+      method: 'POST',
+      body: JSON.stringify({ reply }),
+    }),
 
   /* ---------- notifiche ---------- */
   registerDeviceToken: (expoToken: string) =>
@@ -304,14 +364,29 @@ export const api = {
 
   /* ---------- ristoratore ---------- */
   myRestaurants: () => req<Restaurant[]>('/admin/restaurants'),
-  createRestaurant: (name: string, city: string) =>
+  createRestaurant: (name: string, city: string, inviteCode?: string) =>
     req<Restaurant>('/admin/restaurants', {
       method: 'POST',
-      body: JSON.stringify({ name, city }),
+      body: JSON.stringify({
+        name,
+        city,
+        ...(inviteCode?.trim() ? { invite_code: inviteCode.trim() } : {}),
+      }),
     }),
 
   /* ---------- piani / abbonamento ristoratore ---------- */
   getPlans: () => req<Plan[]>('/billing/plans'),
+  getCustomerPlans: () => req<CustomerPlan[]>('/billing/customer-plans'),
+  customerCheckout: () =>
+    req<{ checkout_url: string }>('/billing/customer-checkout', { method: 'POST' }),
+  customerPortal: () =>
+    req<{ portal_url: string }>('/billing/customer-portal', { method: 'POST' }),
+  recordBarcodeScan: () =>
+    req<{ allowed: boolean; remaining: number | null; limit: number | null }>('/profile/barcode-scan', {
+      method: 'POST',
+    }),
+  barcodeScansRemaining: () =>
+    req<{ allowed: boolean; remaining: number | null; limit: number | null }>('/profile/barcode-scan/remaining'),
   startTrial: (restaurantId: number, plan: BusinessPlan) =>
     req<Restaurant>('/billing/start-trial', {
       method: 'POST',
@@ -327,6 +402,36 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ restaurant_id: restaurantId }),
     }),
+  billingBoost: (restaurantId: number) =>
+    req<{ checkout_url?: string; activated?: boolean; message?: string }>('/billing/boost', {
+      method: 'POST',
+      body: JSON.stringify({ restaurant_id: restaurantId }),
+    }),
+  listBoosts: (restaurantId: number) =>
+    req<import('../types').VisibilityBoost[]>(`/billing/boosts/${restaurantId}`),
+  billingFollowersCount: (restaurantId: number) =>
+    req<{ count: number }>(`/billing/followers-count/${restaurantId}`),
+  billingSendNotification: (restaurantId: number, title: string, body: string) =>
+    req<{ sent_count: number; message: string }>('/billing/send-notification', {
+      method: 'POST',
+      body: JSON.stringify({ restaurant_id: restaurantId, title, body }),
+    }),
+  billingInvoices: (restaurantId: number) =>
+    req<{ id: number; stripe_invoice_id: string; amount_cents: number; status: string; pdf_url: string | null; created_at: string }[]>(
+      `/billing/invoices/${restaurantId}`,
+    ),
+  getRestaurantAnalytics: (restaurantId: number) =>
+    req<{
+      restaurant_id: number;
+      total_views: number;
+      total_allergen_queries: number;
+      distribution: { code: string; name: string; emoji: string; count: number }[];
+      time_series: { date: string; count: number }[];
+    }>(`/admin/restaurants/${restaurantId}/analytics`),
+  menuAudit: (restaurantId: number) =>
+    req<{
+      id: number; action: string; menu_version: number; note: string | null; created_at: string;
+    }[]>(`/admin/restaurants/${restaurantId}/menu/audit`),
   saveMenu: (rid: number, piatti: PiattoIn[]) =>
     req<unknown>(`/admin/restaurants/${rid}/menu`, {
       method: 'PUT',

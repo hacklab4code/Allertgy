@@ -7,11 +7,10 @@ import { api } from '../../src/api/client';
 import { calcolaCompatibilita, type CompatibilitaResult } from '../../src/engine/compatibility';
 import RestaurantCard from '../../src/components/RestaurantCard';
 import { useSession } from '../../src/store/session';
-import LanguageFlagsRow from '../../src/components/LanguageFlagsRow';
 import { useTranslation } from '../../src/constants/translations';
 
 import { colors, radius, shadow, spacing, typography } from '../../src/theme';
-import type { Menu } from '../../src/types';
+import type { RestaurantSummary } from '../../src/types';
 
 interface LocaleData {
   code: string;
@@ -23,6 +22,7 @@ interface LocaleData {
   compatibility: CompatibilitaResult | null;
   ratingAvg?: number | null;
   ratingCount?: number;
+  boostActive?: boolean;
 }
 
 export default function Locali() {
@@ -46,7 +46,7 @@ export default function Locali() {
 
   const { t } = useTranslation();
   const isIt = (language || 'it').toLowerCase() === 'it';
-  const [restaurants, setRestaurants] = useState<Menu[]>([]);
+  const [restaurants, setRestaurants] = useState<RestaurantSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
@@ -57,7 +57,7 @@ export default function Locali() {
 
   useEffect(() => {
     setLoading(true);
-    api.listRestaurants()
+    api.listRestaurantsSummary()
       .then(setRestaurants)
       .catch((e) => console.log('Errore di rete locali:', e))
       .finally(() => setLoading(false));
@@ -94,6 +94,7 @@ export default function Locali() {
         longitude: r.longitude,
         imageUrl: null,
         compatibility: compat,
+        boostActive: !!r.boost_active,
       };
     });
   }, [restaurants, allergie, ingredientiEsclusi]);
@@ -135,7 +136,7 @@ export default function Locali() {
       }
 
       return true;
-    });
+    }).sort((a, b) => Number(!!b.boostActive) - Number(!!a.boostActive));
   }, [locali, searchQuery, compatFilter, cuisineFilter, restaurants]);
 
   // Locali preferiti arricchiti con dati compatibilità
@@ -202,7 +203,6 @@ export default function Locali() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <LanguageFlagsRow />
       <View style={styles.mainContainer}>
         <View style={styles.headerArea}>
           <View style={styles.header}>
@@ -361,6 +361,7 @@ export default function Locali() {
                     compact={true}
                     latitude={locale.latitude}
                     longitude={locale.longitude}
+                    boostActive={locale.boostActive}
                   />
                 </View>
               </Callout>
@@ -413,6 +414,7 @@ export default function Locali() {
                     onToggleFavorite={() => onToggle(item.code, item.name)}
                     latitude={item.latitude}
                     longitude={item.longitude}
+                    boostActive={item.boostActive}
                   />
                 ))}
               </View>
@@ -471,6 +473,7 @@ export default function Locali() {
                     onToggleFavorite={() => onToggle(item.code, item.name)}
                     latitude={item.latitude}
                     longitude={item.longitude}
+                    boostActive={item.boostActive}
                   />
                 ))}
               </View>

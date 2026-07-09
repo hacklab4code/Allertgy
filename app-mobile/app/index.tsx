@@ -15,6 +15,9 @@ export default function Index() {
 
   if (!token) return <Redirect href="/welcome" />;
 
+  // La lingua è una preferenza trasversale: va scelta prima di entrare nei flussi di ruolo.
+  if (!languageSelected) return <Redirect href="/language" />;
+
   // Ristoratore → area gestione locale
   if (role === 'owner') return <Redirect href="/(owner)/locali" />;
 

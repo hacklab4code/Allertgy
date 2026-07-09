@@ -7,7 +7,7 @@ import { LANGUAGES } from '../src/constants/languages';
 import { useSession } from '../src/store/session';
 
 export default function LanguageScreen() {
-  const { language, setLanguage } = useSession();
+  const { language, setLanguage, token } = useSession();
   const [query, setQuery] = useState('');
   const current = (language || 'it').toLowerCase();
 
@@ -24,6 +24,10 @@ export default function LanguageScreen() {
 
   const handleSelect = (code: string) => {
     setLanguage(code);
+    if (token) {
+      router.replace('/');
+      return;
+    }
     if (router.canGoBack()) {
       router.back();
     } else {

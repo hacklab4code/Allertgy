@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { api, API, WEB_URL } from '../../src/api/client';
+import DetailSection from '../../src/components/DetailSection';
 import { useOwner } from '../../src/store/owner';
 
 /** Scheda Locale: seleziona o crea il ristorante. */
@@ -14,6 +15,7 @@ export default function Locali() {
   const [error, setError] = useState('');
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [busy, setBusy] = useState(false);
 
   // Stati form di personalizzazione vetrina
@@ -72,13 +74,18 @@ export default function Locali() {
   const create = async () => {
     setBusy(true); setError('');
     try {
-      const r = await api.createRestaurant(name.trim(), city.trim());
-      const firstLocale = restaurants.length === 0;
+      const r = await api.createRestaurant(name.trim(), city.trim(), inviteCode.trim() || undefined);
       setRestaurants([...restaurants, r]);
       setCurrent(r);
-      setName(''); setCity('');
-      // Il menù digitale richiede un piano: al primo locale porta alla prova gratuita
-      router.push(firstLocale ? '/(owner)/piano' : '/(owner)/menu');
+      setName(''); setCity(''); setInviteCode('');
+      if (inviteCode.trim() && r.business_plan === 'pro_notify') {
+        Alert.alert(
+          'Pro omaggio attivato!',
+          `${r.name} ha il piano Pro gratis per 30 giorni grazie al codice invito del cliente.`,
+        );
+      }
+      // Dopo la creazione mostra subito il lavoro operativo: il gate piano resta dentro Menù.
+      router.push('/(owner)/menu');
     } catch (e) { setError((e as Error).message); }
     setBusy(false);
   };
@@ -221,8 +228,11 @@ export default function Locali() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {restaurants.length > 0 && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>I tuoi locali</Text>
+        <DetailSection
+          title="SELEZIONE LOCALE"
+          subtitle="Scegli quale attività stai gestendo. Da qui passi a menù, QR e piani."
+          padded={false}
+        >
           {restaurants.map((r) => {
             const active = current?.id === r.id;
             return (
@@ -256,115 +266,120 @@ export default function Locali() {
               </TouchableOpacity>
             </View>
           )}
-        </View>
+        </DetailSection>
       )}
 
-      {/* Vetrina Editor Card */}
       {isEditingVetrina && current && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>✨ Personalizzazione Vetrina</Text>
-          <Text style={styles.muted}>Configura i dettagli pubblici del tuo locale visualizzati sulla pagina vetrina per i clienti.</Text>
-          
-          {/* Logo Section */}
-          <Text style={styles.fieldLabel}>Logo del Ristorante</Text>
-          <View style={styles.logoRow}>
-            {logoUrl ? (
-              <Image 
-                source={{ uri: logoUrl.startsWith('http') ? logoUrl : `${API}${logoUrl}` }} 
-                style={styles.logoImage} 
-              />
-            ) : (
-              <View style={styles.logoPlaceholder}>
-                <Text style={styles.logoPlaceholderText}>Nessun Logo</Text>
-              </View>
-            )}
-            <TouchableOpacity style={styles.uploadBtn} onPress={handleLogoUpload}>
-              <Text style={styles.uploadBtnText}>Carica Logo</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Text Fields */}
-          <Text style={styles.fieldLabel}>Nome Locale</Text>
-          <TextInput style={styles.input} value={editName} onChangeText={setEditName} placeholder="Nome del ristorante" />
-
-          <Text style={styles.fieldLabel}>Città</Text>
-          <TextInput style={styles.input} value={editCity} onChangeText={setEditCity} placeholder="Città" />
-
-          <Text style={styles.fieldLabel}>Indirizzo Completo</Text>
-          <TextInput style={styles.input} value={editAddress} onChangeText={setEditAddress} placeholder="es. Via Garibaldi 12" />
-
-          <Text style={styles.fieldLabel}>Telefono</Text>
-          <TextInput style={styles.input} value={editPhone} onChangeText={setEditPhone} keyboardType="phone-pad" placeholder="es. +39 02 1234567" />
-
-          <Text style={styles.fieldLabel}>Email Contatto Pubblico</Text>
-          <TextInput style={styles.input} value={editEmail} onChangeText={setEditEmail} keyboardType="email-address" autoCapitalize="none" placeholder="es. info@trattoria.it" />
-
-          <Text style={styles.fieldLabel}>Sito Web</Text>
-          <TextInput style={styles.input} value={editWebsite} onChangeText={setEditWebsite} keyboardType="url" autoCapitalize="none" placeholder="es. https://trattoria.it" />
-
-          <Text style={styles.fieldLabel}>Link Menù Originale (PDF / Web)</Text>
-          <TextInput style={styles.input} value={editMenuUrl} onChangeText={setEditMenuUrl} keyboardType="url" autoCapitalize="none" placeholder="es. https://trattoria.it/menu.pdf" />
-
-          <Text style={styles.fieldLabel}>Orari di Apertura</Text>
-          <TextInput 
-            style={[styles.input, { height: 80 }]} 
-            value={editHours} 
-            onChangeText={setEditHours} 
-            multiline 
-            placeholder="es. Lun - Ven: 12:30 - 14:30, 19:30 - 22:30" 
-          />
-
-          <Text style={styles.fieldLabel}>Descrizione Vetrina</Text>
-          <TextInput 
-            style={[styles.input, { height: 80 }]} 
-            value={editDesc} 
-            onChangeText={setEditDesc} 
-            multiline 
-            placeholder="es. Specialità tradizionali milanesi con cucina gluten-free..." 
-          />
-
-          <Text style={styles.fieldLabel}>Google Place ID</Text>
-          <TextInput style={styles.input} value={editGoogle} onChangeText={setEditGoogle} placeholder="Google Place ID per recensioni" />
-
-          <Text style={styles.fieldLabel}>TripAdvisor URL</Text>
-          <TextInput style={styles.input} value={editTripAdvisor} onChangeText={setEditTripAdvisor} placeholder="URL TripAdvisor per recensioni" />
-
-          <Text style={styles.fieldLabel}>Partita IVA (P.IVA)</Text>
-          <TextInput style={styles.input} value={editVat} onChangeText={setEditVat} keyboardType="numeric" placeholder="es. 12345678901" />
-
-          <Text style={styles.fieldLabel}>Referente Allergeni (Responsabile HACCP)</Text>
-          <TextInput style={styles.input} value={editAllergenManager} onChangeText={setEditAllergenManager} placeholder="es. Chef Mario Rossi" />
-
-          {/* Galleria Foto */}
-          <Text style={styles.fieldLabel}>Galleria Foto Locale</Text>
-          <TouchableOpacity style={styles.addPhotoBtn} onPress={handleAddPhoto}>
-            <Text style={styles.addPhotoBtnText}>+ Aggiungi Foto alla Galleria</Text>
-          </TouchableOpacity>
-
-          {photos.length > 0 ? (
-            <View style={styles.photosGrid}>
-              {photos.map((p) => (
-                <View key={p.id} style={styles.photoContainer}>
-                  <Image source={{ uri: p.url }} style={styles.photoImage} />
-                  {p.is_cover ? <View style={styles.coverBadge}><Text style={styles.coverBadgeText}>Cover</Text></View> : null}
-                  <View style={styles.photoActions}>
-                    {!p.is_cover && (
-                      <TouchableOpacity style={styles.actionPill} onPress={() => handleSetCover(p.id)}>
-                        <Text style={styles.actionPillText}>Cover</Text>
-                      </TouchableOpacity>
-                    )}
-                    <TouchableOpacity style={[styles.actionPill, { backgroundColor: '#dc2626' }]} onPress={() => handleDeletePhoto(p.id)}>
-                      <Text style={styles.actionPillText}>Elimina</Text>
-                    </TouchableOpacity>
-                  </View>
+        <>
+          <DetailSection
+            title="IDENTITÀ LOCALE"
+            subtitle="Nome, logo e descrizione visibili ai clienti sulla vetrina."
+          >
+            <Text style={styles.fieldLabel}>Logo del Ristorante</Text>
+            <View style={styles.logoRow}>
+              {logoUrl ? (
+                <Image 
+                  source={{ uri: logoUrl.startsWith('http') ? logoUrl : `${API}${logoUrl}` }} 
+                  style={styles.logoImage} 
+                />
+              ) : (
+                <View style={styles.logoPlaceholder}>
+                  <Text style={styles.logoPlaceholderText}>Nessun Logo</Text>
                 </View>
-              ))}
+              )}
+              <TouchableOpacity style={styles.uploadBtn} onPress={handleLogoUpload}>
+                <Text style={styles.uploadBtnText}>Carica Logo</Text>
+              </TouchableOpacity>
             </View>
-          ) : (
-            <Text style={styles.emptyPhotos}>Nessuna foto caricata nella galleria.</Text>
-          )}
+            <Text style={styles.fieldLabel}>Nome Locale</Text>
+            <TextInput style={styles.input} value={editName} onChangeText={setEditName} placeholder="Nome del ristorante" />
+            <Text style={styles.fieldLabel}>Città</Text>
+            <TextInput style={styles.input} value={editCity} onChangeText={setEditCity} placeholder="Città" />
+            <Text style={styles.fieldLabel}>Descrizione Vetrina</Text>
+            <TextInput 
+              style={[styles.input, { height: 80 }]} 
+              value={editDesc} 
+              onChangeText={setEditDesc} 
+              multiline 
+              placeholder="es. Specialità tradizionali milanesi con cucina gluten-free..." 
+            />
+          </DetailSection>
 
-          {/* Action buttons */}
+          <DetailSection
+            title="CONTATTI E POSIZIONE"
+            subtitle="Indirizzo, telefono e orari mostrati nella scheda pubblica."
+          >
+            <Text style={styles.fieldLabel}>Indirizzo Completo</Text>
+            <TextInput style={styles.input} value={editAddress} onChangeText={setEditAddress} placeholder="es. Via Garibaldi 12" />
+            <Text style={styles.fieldLabel}>Telefono</Text>
+            <TextInput style={styles.input} value={editPhone} onChangeText={setEditPhone} keyboardType="phone-pad" placeholder="es. +39 02 1234567" />
+            <Text style={styles.fieldLabel}>Email Contatto Pubblico</Text>
+            <TextInput style={styles.input} value={editEmail} onChangeText={setEditEmail} keyboardType="email-address" autoCapitalize="none" placeholder="es. info@trattoria.it" />
+            <Text style={styles.fieldLabel}>Sito Web</Text>
+            <TextInput style={styles.input} value={editWebsite} onChangeText={setEditWebsite} keyboardType="url" autoCapitalize="none" placeholder="es. https://trattoria.it" />
+            <Text style={styles.fieldLabel}>Orari di Apertura</Text>
+            <TextInput 
+              style={[styles.input, { height: 80 }]} 
+              value={editHours} 
+              onChangeText={setEditHours} 
+              multiline 
+              placeholder="es. Lun - Ven: 12:30 - 14:30, 19:30 - 22:30" 
+            />
+          </DetailSection>
+
+          <DetailSection
+            title="COLLEGAMENTI E RECENSIONI"
+            subtitle="Link utili per menu esterno e recensioni su altre piattaforme."
+          >
+            <Text style={styles.fieldLabel}>Link Menù Originale (PDF / Web)</Text>
+            <TextInput style={styles.input} value={editMenuUrl} onChangeText={setEditMenuUrl} keyboardType="url" autoCapitalize="none" placeholder="es. https://trattoria.it/menu.pdf" />
+            <Text style={styles.fieldLabel}>Google Place ID</Text>
+            <TextInput style={styles.input} value={editGoogle} onChangeText={setEditGoogle} placeholder="Google Place ID per recensioni" />
+            <Text style={styles.fieldLabel}>TripAdvisor URL</Text>
+            <TextInput style={styles.input} value={editTripAdvisor} onChangeText={setEditTripAdvisor} placeholder="URL TripAdvisor per recensioni" />
+          </DetailSection>
+
+          <DetailSection
+            title="DATI LEGALI"
+            subtitle="Obbligatori per registro allergeni e validità del menù digitale."
+          >
+            <Text style={styles.fieldLabel}>Partita IVA (P.IVA)</Text>
+            <TextInput style={styles.input} value={editVat} onChangeText={setEditVat} keyboardType="numeric" placeholder="es. 12345678901" />
+            <Text style={styles.fieldLabel}>Referente Allergeni (Responsabile HACCP)</Text>
+            <TextInput style={styles.input} value={editAllergenManager} onChangeText={setEditAllergenManager} placeholder="es. Chef Mario Rossi" />
+          </DetailSection>
+
+          <DetailSection
+            title="GALLERIA FOTO"
+            subtitle="Immagini del locale mostrate ai clienti. Una foto può essere impostata come cover."
+          >
+            <TouchableOpacity style={styles.addPhotoBtn} onPress={handleAddPhoto}>
+              <Text style={styles.addPhotoBtnText}>+ Aggiungi Foto alla Galleria</Text>
+            </TouchableOpacity>
+            {photos.length > 0 ? (
+              <View style={styles.photosGrid}>
+                {photos.map((p) => (
+                  <View key={p.id} style={styles.photoContainer}>
+                    <Image source={{ uri: p.url }} style={styles.photoImage} />
+                    {p.is_cover ? <View style={styles.coverBadge}><Text style={styles.coverBadgeText}>Cover</Text></View> : null}
+                    <View style={styles.photoActions}>
+                      {!p.is_cover && (
+                        <TouchableOpacity style={styles.actionPill} onPress={() => handleSetCover(p.id)}>
+                          <Text style={styles.actionPillText}>Cover</Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity style={[styles.actionPill, { backgroundColor: '#dc2626' }]} onPress={() => handleDeletePhoto(p.id)}>
+                        <Text style={styles.actionPillText}>Elimina</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.emptyPhotos}>Nessuna foto caricata nella galleria.</Text>
+            )}
+          </DetailSection>
+
           <View style={styles.formActions}>
             <TouchableOpacity style={[styles.formBtn, styles.cancelFormBtn]} onPress={() => setIsEditingVetrina(false)}>
               <Text style={styles.cancelFormBtnText}>Annulla</Text>
@@ -373,10 +388,9 @@ export default function Locali() {
               <Text style={styles.saveFormBtnText}>{busy ? 'Salvataggio...' : 'Salva Vetrina'}</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </>
       )}
 
-      {/* Vetrina Page Link Preview */}
       {!isEditingVetrina && current && (current as any).slug && (
         <View style={styles.slugPreviewCard}>
           <Text style={styles.slugPreviewTitle}>🌐 Pagina vetrina online:</Text>
@@ -384,24 +398,35 @@ export default function Locali() {
         </View>
       )}
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>
-          {restaurants.length === 0 ? 'Registra il tuo locale' : 'Aggiungi un altro locale'}
-        </Text>
-        <Text style={styles.muted}>
-          Riceverai un codice a 6 cifre: i clienti lo useranno per vedere il tuo menù
-          filtrato sulle loro allergie.
-        </Text>
+      <DetailSection
+        title={restaurants.length === 0 ? 'REGISTRA ATTIVITÀ' : 'AGGIUNGI ATTIVITÀ'}
+        subtitle="Riceverai un codice a 6 cifre che i clienti useranno per vedere il menù filtrato sulle loro allergie."
+      >
         <TextInput style={styles.input} placeholder="Nome del locale (es. Trattoria da Mario)"
           value={name} onChangeText={setName} />
         <TextInput style={styles.input} placeholder="Città" value={city} onChangeText={setCity} />
+        {restaurants.length === 0 && (
+          <>
+            <TextInput
+              style={styles.input}
+              placeholder="Codice invito cliente (opzionale)"
+              value={inviteCode}
+              onChangeText={setInviteCode}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+            <Text style={styles.mutedSmall}>
+              Se un cliente AllerTgy ti ha invitato, inserisci il suo codice: tu ricevi 1 mese di Pro omaggio e al cliente regaliamo Plus Famiglia.
+            </Text>
+          </>
+        )}
         <TouchableOpacity
           style={[styles.button, (!name.trim() || busy) && { opacity: 0.4 }]}
           disabled={!name.trim() || busy}
           onPress={create}>
           {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Crea locale</Text>}
         </TouchableOpacity>
-      </View>
+      </DetailSection>
     </ScrollView>
   );
 }
@@ -415,6 +440,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontWeight: '800', fontSize: 15, color: '#1e293b', marginBottom: 8 },
   muted: { color: '#64748b', fontSize: 13, lineHeight: 19, marginBottom: 12 },
+  mutedSmall: { color: '#94a3b8', fontSize: 11, lineHeight: 16, marginBottom: 8, marginTop: -4 },
   place: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12,

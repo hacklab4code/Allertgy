@@ -20,11 +20,14 @@ export default function OwnerLayout() {
         sceneStyle: { backgroundColor: '#f8fafc' },
       }}
     >
-      <Tabs.Screen name="locali" options={{ title: 'Il mio locale', tabBarLabel: 'Locale', tabBarIcon: icon('🏪') }} />
+      <Tabs.Screen name="locali" options={{ title: 'Attività', tabBarLabel: 'Attività', tabBarIcon: icon('🏪') }} />
       <Tabs.Screen name="menu" options={{ title: 'Gestione menù', tabBarLabel: 'Menù', tabBarIcon: icon('📋') }} />
-      <Tabs.Screen name="piano" options={{ title: 'Piano e prezzi', tabBarLabel: 'Piano', tabBarIcon: icon('💳') }} />
+      <Tabs.Screen name="crescita" options={{ title: 'Boost e notifiche', tabBarLabel: 'Crescita', tabBarIcon: icon('🚀') }} />
+      <Tabs.Screen name="recensioni" options={{ href: null, title: 'Recensioni' }} />
+      <Tabs.Screen name="statistiche" options={{ href: null, title: 'Statistiche' }} />
+      <Tabs.Screen name="piano" options={{ title: 'Piani e fatturazione', tabBarLabel: 'Piani', tabBarIcon: icon('💳') }} />
       <Tabs.Screen name="qr" options={{ title: 'QR per i tavoli', tabBarLabel: 'QR Code', tabBarIcon: icon('🖨️') }} />
-      <Tabs.Screen name="account" options={{ title: 'Account', tabBarLabel: 'Account', tabBarIcon: icon('👤') }} />
+      <Tabs.Screen name="account" options={{ title: 'Impostazioni attività', tabBarLabel: 'Impostazioni', tabBarIcon: icon('👤') }} />
     </Tabs>
   );
 }

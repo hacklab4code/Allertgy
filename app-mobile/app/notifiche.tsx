@@ -24,6 +24,29 @@ function present(n: AppNotification): Presented {
         body: payload.body || 'Hai una nuova comunicazione.',
         code: payload.public_code || code
       };
+    case 'profile_share':
+      return {
+        icon: '🔗',
+        title: 'Profilo allergie condiviso',
+        body: `${payload.owner_display_name || 'Un contatto'} ha condiviso il profilo «${payload.label || 'Allergie'}».`,
+        code: payload.token as string | undefined,
+      };
+    case 'referral_reward':
+      return {
+        icon: '🎁',
+        title: 'Plus Famiglia omaggio!',
+        body: payload.restaurant_name
+          ? `Hai portato ${payload.restaurant_name} su AllerTgy: il piano Plus Famiglia è attivo gratis per te.`
+          : 'Hai portato un ristoratore su AllerTgy: il piano Plus Famiglia è attivo gratis per te.',
+      };
+    case 'referral_welcome_pro':
+      return {
+        icon: '🚀',
+        title: 'Pro omaggio 30 giorni!',
+        body: payload.restaurant_name
+          ? `${payload.restaurant_name} ha il piano Pro gratis per 30 giorni grazie al codice invito.`
+          : 'Il tuo locale ha il piano Pro gratis per 30 giorni grazie al codice invito.',
+      };
     default:
       return {
         icon: '🔔',
@@ -54,6 +77,18 @@ export default function Notifiche() {
   const open = (n: AppNotification) => {
     const p = present(n);
     if (!n.read_at) markRead(n.id);
+    if (n.type === 'profile_share' && p.code) {
+      router.push(`/shared-profile/${p.code}`);
+      return;
+    }
+    if (n.type === 'referral_reward') {
+      router.push('/(tabs)/account');
+      return;
+    }
+    if (n.type === 'referral_welcome_pro') {
+      router.push('/(owner)/piano');
+      return;
+    }
     if (p.code) {
       if (n.type === 'promo' || n.type === 'broadcast') {
         router.push({

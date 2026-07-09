@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Linking, Alert } from 'react-native';
 import { useOwner } from '../../src/store/owner';
+import DetailSection from '../../src/components/DetailSection';
 import { WEB_URL, API } from '../../src/api/client';
 import { useSession } from '../../src/store/session';
 
@@ -23,11 +24,14 @@ export default function QR() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.card}>
+      <DetailSection
+        title="CODICE E QR TAVOLO"
+        subtitle="Stampa o condividi questo QR. I clienti vedono il menù personalizzato sulle loro allergie."
+      >
         <Text style={styles.title}>{current.name}</Text>
         {hasMenu
           ? <Text style={styles.ok}>Menù pubblicato ✓</Text>
-          : <Text style={styles.warn}>Menù non ancora pubblicato — vai alla scheda "Menù"</Text>}
+          : <Text style={styles.warn}>Menù non ancora pubblicato — vai alla scheda Menù</Text>}
 
         <Text style={styles.label}>CODICE DEL LOCALE</Text>
         <Text style={styles.code}>{current.public_code}</Text>
@@ -39,12 +43,14 @@ export default function QR() {
         <Text style={styles.hint}>
           I clienti inquadrano questo QR con la fotocamera del cellulare per scoprire cosa possono mangiare da te. Funziona nel browser con semaforo guest e nell'app con il profilo salvato.
         </Text>
-      </View>
+      </DetailSection>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>🛡️ Esenzione Burocrazia e Validità</Text>
+      <DetailSection
+        title="VALIDITÀ LEGALE"
+        subtitle="Registro allergeni digitale conforme al Reg. UE 1169/2011."
+      >
         <Text style={styles.stepDescription}>
-          Il menù digitale di AllerTgy funge da Registro degli Allergeni ufficiale (Regolamento UE n. 1169/2011) ed esonera il locale dall'uso di fogli cartacei instabili.
+          Il menù digitale di AllerTgy funge da Registro degli Allergeni ufficiale ed esonera il locale dall'uso di fogli cartacei instabili.
         </Text>
         
         <View style={styles.metaRow}>
@@ -58,7 +64,7 @@ export default function QR() {
 
         {!((current as any).vat_number && (current as any).allergen_manager) && (
           <Text style={styles.warningHint}>
-            Completa Partita IVA e Referente Allergeni nella sezione "Locale" per garantire la validità legale ineccepibile del registro digitale.
+            Completa Partita IVA e Referente Allergeni in Attività per garantire la validità legale del registro digitale.
           </Text>
         )}
 
@@ -68,21 +74,26 @@ export default function QR() {
             const token = useSession.getState().token;
             if (!token) return;
             const pdfUrl = `${API}/admin/restaurants/${current.id}/registry.pdf?token=${token}`;
-            Linking.openURL(pdfUrl).catch((err) => {
+            Linking.openURL(pdfUrl).catch(() => {
               Alert.alert('Errore', 'Impossibile aprire il link del registro PDF.');
             });
           }}
         >
           <Text style={styles.pdfBtnText}>📥 Scarica Registro PDF Ufficiale</Text>
         </TouchableOpacity>
-      </View>
+      </DetailSection>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Come usarlo</Text>
-        <Text style={styles.step}>1 · Fai uno screenshot di questa schermata (o stampa il PDF dalla dashboard web).</Text>
-        <Text style={styles.step}>2 · Stampa e posiziona il QR sui tavoli e alla cassa.</Text>
-        <Text style={styles.step}>3 · Quando cambi piatti o ricette, aggiorna il menù nella scheda "Menù": il QR resta lo stesso.</Text>
-      </View>
+      <DetailSection
+        title="COME USARLO"
+        subtitle="Tre passaggi per mettere il QR in sala."
+        card={false}
+      >
+        <View style={styles.stepsCard}>
+          <Text style={styles.step}>1 · Fai uno screenshot di questa schermata (o stampa il PDF dalla dashboard web).</Text>
+          <Text style={styles.step}>2 · Stampa e posiziona il QR sui tavoli e alla cassa.</Text>
+          <Text style={styles.step}>3 · Quando cambi piatti o ricette, aggiorna il menù in Menù: il QR resta lo stesso.</Text>
+        </View>
+      </DetailSection>
     </ScrollView>
   );
 }
@@ -94,6 +105,10 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff', borderRadius: 16, padding: 18,
     borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center',
+  },
+  stepsCard: {
+    backgroundColor: '#fff', borderRadius: 16, padding: 18,
+    borderWidth: 1, borderColor: '#e2e8f0',
   },
   title: { fontSize: 18, fontWeight: '800', color: '#1e293b' },
   ok: { color: '#047857', fontWeight: '700', marginTop: 4 },

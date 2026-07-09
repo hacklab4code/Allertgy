@@ -8,7 +8,7 @@ import { api } from '../src/api/client';
 import { useSession } from '../src/store/session';
 import { getSectionTitle, groupAllergensBySection, getLang, TRANSLATED_ALLERGENS } from '../src/engine/translations';
 import type { Allergen } from '../src/types';
-import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
+import ShareProfileModal from '../src/components/ShareProfileModal';
 import { useTranslation } from '../src/constants/translations';
 
 export default function Allergie() {
@@ -22,7 +22,8 @@ export default function Allergie() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const { setAllergie, setProfileCompleted, language } = useSession();
+  const [shareOpen, setShareOpen] = useState(false);
+  const { setAllergie, setProfileCompleted, language, token, email } = useSession();
   const { t } = useTranslation();
   const isIt = (language || 'it').toLowerCase() === 'it';
   const lang = getLang(language);
@@ -83,7 +84,7 @@ export default function Allergie() {
     );
   };
 
-  const save = async () => {
+  const save = async (options?: { silent?: boolean }) => {
     setBusy(true);
     setError('');
     try {
@@ -91,11 +92,33 @@ export default function Allergie() {
       await api.saveAllergens(codes, intensities);
       setAllergie(codes, intensities);
       setProfileCompleted(true);
-      router.replace('/');
+      if (!options?.silent) router.replace('/');
     } catch (e) {
       setError((e as Error).message);
     }
     setBusy(false);
+  };
+
+  const openShare = async () => {
+    const saved = new Set(useSession.getState().allergie);
+    const changed =
+      selected.size !== saved.size ||
+      [...selected].some((code) => !saved.has(code));
+    if (changed) {
+      setBusy(true);
+      try {
+        const codes = [...selected];
+        await api.saveAllergens(codes, intensities);
+        setAllergie(codes, intensities);
+        setProfileCompleted(true);
+      } catch (e) {
+        Alert.alert(isIt ? 'Errore' : 'Error', (e as Error).message);
+        setBusy(false);
+        return;
+      }
+      setBusy(false);
+    }
+    setShareOpen(true);
   };
 
   const Chip = ({ a }: { a: Allergen }) => {
@@ -135,11 +158,28 @@ export default function Allergie() {
   return (
     <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
       <Stack.Screen options={{ headerRight: undefined }} />
-      <LanguageFlagsRow />
 
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>{t('select_allergies_title')}</Text>
         <Text style={styles.subtitle}>{t('select_allergies_subtitle')}</Text>
+
+        {token && (
+          <TouchableOpacity style={styles.shareCard} onPress={openShare}>
+            <Text style={styles.shareCardIcon}>🔗</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.shareCardTitle}>
+                {isIt ? 'Condividi le mie allergie' : 'Share my allergies'}
+              </Text>
+              <Text style={styles.shareCardSub}>
+                {isIt
+                  ? 'Invia il profilo a contatti del telefono o utenti AllerTgy (24h o per sempre).'
+                  : 'Send your profile to phone contacts or AllerTgy users (24h or permanent).'}
+              </Text>
+            </View>
+            <Text style={styles.shareChevron}>›</Text>
+          </TouchableOpacity>
+        )}
+
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {all.length === 0 && !error ? <ActivityIndicator style={{ marginTop: 40 }} /> : null}
 
@@ -192,7 +232,7 @@ export default function Allergie() {
       <TouchableOpacity
         style={[styles.save, (busy || (all.length === 0 && !error)) && { opacity: 0.4 }]}
         disabled={busy || (all.length === 0 && !error)}
-        onPress={save}
+        onPress={() => save()}
       >
         {busy
           ? <ActivityIndicator color="#fff" />
@@ -202,6 +242,14 @@ export default function Allergie() {
                 : (isIt ? `Salva profilo (${selected.size} selezionati)` : `Save profile (${selected.size} selected)`)}
             </Text>}
       </TouchableOpacity>
+
+      <ShareProfileModal
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        profileId={null}
+        profileLabel={email?.split('@')[0] || (isIt ? 'Io' : 'Me')}
+        isIt={isIt}
+      />
     </View>
   );
 }
@@ -210,6 +258,21 @@ const styles = StyleSheet.create({
   container: { padding: 20, paddingBottom: 110 },
   title: { fontSize: 21, fontWeight: '900', color: '#0f172a', letterSpacing: -0.4 },
   subtitle: { color: '#64748b', fontSize: 13, marginTop: 4, marginBottom: 12, lineHeight: 19 },
+  shareCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1.5,
+    borderColor: '#a7f3d0',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+  },
+  shareCardIcon: { fontSize: 22 },
+  shareCardTitle: { fontWeight: '800', color: '#065f46', fontSize: 14 },
+  shareCardSub: { color: '#047857', fontSize: 12, marginTop: 2, lineHeight: 17 },
+  shareChevron: { fontSize: 22, color: '#059669', fontWeight: '600' },
   // --- Search bar ---
   searchBox: {
     flexDirection: 'row',

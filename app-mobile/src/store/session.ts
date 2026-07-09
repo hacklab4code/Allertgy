@@ -53,6 +53,7 @@ interface SessionState {
   setDisclaimer: (v: boolean) => void;
   addRecent: (code: string, name: string) => void;
   toggleFavorite: (code: string, name: string) => void;
+  setFavorites: (favorites: RecentPlace[]) => void;
   isFavorite: (code: string) => boolean;
   setLanguage: (lang: string) => void;
   setEmergencyMedicines: (m: string | null) => void;
@@ -109,6 +110,7 @@ export const useSession = create<SessionState>()(
             : [{ code, name, visitedAt: new Date().toISOString() }, ...favs],
         });
       },
+      setFavorites: (favorites) => set({ favorites }),
       isFavorite: (code) => get().favorites.some((f) => f.code === code),
       setLanguage: (language) => set({ language, languageSelected: true }),
       setEmergencyMedicines: (emergencyMedicines) => set({ emergencyMedicines }),

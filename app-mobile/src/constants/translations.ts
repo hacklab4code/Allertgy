@@ -153,6 +153,9 @@ export const TRANSLATIONS = {
     contact_card_title: "Contatto di Emergenza",
     custom_ingredients_label: "INGREDIENTI DA EVITARE",
     custom_ingredients_sub: "Se ci sono ingredienti non inclusi nella lista ufficiale degli allergeni che vuoi evitare (es. aglio, cipolla), scrivili qui separati da virgola.",
+    apple_health_section: "APPLE SALUTE",
+    apple_health_title: "Collega Apple Salute",
+    apple_health_sub: "Esporta un riepilogo delle allergie e dei farmaci di emergenza verso l'app Salute.",
   },
   en: {
     // General
@@ -306,17 +309,114 @@ export const TRANSLATIONS = {
     contact_card_title: "Emergency Contact",
     custom_ingredients_label: "INGREDIENTS TO AVOID",
     custom_ingredients_sub: "If there are ingredients not included in the official allergen list that you want to avoid (e.g. garlic, onion), write them here separated by commas.",
-  }
+    apple_health_section: "APPLE HEALTH",
+    apple_health_title: "Connect Apple Health",
+    apple_health_sub: "Export a summary of allergies and emergency medicines to the Health app.",
+  },
+  es: {
+    welcome: "Bienvenido a AllerTgy",
+    scanQR: "Escanea el QR",
+    enterCode: "Introduce el código",
+    save: "Guardar",
+    logout: "Salir",
+    language: "Idioma",
+    profile: "Perfil",
+    login_btn: "Iniciar sesión",
+    register_btn: "Registrarse",
+    back: "Atrás",
+    saved: "Guardado",
+    error: "Error",
+    cancel: "Cancelar",
+    apple_health_section: "SALUD DE APPLE",
+    apple_health_title: "Conectar Salud de Apple",
+    apple_health_sub: "Exporta un resumen de alergias y medicamentos de emergencia a la app Salud.",
+    custom_ingredients_label: "INGREDIENTES A EVITAR",
+    logout_title: "Cerrar sesión",
+    logout_confirm: "¿Seguro que quieres salir?",
+    logout_btn: "Salir",
+    emergency_saved: "Datos de emergencia guardados.",
+    medicines_card_title: "Medicamentos de emergencia",
+    contact_card_title: "Contacto de emergencia",
+    save_contact_btn: "Guardar contacto",
+    save_emergency_info: "Guardar información",
+  },
+  de: {
+    welcome: "Willkommen bei AllerTgy",
+    scanQR: "QR scannen",
+    enterCode: "Code eingeben",
+    save: "Speichern",
+    logout: "Abmelden",
+    language: "Sprache",
+    profile: "Profil",
+    login_btn: "Anmelden",
+    register_btn: "Registrieren",
+    back: "Zurück",
+    saved: "Gespeichert",
+    error: "Fehler",
+    cancel: "Abbrechen",
+    apple_health_section: "APPLE HEALTH",
+    apple_health_title: "Apple Health verbinden",
+    apple_health_sub: "Exportiere eine Zusammenfassung deiner Allergien und Notfallmedikamente in die Health-App.",
+    custom_ingredients_label: "ZU VERMEIDENDE ZUTATEN",
+    logout_title: "Abmelden",
+    logout_confirm: "Möchtest du dich wirklich abmelden?",
+    logout_btn: "Abmelden",
+    emergency_saved: "Notfalldaten gespeichert.",
+    medicines_card_title: "Notfallmedikamente",
+    contact_card_title: "Notfallkontakt",
+    save_contact_btn: "Kontakt speichern",
+    save_emergency_info: "Informationen speichern",
+  },
+  fr: {
+    welcome: "Bienvenue sur AllerTgy",
+    scanQR: "Scanner le QR",
+    enterCode: "Entrer le code",
+    save: "Enregistrer",
+    logout: "Déconnexion",
+    language: "Langue",
+    profile: "Profil",
+    login_btn: "Se connecter",
+    register_btn: "S'inscrire",
+    back: "Retour",
+    saved: "Enregistré",
+    error: "Erreur",
+    cancel: "Annuler",
+    apple_health_section: "SANTÉ APPLE",
+    apple_health_title: "Connecter Santé Apple",
+    apple_health_sub: "Exportez un résumé des allergies et médicaments d'urgence vers l'app Santé.",
+    custom_ingredients_label: "INGRÉDIENTS À ÉVITER",
+    logout_title: "Déconnexion",
+    logout_confirm: "Voulez-vous vraiment vous déconnecter ?",
+    logout_btn: "Déconnexion",
+    emergency_saved: "Données d'urgence enregistrées.",
+    medicines_card_title: "Médicaments d'urgence",
+    contact_card_title: "Contact d'urgence",
+    save_contact_btn: "Enregistrer le contact",
+    save_emergency_info: "Enregistrer les informations",
+  },
 };
+
+type TranslationKey = keyof typeof TRANSLATIONS.it;
+
+function resolveLang(language: string): 'it' | 'en' | 'es' | 'de' | 'fr' {
+  const code = language.toLowerCase().slice(0, 2);
+  if (code === 'it') return 'it';
+  if (code === 'es') return 'es';
+  if (code === 'de') return 'de';
+  if (code === 'fr') return 'fr';
+  return 'en';
+}
 
 export function useTranslation() {
   const language = useSession((s) => s.language) || 'it';
-  // Use 'it' if language starts with 'it', otherwise default to 'en'
-  const langKey = (language.toLowerCase().startsWith('it') ? 'it' : 'en') as 'it' | 'en';
-  
-  const t = (key: keyof typeof TRANSLATIONS['it']) => {
-    return TRANSLATIONS[langKey][key] || TRANSLATIONS['it'][key] || key;
+  const langKey = resolveLang(language);
+
+  const t = (key: TranslationKey) => {
+    const bucket = TRANSLATIONS[langKey] as Partial<Record<TranslationKey, string>>;
+    const localized = bucket[key];
+    if (localized) return localized;
+    return TRANSLATIONS.en[key] ?? TRANSLATIONS.it[key] ?? key;
   };
-  
+
   return { t, currentLang: langKey };
 }

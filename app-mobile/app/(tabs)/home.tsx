@@ -9,10 +9,10 @@ import { calcolaCompatibilita } from '../../src/engine/compatibility';
 import RestaurantCard from '../../src/components/RestaurantCard';
 import { useSession } from '../../src/store/session';
 import { colors, radius, shadow, spacing, typography } from '../../src/theme';
-import type { Menu } from '../../src/types';
-import LanguageFlagsRow from '../../src/components/LanguageFlagsRow';
+import type { RestaurantSummary } from '../../src/types';
+import { avviaGeofencing, fermaGeofencing } from '../../src/services/geofencing';
+import { syncFavoritesFromServer } from '../../src/services/favorites';
 import { useTranslation } from '../../src/constants/translations';
-import { avviaGeofencing } from '../../src/services/geofencing';
 
 /**
  * Home del cliente. Tre sezioni prioritarie:
@@ -52,7 +52,7 @@ export default function Home() {
   const hasAllergie = allergie.length > 0;
   const firstName = activeProfile ? activeProfile.name : ((email ?? '').split('@')[0] || 'benvenuto');
 
-  const [restaurants, setRestaurants] = useState<Menu[]>([]);
+  const [restaurants, setRestaurants] = useState<RestaurantSummary[]>([]);
   const [loadingRestaurants, setLoadingRestaurants] = useState(false);
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [locationStatus, setLocationStatus] = useState<'prompt' | 'granted' | 'denied' | 'error'>('prompt');
@@ -75,7 +75,7 @@ export default function Home() {
 
   useEffect(() => {
     setLoadingRestaurants(true);
-    api.listRestaurants()
+    api.listRestaurantsSummary()
       .then((res) => {
         setRestaurants(res);
         avviaGeofencing(res).catch((err) => console.log('Errore geofencing:', err));
@@ -87,7 +87,10 @@ export default function Home() {
 
     if (token) {
       api.getSubProfiles().then(setSubProfiles).catch(() => {});
+      syncFavoritesFromServer().catch(() => {});
     }
+
+    return () => fermaGeofencing();
   }, [token]);
 
   const onToggle = (code: string, name: string) => {
@@ -135,7 +138,6 @@ export default function Home() {
 
   return (
     <View style={styles.root}>
-      <LanguageFlagsRow />
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* Benvenuto + sottoprofili */}
         <View style={styles.hero}>

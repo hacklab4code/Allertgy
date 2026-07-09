@@ -31,6 +31,7 @@ function trialDaysLeft(iso?: string | null): number | null {
 export default function OwnerPiano() {
   const { restaurants, current, setRestaurants, setCurrent } = useOwner();
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [invoices, setInvoices] = useState<{ id: number; amount_cents: number; status: string; pdf_url: string | null; created_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<BusinessPlan | 'portal' | null>(null);
 
@@ -52,6 +53,11 @@ export default function OwnerPiano() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!locale?.id) return;
+    api.billingInvoices(locale.id).then(setInvoices).catch(() => setInvoices([]));
+  }, [locale?.id]);
+
   const applyUpdated = (updated: Restaurant) => {
     setRestaurants(restaurants.map((r) => (r.id === updated.id ? updated : r)));
     setCurrent(updated);
@@ -72,7 +78,7 @@ export default function OwnerPiano() {
       applyUpdated(updated);
       Alert.alert(
         '🎉 Prova attivata!',
-        `Hai 14 giorni gratis del piano ${plan === 'base' ? 'Base' : plan === 'pro_notify' ? 'Pro Notifiche' : plan}. Ora puoi creare il menù digitale con gli allergeni.`,
+        `Hai 14 giorni gratis del piano ${plan === 'base' ? 'Base' : plan === 'pro_notify' ? 'Pro' : plan}. Ora puoi creare il menù digitale con gli allergeni.`,
         [{ text: 'Crea il menù', onPress: () => router.push('/(owner)/menu') }, { text: 'Ok' }],
       );
     } catch (e) {
@@ -176,7 +182,7 @@ export default function OwnerPiano() {
           <Text style={styles.trialHeroEmoji}>🎁</Text>
           <Text style={styles.trialHeroTitle}>14 giorni di Base, gratis</Text>
           <Text style={styles.trialHeroText}>
-            Sblocca subito il menù digitale con allergeni per piatto, QR code e registro stampabile.
+            Sblocca semaforo clienti, QR al tavolo e registro allergeni PDF.
             Nessuna carta richiesta, nessun addebito automatico.
           </Text>
           <TouchableOpacity
@@ -243,6 +249,30 @@ export default function OwnerPiano() {
           </View>
         );
       })}
+
+      {invoices.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Storico fatture</Text>
+          {invoices.map((inv) => (
+            <View key={inv.id} style={styles.invoiceRow}>
+              <View>
+                <Text style={styles.invoiceAmount}>{euro(inv.amount_cents)}</Text>
+                <Text style={styles.invoiceDate}>
+                  {new Date(inv.created_at).toLocaleDateString('it-IT')}
+                </Text>
+              </View>
+              <View style={styles.invoiceRight}>
+                <Text style={styles.invoiceStatus}>{inv.status}</Text>
+                {inv.pdf_url ? (
+                  <TouchableOpacity onPress={() => Linking.openURL(inv.pdf_url!)}>
+                    <Text style={styles.invoicePdf}>PDF</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+          ))}
+        </>
+      )}
 
       <Text style={styles.footnote}>
         La prova gratuita non richiede metodi di pagamento. I piani a pagamento sono mensili,
@@ -327,6 +357,16 @@ const styles = StyleSheet.create({
   currentBannerText: { color: colors.greenText, fontWeight: '800', fontSize: 13 },
 
   footnote: { color: colors.textMuted, fontSize: 11.5, lineHeight: 17, marginTop: spacing.sm },
+  invoiceRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md,
+    borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm,
+  },
+  invoiceAmount: { fontWeight: '800', color: colors.ink, fontSize: 15 },
+  invoiceDate: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  invoiceRight: { alignItems: 'flex-end', gap: 4 },
+  invoiceStatus: { fontSize: 10, fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase' },
+  invoicePdf: { color: colors.brand, fontWeight: '800', fontSize: 12 },
 
   emptyBox: {
     alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg,

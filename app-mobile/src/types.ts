@@ -21,8 +21,8 @@ export interface Piatto {
   id: number;
   nome_piatto: string;
   descrizione: string | null;
-  categoria: string | null;
-  prezzo_cents: number | null;
+  categoria?: string | null;
+  prezzo_cents?: number | null;
   image_url?: string | null;
   menu_group?: string | null;
   menu_id?: number | null;
@@ -30,6 +30,23 @@ export interface Piatto {
   cross_contamination_checked_at?: string | null;
   allergeni_contenuti: string[];
   allergeni_tracce: string[];
+}
+
+/** Lista leggera locali (endpoint /restaurants/summary). */
+export interface RestaurantSummary {
+  restaurant_id: number;
+  public_code: string;
+  nome_ristorante: string;
+  citta: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  boost_active?: boolean;
+  piatti: Piatto[];
+}
+
+export interface FavoriteItem {
+  public_code: string;
+  name: string;
 }
 
 export interface Menu {
@@ -51,6 +68,7 @@ export interface Menu {
   google_reviews_count?: number | null;
   tripadvisor_rating?: number | null;
   tripadvisor_reviews_count?: number | null;
+  boost_active?: boolean;
   safety_notice?: string;
   menus?: MenuOutItem[];
   piatti: Piatto[];
@@ -121,6 +139,37 @@ export interface Plan {
   has_priority: boolean;
 }
 
+export interface VisibilityBoost {
+  id: number;
+  restaurant_id: number;
+  amount_cents: number;
+  duration_days: number;
+  activated_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface CustomerPlan {
+  code: 'customer_free' | 'customer_plus';
+  name: string;
+  price_cents: number;
+  tagline: string;
+  features: string[];
+  sub_profile_limit: number | null;
+  barcode_scan_limit_month: number | null;
+  medical_ai_limit_month: number | null;
+  shared_profile_permanent: boolean;
+}
+
+export interface ReferralStats {
+  invite_code: string | null;
+  referrals_count: number;
+  customer_plan: 'customer_free' | 'customer_plus';
+  customer_subscription_status: string;
+  has_plus: boolean;
+  reward_message?: string | null;
+}
+
 export interface CustomerAnnotation {
   id: number;
   restaurant_id: number;
@@ -164,6 +213,19 @@ export interface ProfileShare {
   expires_at: string | null;
   created_at: string;
   share_url: string;
+  delivered_in_app?: boolean;
+  recipient_display_name?: string | null;
+}
+
+export interface AppContactMatch {
+  user_id: number;
+  display_name: string | null;
+  email: string;
+  email_hint: string;
+}
+
+export interface RecentAppContact extends AppContactMatch {
+  last_shared_at: string;
 }
 
 export interface SharedProfile {

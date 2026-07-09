@@ -20,7 +20,6 @@ import { api } from '../../src/api/client';
 import { colors, radius, shadow, spacing, typography, semaforoColors } from '../../src/theme';
 import { calcolaSemaforo, type PiattoAllergeni } from '../../src/engine/semaforo';
 import { TRANSLATED_ALLERGENS } from '../../src/engine/translations';
-import LanguageFlagsRow from '../../src/components/LanguageFlagsRow';
 import { useTranslation } from '../../src/constants/translations';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -341,6 +340,9 @@ export default function Spesa() {
     setError(null);
 
     try {
+      if (token) {
+        await api.recordBarcodeScan();
+      }
       const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`, {
         headers: { 'User-Agent': 'AllerTgyApp/1.0 (contact@allertgy.com)' },
       });
@@ -546,7 +548,6 @@ export default function Spesa() {
   if (!permission.granted) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <LanguageFlagsRow />
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionIcon}>🛒</Text>
           <Text style={styles.permissionTitle}>{t('grocery_scanner_title')}</Text>
@@ -561,7 +562,6 @@ export default function Spesa() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <LanguageFlagsRow />
       <View style={styles.container}>
       {/* 1. SEZIONE FOTOCAMERA (TOP 60%) */}
       <View style={styles.cameraFrame}>

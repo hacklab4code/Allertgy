@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../../src/api/client';
+import DetailSection from '../../src/components/DetailSection';
 import { useOwner } from '../../src/store/owner';
 import type { Allergen, PiattoIn } from '../../src/types';
 
@@ -236,7 +237,11 @@ export default function MenuEditor() {
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        {/* AI Assistant Banner */}
+        <DetailSection
+          title="IMPORTA MENÙ"
+          subtitle="Carica foto o link del menù esistente. L'AI propone piatti e allergeni da verificare."
+          card={false}
+        />
         {loaded && (
           <View style={styles.aiBanner}>
             <View style={{ flex: 1 }}>
@@ -255,6 +260,12 @@ export default function MenuEditor() {
         )}
 
         {!loaded && <ActivityIndicator style={{ marginVertical: 20 }} color="#059669" />}
+
+        <DetailSection
+          title="ELENCO PIATTI"
+          subtitle="Per ogni piatto indica categoria, prezzo e allergeni. Tocca un allergene per ciclare: contiene → tracce → assente."
+          card={false}
+        />
 
         {piatti.map((p, i) => (
           <View key={i} style={styles.dish}>
@@ -334,6 +345,12 @@ export default function MenuEditor() {
         <TouchableOpacity style={styles.add} onPress={() => addDish()}>
           <Text style={styles.addText}>＋ Aggiungi piatto</Text>
         </TouchableOpacity>
+
+        <DetailSection
+          title="PUBBLICAZIONE"
+          subtitle="Conferma la correttezza degli allergeni prima di rendere il menù visibile ai clienti."
+          card={false}
+        />
         <TouchableOpacity style={styles.legalRow} onPress={() => setLegalAck(!legalAck)}>
           <View style={[styles.checkbox, legalAck && styles.checkboxOn]}>
             {legalAck ? <Text style={styles.checkboxMark}>✓</Text> : null}

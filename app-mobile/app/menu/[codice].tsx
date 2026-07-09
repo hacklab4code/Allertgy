@@ -12,8 +12,8 @@ import { useSession } from '../../src/store/session';
 import type { Menu, Piatto, CustomerAnnotation, Allergen } from '../../src/types';
 import { t, tSummary, tSection } from '../../src/engine/translations';
 import { getLocaleForLang } from '../../src/constants/languages';
+import DetailSection from '../../src/components/DetailSection';
 import { colors } from '../../src/theme';
-import LanguageFlagsRow from '../../src/components/LanguageFlagsRow';
 
 type Filtro = 'tutti' | 'verde' | 'giallo' | 'rosso';
 
@@ -333,7 +333,6 @@ export default function MenuScreen() {
   return (
     <>
       <Stack.Screen options={{ title: menu.nome_ristorante }} />
-      <LanguageFlagsRow />
       {showPromo && promoTitle && promoBody && (
         <View style={styles.promoOverlay}>
           <View style={styles.promoCard}>
@@ -389,32 +388,36 @@ export default function MenuScreen() {
 
           {/* Selettore Multi-menù */}
           {menu.menus && menu.menus.length > 0 && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.menuTabsContainer}
-              style={{ marginVertical: 8 }}
-            >
-              {menu.menus.map((m) => {
-                const isActive = activeMenuId === m.id;
-                return (
-                  <TouchableOpacity
-                    key={m.id}
-                    onPress={() => setActiveMenuId(m.id)}
-                    style={[styles.menuTabButton, isActive && styles.menuTabButtonActive]}
-                  >
-                    <Text style={[styles.menuTabButtonText, isActive && styles.menuTabButtonTextActive]}>
-                      {m.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+            <>
+              <Text style={styles.contextLabel}>{language === 'it' ? 'Scegli menu' : 'Choose menu'}</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.menuTabsContainer}
+                style={{ marginVertical: 8 }}
+              >
+                {menu.menus.map((m) => {
+                  const isActive = activeMenuId === m.id;
+                  return (
+                    <TouchableOpacity
+                      key={m.id}
+                      onPress={() => setActiveMenuId(m.id)}
+                      style={[styles.menuTabButton, isActive && styles.menuTabButtonActive]}
+                    >
+                      <Text style={[styles.menuTabButtonText, isActive && styles.menuTabButtonTextActive]}>
+                        {m.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </>
           )}
 
           {/* Indicatore % compatibilità */}
           {compat && (
             <View style={styles.compatSection}>
+              <Text style={styles.contextLabel}>{language === 'it' ? 'Riepilogo sicurezza' : 'Safety summary'}</Text>
               <View style={[styles.compatBadge, { backgroundColor: compatRingBg, borderColor: compatRingColor }]}>
                 <Text style={[styles.compatPct, { color: compatRingColor }]}>{compat.percentuale}%</Text>
                 <Text style={[styles.compatLabel, { color: compatRingColor }]}>
@@ -481,7 +484,12 @@ export default function MenuScreen() {
           )}
         </View>
 
-        {/* ── Info Locale ── sempre visibile */}
+        {/* ── Info Locale ── */}
+        <DetailSection
+          title={language === 'it' ? 'INFO LOCALE' : 'VENUE INFO'}
+          subtitle={language === 'it' ? 'Contatti, posizione e orari del ristorante.' : 'Venue contact details, location, and opening hours.'}
+          card={false}
+        />
         {(() => {
           const openStatus = parseOpenStatus(menu.orari_apertura);
           const openColor = openStatus === 'open' ? '#16a34a'
@@ -617,6 +625,7 @@ export default function MenuScreen() {
         {/* Schede Gruppi Menù (se multipli) */}
         {menuGroups.length > 1 && (
           <View style={styles.groupTabsContainer}>
+            <Text style={styles.groupTabsLabel}>{language === 'it' ? 'Categorie del menu' : 'Menu categories'}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupTabsScroll}>
               {menuGroups.map((g) => {
                 const active = selectedGroup === g;
@@ -638,6 +647,7 @@ export default function MenuScreen() {
 
         {/* Filtri (sticky) */}
         <View style={styles.filters}>
+          <Text style={styles.filterLabel}>{language === 'it' ? 'Filtra per semaforo' : 'Filter by traffic light'}</Text>
           <FilterChip f="tutti" label={`${t('all', language)} (${valutatiFiltrati.length})`} />
           <FilterChip f="verde" label={`🟢 ${t('yes', language)} (${conta('verde')})`} />
           <FilterChip f="giallo" label={`🟡 (${conta('giallo')})`} />
@@ -681,6 +691,11 @@ export default function MenuScreen() {
         )}
 
         {/* Annotazioni dei Clienti */}
+        <DetailSection
+          title={language === 'it' ? 'COMMUNITY E SICUREZZA' : 'COMMUNITY & SAFETY'}
+          subtitle={language === 'it' ? 'Segnalazioni di altri clienti e invio di nuovi warning.' : 'Reports from other customers and submitting new warnings.'}
+          card={false}
+        />
         <View style={styles.annotationsBox}>
           <View style={styles.annotationsHeader}>
             <Text style={styles.annotationsTitle}>
@@ -846,6 +861,11 @@ export default function MenuScreen() {
         </View>
 
         {/* Recensioni — sezione premium */}
+        <DetailSection
+          title={language === 'it' ? 'RECENSIONI' : 'REVIEWS'}
+          subtitle={language === 'it' ? 'Opinioni AllerTgy, Google e TripAdvisor sul locale.' : 'AllerTgy, Google, and TripAdvisor ratings for this venue.'}
+          card={false}
+        />
         <View style={styles.reviewsBox}>
           <View style={styles.reviewsHeader}>
             <Text style={styles.reviewsTitle}>
@@ -1103,6 +1123,14 @@ const styles = StyleSheet.create({
   compatSection: {
     marginTop: 12,
     gap: 8,
+  },
+  contextLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#047857',
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+    marginTop: 10,
   },
   compatBadge: {
     flexDirection: 'row',
@@ -1404,8 +1432,17 @@ const styles = StyleSheet.create({
   summaryText: { color: '#14532d', marginTop: 6, lineHeight: 20, fontSize: 13, fontWeight: '500' },
   reminder: { fontSize: 12, color: '#15803d', marginTop: 8, fontWeight: '700' },
   filters: {
-    flexDirection: 'row', gap: 8, paddingVertical: 10,
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 10,
     backgroundColor: '#f8fafc',
+  },
+  filterLabel: {
+    width: '100%',
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+    marginBottom: 2,
   },
   fchip: {
     borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 999,
@@ -1430,6 +1467,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 8,
     borderRadius: 12,
+  },
+  groupTabsLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+    marginBottom: 8,
+    paddingHorizontal: 10,
   },
   groupTabsScroll: {
     paddingHorizontal: 8,

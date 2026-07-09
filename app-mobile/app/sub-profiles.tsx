@@ -5,6 +5,7 @@ import {
   TouchableOpacity, View
 } from 'react-native';
 import { api } from '../src/api/client';
+import DetailSection from '../src/components/DetailSection';
 import { useSession } from '../src/store/session';
 import type { Allergen, SubProfile } from '../src/types';
 import { colors } from '../src/theme';
@@ -179,6 +180,12 @@ export default function SubProfilesScreen() {
         </View>
 
         {loading && <ActivityIndicator color={colors.brand} style={{ marginVertical: 12 }} />}
+
+        <DetailSection
+          title={isIt ? 'PERSONE REGISTRATE' : 'REGISTERED PROFILES'}
+          subtitle={isIt ? 'Ogni persona ha allergie separate per scansioni e semaforo.' : 'Each person has separate allergies for scans and traffic light.'}
+          card={false}
+        />
 
         <View style={styles.list}>
           {subProfiles.map(p => (

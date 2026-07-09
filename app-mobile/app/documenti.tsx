@@ -7,6 +7,7 @@ import {
 import { api, type Extraction, type MedicalDocument } from '../src/api/client';
 import { useSession } from '../src/store/session';
 import { TRANSLATED_ALLERGENS } from '../src/engine/translations';
+import DetailSection from '../src/components/DetailSection';
 
 /** Documenti medici: upload su storage privato, analisi AI con consenso
  * per-documento e conferma manuale obbligatoria prima di toccare il profilo. */
@@ -120,12 +121,22 @@ export default function Documenti() {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
+      <DetailSection
+        title="CARICA DOCUMENTO"
+        subtitle="PDF o foto del referto allergologico. Puoi caricarlo con o senza analisi AI."
+        card={false}
+      />
       <TouchableOpacity style={[styles.button, busy && styles.disabled]} disabled={busy} onPress={pickAndUpload}>
         {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>+ Carica referto</Text>}
       </TouchableOpacity>
 
-      {/* Suggerimenti AI da confermare */}
       {suggestions && (
+        <>
+      <DetailSection
+        title="CONFERMA SUGGERIMENTI AI"
+        subtitle="Verifica gli allergeni rilevati prima di aggiungerli al profilo."
+        card={false}
+      />
         <View style={styles.suggestBox}>
           <Text style={styles.suggestTitle}>🤖 Abbiamo rilevato questi allergeni</Text>
           <Text style={styles.suggestNote}>{suggestions.note}</Text>
@@ -162,9 +173,14 @@ export default function Documenti() {
             <Text style={styles.cancelLink}>Non ora</Text>
           </TouchableOpacity>
         </View>
+        </>
       )}
 
-      {/* Elenco documenti */}
+      <DetailSection
+        title="I TUOI DOCUMENTI"
+        subtitle={docs.length === 0 ? 'Nessun file caricato finora.' : `${docs.length} documento${docs.length === 1 ? '' : 'i'} archiviato${docs.length === 1 ? '' : 'i'} in modo privato.`}
+        card={false}
+      />
       {docs.length === 0 ? (
         <Text style={styles.empty}>Nessun documento caricato.</Text>
       ) : (
@@ -206,6 +222,11 @@ export default function Documenti() {
         ))
       )}
 
+      <DetailSection
+        title="PRIVACY E SICUREZZA"
+        subtitle="Come vengono conservati e trattati i tuoi documenti sanitari."
+        card={false}
+      />
       <Text style={styles.privacyNote}>
         🔒 I documenti sono conservati su storage privato e ogni accesso viene registrato.
         L'AI può commettere errori: i suggerimenti vanno sempre verificati e nessun dato entra nel

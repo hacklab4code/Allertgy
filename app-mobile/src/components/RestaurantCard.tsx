@@ -23,6 +23,7 @@ interface Props {
   distanceLabel?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  boostActive?: boolean;
 }
 
 const RING_SIZE = 62;
@@ -74,6 +75,7 @@ export default function RestaurantCard({
   distanceLabel,
   latitude,
   longitude,
+  boostActive = false,
 }: Props) {
   const pct = compatibility?.percentuale ?? 0;
   const hasMenu = compatibility !== null && compatibility.totaleDishes > 0;
@@ -156,6 +158,11 @@ export default function RestaurantCard({
 
         {/* Badge semaforo + conteggio piatti */}
         <View style={styles.badgeRow}>
+          {boostActive && (
+            <View style={[styles.badge, { backgroundColor: '#FEF9C3', borderColor: '#FDE047' }]}>
+              <Text style={[styles.badgeText, { color: '#854D0E' }]}>🚀 In evidenza</Text>
+            </View>
+          )}
           <View style={[styles.badge, { backgroundColor: statusBadgeBg, borderColor: statusBadgeBorder }]}>
             <Text style={[styles.badgeText, { color: statusBadgeText }]}>{statusLabel}</Text>
           </View>

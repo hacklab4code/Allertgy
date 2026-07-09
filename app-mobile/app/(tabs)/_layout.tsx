@@ -44,10 +44,10 @@ export default function TabsLayout() {
         ),
       }}
     >
-      <Tabs.Screen name="home" options={{ title: 'AllerTgy', tabBarLabel: 'Cerca', tabBarIcon: icon('🔍') }} />
+      <Tabs.Screen name="home" options={{ title: 'Scansiona menu', tabBarLabel: 'Scansiona', tabBarIcon: icon('🔍') }} />
       <Tabs.Screen name="spesa" options={{ title: 'Spesa', tabBarLabel: 'Spesa', tabBarIcon: icon('🛒') }} />
-      <Tabs.Screen name="locali" options={{ title: 'I miei locali', tabBarLabel: 'Locali', tabBarIcon: icon('🍽️') }} />
-      <Tabs.Screen name="account" options={{ title: 'Account', tabBarLabel: 'Account', tabBarIcon: icon('👤') }} />
+      <Tabs.Screen name="locali" options={{ title: 'Ristoranti', tabBarLabel: 'Ristoranti', tabBarIcon: icon('🍽️') }} />
+      <Tabs.Screen name="account" options={{ title: 'Profilo e impostazioni', tabBarLabel: 'Profilo', tabBarIcon: icon('👤') }} />
     </Tabs>
   );
 }

@@ -12,6 +12,7 @@ import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
 import { useTranslation } from '../src/constants/translations';
 import { TRANSLATED_ALLERGENS } from '../src/engine/translations';
 import { registraPushToken } from '../src/services/geofencing';
+import { syncFavoritesFromServer } from '../src/services/favorites';
 
 export default function Login() {
   const session = useSession();
@@ -131,6 +132,7 @@ export default function Login() {
           });
           session.setAllergie(mine.map((a) => a.code), intensitiesMap);
         }
+        await syncFavoritesFromServer();
         useNotifStore.getState().refresh();
       } else {
         session.setLegalStatus(true, false);

@@ -10,7 +10,16 @@
     "android": { "package": "com.allertgy.app" },
     "plugins": [
       "expo-router",
-      ["expo-camera", { "cameraPermission": "AllerTgy usa la fotocamera per scansionare il QR al tavolo e scoprire cosa puoi mangiare in quel ristorante, o i codici a barre per la spesa." }]
-    ]
+      ["expo-camera", { "cameraPermission": "AllerTgy usa la fotocamera per scansionare il QR al tavolo e scoprire cosa puoi mangiare in quel ristorante, o i codici a barre per la spesa." }],
+      ["expo-contacts", { "contactsPermission": "AllerTgy accede alla rubrica per inviare il tuo profilo allergie ai contatti del telefono o agli utenti AllerTgy." }],
+      ["expo-notifications", {
+        "color": "#059669"
+      }]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "INSERISCI_EAS_PROJECT_ID"
+      }
+    }
   }
 }
