@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -39,8 +39,11 @@ class Settings(BaseSettings):
     stripe_price_boost: str = ""       # Boost Visibilità €9,90 / 30 giorni
     stripe_price_customer_plus: str = ""  # Plus Famiglia €3,99/mese
 
-    class Config:
-        env_file = ".env"
+    # Titolare del trattamento (Informativa Privacy) — compilare prima del go-live
+    legal_entity_name: str = "[Ragione sociale/nome del titolare da inserire]"
+    legal_privacy_email: str = "[email privacy da inserire]"
+
+    model_config = SettingsConfigDict(env_file=".env")
 
     @property
     def cors_origins_list(self) -> list[str]:
@@ -77,6 +80,12 @@ def validate_production_settings() -> None:
         errors.append("PUBLIC_WEB_URL deve puntare al dominio pubblico (non localhost)")
     if "localhost" in (settings.public_api_url or ""):
         errors.append("PUBLIC_API_URL deve puntare all'API pubblica (non localhost)")
+    if not settings.stripe_secret_key:
+        errors.append("STRIPE_SECRET_KEY deve essere configurata in produzione")
+    if not settings.stripe_webhook_secret:
+        errors.append("STRIPE_WEBHOOK_SECRET deve essere configurato in produzione")
+    if not settings.resend_api_key:
+        errors.append("RESEND_API_KEY deve essere configurata in produzione (email transazionali)")
     if errors:
         raise RuntimeError("Configurazione produzione non valida:\n- " + "\n- ".join(errors))
 

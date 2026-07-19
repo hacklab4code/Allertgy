@@ -95,6 +95,10 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     clearTimeout(timer);
   }
   if (!res.ok) {
+    if (res.status === 401 && token) {
+      clearToken();
+      throw new Error('SESSION_EXPIRED');
+    }
     const body = await res.json().catch(() => ({}));
     let msg = '';
     if (body.detail) {
@@ -126,6 +130,14 @@ export type SubscriptionStatus = 'free' | 'trialing' | 'active' | 'past_due' | '
 
 export interface PlanDefinition {
   code: BusinessPlan;
+  name: string;
+  price_cents: number;
+  tagline: string;
+  features: string[];
+}
+
+export interface CustomerPlanDefinition {
+  code: 'customer_free' | 'customer_plus';
   name: string;
   price_cents: number;
   tagline: string;
@@ -465,6 +477,12 @@ export const api = {
     req<{ id: number; restaurant_id: number; expires_at: string | null; activated_at: string | null }[]>(
       `/billing/boosts/${restaurantId}`,
     ),
+
+  getCustomerPlans: () => req<CustomerPlanDefinition[]>('/billing/customer-plans'),
+  customerCheckout: () =>
+    req<{ checkout_url: string }>('/billing/customer-checkout', { method: 'POST' }),
+  customerPortal: () =>
+    req<{ portal_url: string }>('/billing/customer-portal', { method: 'POST' }),
 
   // --- Notifiche ristoratore (stesso account/JWT) ---
   notifications: () => req<OwnerNotification[]>('/profile/notifications'),

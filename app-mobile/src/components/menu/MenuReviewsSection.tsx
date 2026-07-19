@@ -8,9 +8,11 @@ import {
 } from 'react-native';
 import { type Review } from '../../api/client';
 import DetailSection from '../DetailSection';
+import { GlassCard } from '../ui/GlassCard';
 import { t } from '../../engine/translations';
 import { getLocaleForLang } from '../../constants/languages';
 import type { Menu } from '../../types';
+import { colors } from '../../theme';
 
 type ReviewState = {
   reviews: Review[];
@@ -133,7 +135,7 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
         {reviewTab === 'allertgy' && (
           <>
             {reviews.slice(0, 5).map((r) => (
-              <View key={r.id} style={styles.card}>
+              <GlassCard key={r.id} style={styles.card}>
                 <View style={styles.cardHead}>
                   <View style={styles.authorWrap}>
                     <View style={styles.avatar}>
@@ -174,7 +176,7 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
                     <Text style={styles.comment}>{r.reply}</Text>
                   </View>
                 ) : null}
-              </View>
+              </GlassCard>
             ))}
             {reviews.length === 0 && (
               <View style={styles.emptyBox}>
@@ -185,7 +187,7 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
             )}
 
             {canSubmit && (
-              <View style={styles.form}>
+              <GlassCard style={styles.form}>
                 <View style={styles.formHeader}>
                   <Text style={styles.formEmoji}>✍️</Text>
                   <Text style={styles.formLabel}>La tua esperienza allergie</Text>
@@ -231,7 +233,7 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
                   onChangeText={setMyComment}
                   multiline
                   placeholder="Descrivi la tua esperienza con le allergie..."
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor={colors.textMuted}
                 />
                 <TouchableOpacity
                   style={[styles.submit, reviewBusy && { opacity: 0.4 }]}
@@ -244,7 +246,7 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
                     <Text style={styles.submitText}>Pubblica recensione AllerTgy</Text>
                   )}
                 </TouchableOpacity>
-              </View>
+              </GlassCard>
             )}
           </>
         )}
@@ -260,7 +262,7 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
               externalReviews
                 .filter((r) => r.source === reviewTab)
                 .map((r, idx) => (
-                  <View key={idx} style={[styles.card, { backgroundColor: '#f8fafc' }]}>
+                  <GlassCard key={idx} style={styles.card}>
                     <View style={styles.cardHead}>
                       <View style={styles.authorWrap}>
                         <View
@@ -291,7 +293,7 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
                       </View>
                     </View>
                     {r.comment ? <Text style={styles.comment}>{r.comment}</Text> : null}
-                  </View>
+                  </GlassCard>
                 ))
             )}
           </>
@@ -304,16 +306,13 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
 const styles = StyleSheet.create({
   box: { marginTop: 24, gap: 10 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { fontSize: 18, fontWeight: '900', color: '#10201B', letterSpacing: -0.3 },
+  title: { fontSize: 18, fontWeight: '900', color: colors.onSurface, letterSpacing: -0.3 },
   avg: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 'auto' },
   avgStar: { fontSize: 14, color: '#f59e0b' },
-  avgText: { fontSize: 14, fontWeight: '800', color: '#1e293b' },
+  avgText: { fontSize: 14, fontWeight: '800', color: colors.inkSoft },
   card: {
-    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 16,
-    padding: 14,
+    borderColor: colors.border,
     gap: 8,
   },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
@@ -322,77 +321,74 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: colors.brand50,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#a7f3d0',
+    borderColor: colors.brand200,
   },
-  avatarText: { fontSize: 15, fontWeight: '800', color: '#047857' },
-  author: { fontWeight: '700', fontSize: 13, color: '#1e293b' },
-  date: { fontSize: 11, color: '#94a3b8', marginTop: 1 },
+  avatarText: { fontSize: 15, fontWeight: '800', color: colors.brandDark },
+  author: { fontWeight: '700', fontSize: 13, color: colors.onSurface },
+  date: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
   starsWrap: { flexDirection: 'row', gap: 1 },
   starIcon: { fontSize: 14, color: '#f59e0b' },
-  starOff: { color: '#e2e8f0' },
-  comment: { color: '#475569', fontSize: 13, lineHeight: 19 },
+  starOff: { color: colors.border },
+  comment: { color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
   replyBox: {
     marginTop: 4,
     marginLeft: 8,
     padding: 10,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: colors.brand50,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: colors.brand200,
     gap: 4,
   },
-  replyLabel: { fontSize: 10, fontWeight: '800', color: '#047857', textTransform: 'uppercase' },
+  replyLabel: { fontSize: 10, fontWeight: '800', color: colors.brandDark, textTransform: 'uppercase' },
   emptyBox: {
     alignItems: 'center',
     padding: 24,
     gap: 6,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     borderStyle: 'dashed',
   },
   emptyEmoji: { fontSize: 28 },
-  empty: { color: '#64748b', fontSize: 14, fontWeight: '700', textAlign: 'center' },
-  emptySub: { color: '#94a3b8', fontSize: 12, fontWeight: '500', textAlign: 'center' },
+  empty: { color: colors.onSurfaceMuted, fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  emptySub: { color: colors.textMuted, fontSize: 12, fontWeight: '500', textAlign: 'center' },
   form: {
-    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 16,
-    padding: 16,
+    borderColor: colors.border,
     gap: 10,
     marginTop: 6,
   },
   formHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   formEmoji: { fontSize: 18 },
-  formLabel: { fontWeight: '800', fontSize: 15, color: '#1e293b' },
-  formSub: { fontSize: 12, color: '#94a3b8', fontWeight: '500', marginTop: -4 },
+  formLabel: { fontWeight: '800', fontSize: 15, color: colors.onSurface },
+  formSub: { fontSize: 12, color: colors.textMuted, fontWeight: '500', marginTop: -4 },
   starsRow: { flexDirection: 'row', gap: 6 },
   starBtn: { fontSize: 28 },
   input: {
     minHeight: 80,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     borderRadius: 14,
     padding: 12,
     fontSize: 14,
-    color: '#10201B',
+    color: colors.onSurface,
     textAlignVertical: 'top',
     lineHeight: 20,
   },
   submit: {
     height: 48,
-    backgroundColor: '#059669',
+    backgroundColor: colors.brand,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#059669',
+    shadowColor: colors.brand,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -412,11 +408,11 @@ const styles = StyleSheet.create({
   },
   externalBadgeLabel: { fontSize: 11, fontWeight: '800', color: '#1d4ed8' },
   externalBadgeRating: { fontSize: 13, fontWeight: '900', color: '#1d4ed8' },
-  externalBadgeCount: { fontSize: 10, color: '#64748b', fontWeight: '600' },
+  externalBadgeCount: { fontSize: 10, color: colors.textSecondary, fontWeight: '600' },
   tabsRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: colors.border,
     marginBottom: 8,
   },
   tabBtn: {
@@ -426,29 +422,29 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
     marginBottom: -1,
   },
-  tabBtnActive: { borderBottomColor: '#059669' },
-  tabText: { fontSize: 12, fontWeight: '700', color: '#94a3b8' },
-  tabTextActive: { color: '#059669' },
+  tabBtnActive: { borderBottomColor: colors.brand },
+  tabText: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  tabTextActive: { color: colors.brand },
   allergyQBox: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     borderRadius: 14,
     padding: 12,
     gap: 12,
   },
   allergyQRow: { gap: 4 },
-  allergyQLabel: { fontSize: 12, fontWeight: '800', color: '#475569' },
+  allergyQLabel: { fontSize: 12, fontWeight: '800', color: colors.inkSoft },
   breakdown: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: colors.brand50,
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: colors.brand200,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  breakdownItem: { fontSize: 11, fontWeight: '700', color: '#047857' },
+  breakdownItem: { fontSize: 11, fontWeight: '700', color: colors.brandDark },
 });

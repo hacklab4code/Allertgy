@@ -12,9 +12,9 @@ import {
   View,
 } from 'react-native';
 import { api } from '../../src/api/client';
-import DetailSection from '../../src/components/DetailSection';
+import { CollapseSection, Screen } from '../../src/components/ui';
 import { useOwner } from '../../src/store/owner';
-import { colors, radius, shadow, spacing, typography } from '../../src/theme';
+import { TAB_BAR_CLEARANCE, colors, radius, shadow, spacing, typography } from '../../src/theme';
 import type { Restaurant, VisibilityBoost } from '../../src/types';
 
 function canPushNotify(locale: Restaurant | null) {
@@ -39,6 +39,8 @@ export default function OwnerCrescita() {
   const [busyPush, setBusyPush] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [pushExpanded, setPushExpanded] = useState(false);
 
   const load = useCallback(async () => {
     if (!locale) return;
@@ -119,6 +121,7 @@ export default function OwnerCrescita() {
 
   if (!locale) {
     return (
+      <Screen edges={false}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.emptyBox}>
           <Text style={styles.emptyEmoji}>🏪</Text>
@@ -129,21 +132,21 @@ export default function OwnerCrescita() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      </Screen>
     );
   }
 
   const pushEnabled = canPushNotify(locale);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <Screen edges={false}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingBottom: TAB_BAR_CLEARANCE }]}>
       {loading && <ActivityIndicator color={colors.brand} style={{ marginVertical: 12 }} />}
 
-      <DetailSection
-        title="BOOST VISIBILITÀ"
-        subtitle={`${locale.name} · metti il locale in cima alla ricerca clienti per 30 giorni (€9,90).`}
-        style={{ marginTop: 0 }}
-        card={false}
-      >
+      <View style={styles.blockHead}>
+        <Text style={styles.blockTitle}>Boost visibilità</Text>
+        <Text style={styles.blockSub}>{locale.name} · €9,90 per 30 giorni in cima alla ricerca</Text>
+      </View>
       <View style={styles.card}>
         <Text style={styles.cardEmoji}>🚀</Text>
         <Text style={styles.cardTitle}>Boost Visibilità · €9,90</Text>
@@ -163,13 +166,14 @@ export default function OwnerCrescita() {
           )}
         </TouchableOpacity>
       </View>
-      </DetailSection>
 
       {boosts.length > 0 && (
-        <DetailSection
-          title="STORICO BOOST"
-          subtitle="Attivazioni passate e date di scadenza."
-          card={false}
+        <CollapseSection
+          icon="time"
+          title="Storico boost"
+          preview={`${boosts.length} attivazioni`}
+          expanded={historyExpanded}
+          onToggle={() => setHistoryExpanded((v) => !v)}
         >
         <View style={styles.card}>
           {boosts.map((b) => {
@@ -186,16 +190,15 @@ export default function OwnerCrescita() {
             );
           })}
         </View>
-        </DetailSection>
+        </CollapseSection>
       )}
 
-      <DetailSection
-        title="STRUMENTI COLLEGATI"
-        subtitle="Recensioni dei clienti e statistiche sul menù digitale."
-        card={false}
-      >
+      <View style={styles.blockHead}>
+        <Text style={styles.blockTitle}>Strumenti collegati</Text>
+        <Text style={styles.blockSub}>Recensioni e statistiche sul menù digitale</Text>
+      </View>
       <View style={styles.quickRow}>
-        <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(owner)/recensioni')}>
+        <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(owner)/locali')}>
           <Text style={styles.quickEmoji}>⭐</Text>
           <Text style={styles.quickLabel}>Recensioni</Text>
         </TouchableOpacity>
@@ -204,12 +207,13 @@ export default function OwnerCrescita() {
           <Text style={styles.quickLabel}>Statistiche</Text>
         </TouchableOpacity>
       </View>
-      </DetailSection>
 
-      <DetailSection
-        title="NOTIFICHE PUSH"
-        subtitle="Solo con piano Pro · messaggi ai clienti che hanno salvato il locale."
-        card={false}
+      <CollapseSection
+        icon="notifications"
+        title="Notifiche push"
+        preview={pushEnabled ? `${followers ?? 0} follower` : 'Richiede piano Pro'}
+        expanded={pushExpanded}
+        onToggle={() => setPushExpanded((v) => !v)}
       >
       <View style={[styles.card, !pushEnabled && styles.cardLocked]}>
         <Text style={styles.cardEmoji}>🔔</Text>
@@ -267,13 +271,17 @@ export default function OwnerCrescita() {
           </>
         )}
       </View>
-      </DetailSection>
+      </CollapseSection>
     </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   container: { padding: spacing.lg, paddingBottom: 48, backgroundColor: colors.bg, gap: spacing.lg },
+  blockHead: { gap: 2 },
+  blockTitle: { ...typography.h2, color: colors.ink },
+  blockSub: { color: colors.textSecondary, fontSize: 12 },
   heroTitle: { ...typography.h1, color: colors.ink },
   heroSub: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
   card: {

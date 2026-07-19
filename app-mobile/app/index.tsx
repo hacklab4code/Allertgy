@@ -1,29 +1,26 @@
 import { Redirect } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
+import { getOnboardingRedirect, useSessionHydrated } from '../src/hooks/onboardingGuard';
 import { useSession } from '../src/store/session';
+import { colors } from '../src/theme';
 
 /** Smista l'utente in base a ruolo e stato di onboarding. */
 export default function Index() {
-  const {
-    token,
-    role,
-    legalAccepted,
-    healthDataConsent,
-    profileCompleted,
-    disclaimerAccepted,
-    languageSelected,
-  } = useSession();
+  const hydrated = useSessionHydrated();
+  const session = useSession();
 
-  if (!token) return <Redirect href="/welcome" />;
+  if (!hydrated) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface }}>
+        <ActivityIndicator color={colors.brand} />
+      </View>
+    );
+  }
 
-  // La lingua è una preferenza trasversale: va scelta prima di entrare nei flussi di ruolo.
-  if (!languageSelected) return <Redirect href="/language" />;
+  const area = session.role === 'owner' ? 'owner' : 'customer';
+  const gate = getOnboardingRedirect(session, area);
+  if (gate) return <Redirect href={gate as any} />;
 
-  // Ristoratore → area gestione locale
-  if (role === 'owner') return <Redirect href="/(owner)/locali" />;
-
-  // Cliente → onboarding poi app a schede
-  if (!legalAccepted || !healthDataConsent) return <Redirect href="/legal" />;
-  if (!profileCompleted) return <Redirect href="/allergie" />;
-  if (!disclaimerAccepted) return <Redirect href="/disclaimer" />;
+  if (session.role === 'owner') return <Redirect href="/(owner)/locali" />;
   return <Redirect href="/(tabs)/home" />;
 }

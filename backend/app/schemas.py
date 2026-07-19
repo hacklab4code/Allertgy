@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
 # ---------- Auth ----------
@@ -47,8 +47,7 @@ class AllergenOut(BaseModel):
     category: str = "ue"
     intensity: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProfileAllergenItem(BaseModel):
@@ -73,8 +72,7 @@ class DishTranslationOut(BaseModel):
     name: str
     description: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MenuIn(BaseModel):
@@ -91,8 +89,7 @@ class MenuOutItem(BaseModel):
     sort_order: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DishOut(BaseModel):
@@ -110,8 +107,7 @@ class DishOut(BaseModel):
     allergeni_tracce: list[str]
     translations: list[DishTranslationOut] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DishSummaryOut(BaseModel):
@@ -144,6 +140,29 @@ class BarcodeScanOut(BaseModel):
     allowed: bool
     remaining: Optional[int] = None
     limit: Optional[int] = None
+
+
+class ProductLabelAnalyzeOut(BaseModel):
+    barcode: str
+    product_name: str
+    brand: str
+    ingredients: str
+    allergeni_contenuti: list[str] = []
+    allergeni_tracce: list[str] = []
+    ai_stub: bool = False
+    from_cache: bool = False
+    note: str = ""
+    remaining_this_month: Optional[int] = None
+
+
+class ProductLabelCacheOut(BaseModel):
+    barcode: str
+    product_name: str
+    brand: str
+    ingredients: str
+    allergeni_contenuti: list[str] = []
+    allergeni_tracce: list[str] = []
+    cached_at: datetime
 
 
 class MenuOut(BaseModel):
@@ -260,8 +279,7 @@ class RestaurantOut(BaseModel):
     tripadvisor_reviews_count: Optional[int] = None
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PlanDefinitionOut(BaseModel):
@@ -337,8 +355,7 @@ class InternalUserOut(BaseModel):
     barcode_scans_month: int = 0
     reviews_count: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InternalCustomerDetailOut(InternalUserOut):
@@ -410,8 +427,7 @@ class MenuAuditOut(BaseModel):
     note: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserDocumentOut(BaseModel):
@@ -421,8 +437,7 @@ class UserDocumentOut(BaseModel):
     status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AppleHealthIn(BaseModel):
@@ -458,8 +473,7 @@ class UserProfileOut(BaseModel):
     customer_plan_started_at: Optional[datetime] = None
     has_customer_plus: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReferralStatsOut(BaseModel):
@@ -549,8 +563,7 @@ class MedicalDocumentOut(BaseModel):
     uploaded_at: datetime
     url: Optional[str] = None  # signed URL breve (5 min), generato a richiesta
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ExtractionOut(BaseModel):
@@ -559,8 +572,7 @@ class ExtractionOut(BaseModel):
     confidence: Optional[float] = None
     applied: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DocumentExtractionResultOut(BaseModel):
@@ -636,8 +648,7 @@ class NotificationOut(BaseModel):
     read_at: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------- Billing (Stripe) ----------
@@ -679,8 +690,7 @@ class InvoiceOut(BaseModel):
     pdf_url: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------- Boost Visibilità (one-time) ----------
@@ -703,8 +713,7 @@ class VisibilityBoostOut(BaseModel):
     expires_at: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------- Notifiche push ai preferiti (solo piano Pro Notifiche) ----------
@@ -747,8 +756,7 @@ class CustomerAnnotationOut(BaseModel):
     is_mine: bool = False
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SubProfileAllergenItem(BaseModel):
@@ -776,8 +784,7 @@ class SubProfileOut(BaseModel):
     allergens: list[SubProfileAllergenOut]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProfileShareCreateIn(BaseModel):

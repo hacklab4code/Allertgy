@@ -85,6 +85,7 @@ CUSTOMER_PLAN_DEFINITIONS = [
         "sub_profile_limit": 0,
         "barcode_scan_limit_month": 20,
         "medical_ai_limit_month": 0,
+        "product_label_ai_limit_month": 0,
         "shared_profile_permanent": False,
     },
     {
@@ -96,11 +97,13 @@ CUSTOMER_PLAN_DEFINITIONS = [
             "Sottoprofili famiglia illimitati",
             "Condivisione profilo 24h o permanente",
             "Scanner spesa illimitato",
+            "Analisi AI etichette (30/mese) quando il prodotto non è in database",
             "5 analisi AI documenti medici/mese",
         ],
         "sub_profile_limit": None,
         "barcode_scan_limit_month": None,
         "medical_ai_limit_month": 5,
+        "product_label_ai_limit_month": 30,
         "shared_profile_permanent": True,
     },
 ]

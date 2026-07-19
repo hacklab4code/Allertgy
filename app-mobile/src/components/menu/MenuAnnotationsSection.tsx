@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import DetailSection from '../DetailSection';
+import { GlassCard } from '../ui/GlassCard';
 import { colors } from '../../theme';
 import type { Allergen, CustomerAnnotation } from '../../types';
 
@@ -68,7 +69,7 @@ export default function MenuAnnotationsSection({ language, allergie, canSubmit, 
         }
         card={false}
       />
-      <View style={styles.box}>
+      <GlassCard style={styles.box}>
         <View style={styles.header}>
           <Text style={styles.title}>
             ⚠️ Warning e Annotazioni Clienti ({annotations.length})
@@ -81,7 +82,10 @@ export default function MenuAnnotationsSection({ language, allergie, canSubmit, 
         {annotations.map((ann) => {
           const matchesMyAllergy = allergie.includes(ann.allergen_code);
           return (
-            <View key={ann.id} style={[styles.card, matchesMyAllergy && styles.cardHighlight]}>
+            <GlassCard
+              key={ann.id}
+              style={[styles.card, matchesMyAllergy && styles.cardHighlight]}
+            >
               <View style={styles.cardHead}>
                 <Text style={styles.allergen}>
                   {ann.allergen_emoji} {ann.allergen_name_it}
@@ -104,7 +108,7 @@ export default function MenuAnnotationsSection({ language, allergie, canSubmit, 
                   Inviato da {ann.author_name} · {new Date(ann.created_at).toLocaleDateString()}
                 </Text>
               </View>
-            </View>
+            </GlassCard>
           );
         })}
 
@@ -231,38 +235,25 @@ export default function MenuAnnotationsSection({ language, allergie, canSubmit, 
             </TouchableOpacity>
           </View>
         )}
-      </View>
+      </GlassCard>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   box: {
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 20,
-    padding: 16,
     marginBottom: 12,
-    shadowColor: '#1e293b',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
     gap: 12,
   },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 16, fontWeight: '900', color: '#0f172a', letterSpacing: -0.3 },
   subtitle: { fontSize: 12.5, color: '#64748b', lineHeight: 18, marginTop: -8 },
   card: {
-    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 14,
-    padding: 12,
+    borderColor: colors.border,
     gap: 6,
   },
-  cardHighlight: { borderColor: '#fca5a5', backgroundColor: '#fff5f5' },
+  cardHighlight: { borderColor: colors.redBorder, borderLeftWidth: 3, borderLeftColor: colors.redBorder },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   allergen: { fontSize: 13, fontWeight: '800', color: '#0f172a' },
   matchBadge: { backgroundColor: '#fecaca', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },

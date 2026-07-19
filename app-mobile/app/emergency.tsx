@@ -1,247 +1,244 @@
 import { Stack, router } from 'expo-router';
-import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import DetailSection from '../src/components/DetailSection';
+import { useMemo } from 'react';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import { AppText, GlassScreenScroll, PuffyButton, Screen, Section } from '../src/components/ui';
 import { useSession } from '../src/store/session';
 import { getAllergenName, t } from '../src/engine/translations';
+import { colors, spacing, MIN_TOUCH_TARGET } from '../src/theme';
 
 export default function EmergencyScreen() {
-  const { allergie, emergencyMedicines, language, emergencyContactName, emergencyContactPhone } = useSession();
+  const {
+    allergie: primaryAllergies,
+    emergencyMedicines,
+    language,
+    emergencyContactName,
+    emergencyContactPhone,
+    subProfiles,
+    activeProfileId,
+    email,
+  } = useSession();
+  const insets = useSafeAreaInsets();
   const isIt = (language || 'it').toLowerCase() === 'it';
 
+  const activeProfile = useMemo(() => {
+    if (!activeProfileId) return null;
+    return subProfiles.find((p) => p.id === activeProfileId) || null;
+  }, [activeProfileId, subProfiles]);
+
+  const allergie = useMemo(() => {
+    if (activeProfile) return activeProfile.allergens.map((a) => a.code);
+    return primaryAllergies;
+  }, [activeProfile, primaryAllergies]);
+
+  const profileLabel = activeProfile?.name
+    ?? (email ? email.split('@')[0] : (isIt ? 'Profilo personale' : 'Personal profile'));
+
   const handleCall112 = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Linking.openURL('tel:112').catch(() => {
-      alert("Chiamata telefonica non supportata su questo dispositivo.");
+      alert(isIt ? 'Chiamata non supportata su questo dispositivo.' : 'Calls not supported on this device.');
     });
   };
 
   const handleCallContact = () => {
     if (!emergencyContactPhone) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     Linking.openURL(`tel:${emergencyContactPhone}`).catch(() => {
-      alert("Chiamata telefonica non supportata su questo dispositivo.");
+      alert(isIt ? 'Chiamata non supportata su questo dispositivo.' : 'Calls not supported on this device.');
     });
   };
 
   const handleSendSMS = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const listAllergie = allergie.map((a) => getAllergenName(a, language)).join(', ');
     const listMedicines = emergencyMedicines || t('none_declared', language);
-
     const bodyText = `${t('sos_message_prefix', language)} ${listAllergie}. ${t('sos_medicines_label', language)} ${listMedicines}.`;
-
     const smsUrl = emergencyContactPhone
       ? `sms:${emergencyContactPhone}?body=${encodeURIComponent(bodyText)}`
       : `sms:?body=${encodeURIComponent(bodyText)}`;
 
     Linking.openURL(smsUrl).catch(() => {
-      alert("Invio SMS non supportato su questo dispositivo.");
+      alert(isIt ? 'SMS non supportato su questo dispositivo.' : 'SMS not supported on this device.');
     });
   };
 
   return (
-    <>
+    <Screen edges={false} ambient>
       <Stack.Screen
         options={{
           title: t('emergency_title', language),
           headerStyle: { backgroundColor: '#b91c1c' },
           headerTintColor: '#ffffff',
-          headerTitleStyle: { fontWeight: '900' }
+          headerTitleStyle: { fontWeight: '900' },
         }}
       />
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* Banner principale di allarme */}
+
+      <GlassScreenScroll showsVerticalScrollIndicator={false}>
         <View style={styles.alertCard}>
-          <Text style={styles.alertEmoji}>🚨</Text>
-          <Text style={styles.alertTitle}>
+          <AppText variant="h1" color="#FFFFFF">🚨</AppText>
+          <AppText variant="title" color="#FFFFFF" style={{ textAlign: 'center' }}>
             {t('emergency_banner', language)}
-          </Text>
-          <Text style={styles.alertSubtitle}>
+          </AppText>
+          <AppText variant="caption" style={{ textAlign: 'center', color: '#fee2e2' }}>
             {t('emergency_show', language)}
-          </Text>
+          </AppText>
+          <AppText variant="caption" style={styles.profileHint}>
+            {isIt ? `Profilo attivo: ${profileLabel}` : `Active profile: ${profileLabel}`}
+          </AppText>
         </View>
 
-        <DetailSection
-          title={isIt ? 'ALLERGIE ATTIVE' : 'ACTIVE ALLERGIES'}
-          subtitle={isIt ? 'Dati dal tuo profilo AllerTgy — mostra allo staff in caso di emergenza.' : 'From your AllerTgy profile — show staff in an emergency.'}
-          style={{ marginTop: 0 }}
-          card={false}
+        <Section
+          title={isIt ? 'Allergie attive' : 'Active allergies'}
+          subtitle={isIt ? 'Mostra allo staff in caso di emergenza' : 'Show staff in an emergency'}
         >
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionHeader}>
-              {t('allergies_section', language)}
-            </Text>
-            {allergie.length === 0 ? (
-              <Text style={styles.emptyText}>
-                {t('no_allergies', language)}
-              </Text>
-            ) : (
-              <View style={styles.badgeContainer}>
-                {allergie.map((code) => {
-                  const name = getAllergenName(code, language);
-                  return (
-                    <View key={code} style={styles.allergenBadge}>
-                      <Text style={styles.allergenBadgeText}>⚠️ {name.toUpperCase()}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-        </DetailSection>
-
-        <DetailSection
-          title={isIt ? 'FARMACI SOS' : 'EMERGENCY MEDICATION'}
-          subtitle={isIt ? 'Antistaminici, autoiniettore o farmaci salvavita dichiarati nel profilo.' : 'Antihistamines, auto-injector or life-saving meds from your profile.'}
-          card={false}
-        >
-          <View style={[styles.sectionCard, { borderColor: '#fca5a5', backgroundColor: '#fef2f2' }]}>
-            <Text style={[styles.sectionHeader, { color: '#991b1b' }]}>
-              {t('emergency_drugs_section', language)}
-            </Text>
-            <Text style={styles.medicineText}>
-              {emergencyMedicines || t('no_drugs', language)}
-            </Text>
-            {emergencyMedicines && (
-              <Text style={styles.medicineWarning}>
-                {t('drug_warning', language)}
-              </Text>
-            )}
-          </View>
-        </DetailSection>
-
-        <DetailSection
-          title={isIt ? 'AZIONI RAPIDE' : 'QUICK ACTIONS'}
-          subtitle={isIt ? 'Chiama i soccorsi o invia un SMS con allergie e farmaci già compilati.' : 'Call emergency services or send an SMS with allergies and meds pre-filled.'}
-          card={false}
-        >
-        <View style={{ gap: 14 }}>
-          {/* Pulsante Chiamata Contatto di Emergenza (se configurato) */}
-          {emergencyContactPhone && (
-            <TouchableOpacity style={[styles.sosButton, { backgroundColor: '#059669', shadowColor: '#059669' }]} onPress={handleCallContact}>
-              <Text style={styles.sosButtonEmoji}>📞</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sosButtonText}>
-                  {t('call_contact', language)} {emergencyContactName?.toUpperCase() || ''}
-                </Text>
-                <Text style={[styles.sosButtonSub, { color: '#d1fae5' }]}>
-                  {emergencyContactPhone}
-                </Text>
-              </View>
-            </TouchableOpacity>
+          {allergie.length === 0 ? (
+            <View style={styles.card}>
+              <AppText variant="subtitle">{t('no_allergies', language)}</AppText>
+              <PuffyButton
+                label={isIt ? 'Configura allergie' : 'Set up allergies'}
+                onPress={() => router.push('/allergie')}
+                variant="soft"
+              />
+            </View>
+          ) : (
+            <View style={styles.badgeWrap}>
+              {allergie.map((code) => (
+                <View key={code} style={styles.allergenBadge}>
+                  <AppText variant="caption" style={styles.allergenBadgeText}>
+                    ⚠️ {getAllergenName(code, language).toUpperCase()}
+                  </AppText>
+                </View>
+              ))}
+            </View>
           )}
+        </Section>
 
-          {/* Pulsante Chiamata 112 */}
-          <TouchableOpacity style={styles.sosButton} onPress={handleCall112}>
-            <Text style={styles.sosButtonEmoji}>🚑</Text>
-            <View>
-              <Text style={styles.sosButtonText}>
-                {t('call_emergency', language)}
-              </Text>
-              <Text style={styles.sosButtonSub}>
-                {t('call_emergency_sub', language)}
-              </Text>
+        <Section
+          title={isIt ? 'Farmaci SOS' : 'Emergency medication'}
+          subtitle={isIt ? 'Dal tuo profilo AllerTgy' : 'From your AllerTgy profile'}
+        >
+          <View style={[styles.card, styles.medsCard]}>
+            <AppText variant="bodyBold" color="#991b1b">
+              {emergencyMedicines || t('no_drugs', language)}
+            </AppText>
+            {!emergencyMedicines && (
+              <PuffyButton
+                label={isIt ? 'Aggiungi nel profilo' : 'Add in profile'}
+                onPress={() => router.push('/(tabs)/account')}
+                variant="soft"
+                style={{ marginTop: spacing.sm }}
+              />
+            )}
+            {emergencyMedicines ? (
+              <AppText variant="caption" color="#7f1d1d" style={{ marginTop: spacing.xs }}>
+                {t('drug_warning', language)}
+              </AppText>
+            ) : null}
+          </View>
+        </Section>
+      </GlassScreenScroll>
+
+      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+        {emergencyContactPhone ? (
+          <Pressable style={[styles.sosBtn, styles.contactBtn]} onPress={handleCallContact}>
+            <AppText variant="h2">📞</AppText>
+            <View style={{ flex: 1 }}>
+              <AppText variant="bodyBold" color="#FFFFFF">
+                {t('call_contact', language)} {emergencyContactName?.toUpperCase() || ''}
+              </AppText>
+              <AppText variant="caption" color="#d1fae5">{emergencyContactPhone}</AppText>
             </View>
-          </TouchableOpacity>
+          </Pressable>
+        ) : (
+          <PuffyButton
+            label={isIt ? 'Configura contatto emergenza' : 'Set emergency contact'}
+            onPress={() => router.push('/(tabs)/account')}
+            variant="secondary"
+          />
+        )}
 
-          {/* Pulsante SMS SOS */}
-          <TouchableOpacity style={styles.smsButton} onPress={handleSendSMS}>
-            <Text style={styles.smsButtonEmoji}>💬</Text>
-            <View>
-              <Text style={styles.smsButtonText}>
-                {t('send_sos', language)}
-              </Text>
-              <Text style={styles.smsButtonSub}>
-                {t('send_sos_sub', language)}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-        </DetailSection>
+        <Pressable style={styles.sosBtn} onPress={handleCall112}>
+          <AppText variant="h2">🚑</AppText>
+          <View>
+            <AppText variant="bodyBold" color="#FFFFFF">{t('call_emergency', language)}</AppText>
+            <AppText variant="caption" color="#fca5a5">{t('call_emergency_sub', language)}</AppText>
+          </View>
+        </Pressable>
 
-        {/* Chiusura */}
-        <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
-          <Text style={styles.closeButtonText}>
-            {t('close_back', language)}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </>
+        <Pressable style={[styles.sosBtn, styles.smsBtn]} onPress={handleSendSMS}>
+          <AppText variant="h2">💬</AppText>
+          <View>
+            <AppText variant="bodyBold" color="#FFFFFF">{t('send_sos', language)}</AppText>
+            <AppText variant="caption" color="#cbd5e1">{t('send_sos_sub', language)}</AppText>
+          </View>
+        </Pressable>
+
+        <Pressable onPress={() => router.back()} style={styles.closeBtn}>
+          <AppText variant="bodyBold" color={colors.onSurfaceMuted}>{t('close_back', language)}</AppText>
+        </Pressable>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, paddingBottom: 48, gap: 18, backgroundColor: '#f8fafc' },
+  scroll: {
+    padding: spacing.lg,
+    paddingBottom: spacing.md,
+    gap: spacing.lg,
+  },
   alertCard: {
     backgroundColor: '#b91c1c',
-    borderRadius: 24,
-    padding: 24,
+    padding: spacing.lg,
     alignItems: 'center',
+    gap: spacing.xs,
+  },
+  profileHint: {
     textAlign: 'center',
-    shadowColor: '#b91c1c',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 4,
+    color: '#fecaca',
+    marginTop: spacing.xs,
   },
-  alertEmoji: { fontSize: 42, marginBottom: 8 },
-  alertTitle: { color: '#ffffff', fontSize: 22, fontWeight: '900', letterSpacing: 0.5 },
-  alertSubtitle: { color: '#fee2e2', fontSize: 13, textAlign: 'center', marginTop: 6, lineHeight: 18, fontWeight: '500' },
-  sectionCard: {
-    backgroundColor: '#ffffff',
+  card: {
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 20,
-    padding: 18,
-    gap: 10,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSecondary,
+    padding: spacing.md,
+    gap: spacing.sm,
   },
-  sectionHeader: { fontSize: 12, fontWeight: '900', color: '#64748b', letterSpacing: 0.5 },
-  emptyText: { color: '#94a3b8', fontSize: 13 },
-  badgeContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  medsCard: {
+    borderColor: '#fca5a5',
+    backgroundColor: '#fef2f2',
+  },
+  badgeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   allergenBadge: {
     backgroundColor: '#fee2e2',
     borderColor: '#fca5a5',
     borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    minHeight: MIN_TOUCH_TARGET,
+    justifyContent: 'center',
   },
-  allergenBadgeText: { color: '#b91c1c', fontSize: 11, fontWeight: '800' },
-  medicineText: { color: '#b91c1c', fontSize: 16, fontWeight: '800', lineHeight: 22 },
-  medicineWarning: { color: '#7f1d1d', fontSize: 11, fontWeight: '600', lineHeight: 16 },
-  sosButton: {
+  allergenBadgeText: { color: '#b91c1c', fontWeight: '800' },
+  bottomBar: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  sosBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     backgroundColor: '#dc2626',
-    borderRadius: 20,
-    padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    shadowColor: '#dc2626',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3,
+    padding: spacing.md,
+    minHeight: MIN_TOUCH_TARGET + 8,
   },
-  sosButtonEmoji: { fontSize: 28 },
-  sosButtonText: { color: '#ffffff', fontWeight: '900', fontSize: 15 },
-  sosButtonSub: { color: '#fca5a5', fontSize: 11, marginTop: 1, fontWeight: '500' },
-  smsButton: {
-    backgroundColor: '#475569',
-    borderRadius: 20,
-    padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    shadowColor: '#475569',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  smsButtonEmoji: { fontSize: 28 },
-  smsButtonText: { color: '#ffffff', fontWeight: '900', fontSize: 15 },
-  smsButtonSub: { color: '#cbd5e1', fontSize: 11, marginTop: 1, fontWeight: '500' },
-  closeButton: {
-    alignItems: 'center',
-    paddingVertical: 14,
-    marginTop: 10,
-  },
-  closeButtonText: { color: '#64748b', fontWeight: '700', fontSize: 14 },
+  contactBtn: { backgroundColor: '#059669' },
+  smsBtn: { backgroundColor: '#475569' },
+  closeBtn: { alignItems: 'center', minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' },
 });

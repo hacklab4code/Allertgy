@@ -1,12 +1,13 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, Stack } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../../src/api/client';
-import DetailSection from '../../src/components/DetailSection';
+import { CollapseSection, HeaderAddButton, Screen, Section } from '../../src/components/ui';
+import { TAB_BAR_CLEARANCE } from '../../src/theme';
 import { useOwner } from '../../src/store/owner';
 import type { Allergen, PiattoIn } from '../../src/types';
 
@@ -25,6 +26,9 @@ export default function MenuEditor() {
   const [showUrlModal, setShowUrlModal] = useState(false);
   const [menuUrlInput, setMenuUrlInput] = useState('');
   const [loadingStep, setLoadingStep] = useState<string | null>(null);
+  const [importExpanded, setImportExpanded] = useState(true);
+  const [publishExpanded, setPublishExpanded] = useState(false);
+  const [catExpanded, setCatExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     api.allergens().then(setAllergens).catch((e) => setError(e.message));
@@ -43,6 +47,130 @@ export default function MenuEditor() {
       .finally(() => setLoaded(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
+
+  useEffect(() => {
+    if (piatti.length > 0) setImportExpanded(false);
+  }, [piatti.length]);
+
+  const update = (i: number, patch: Partial<PiattoIn>) =>
+    setPiatti(piatti.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+
+  const cycle = (i: number, code: string) => {
+    const p = piatti[i];
+    if (!p) return;
+    if (p.allergeni_contenuti.includes(code)) {
+      update(i, {
+        allergeni_contenuti: p.allergeni_contenuti.filter((c) => c !== code),
+        allergeni_tracce: [...p.allergeni_tracce, code],
+      });
+    } else if (p.allergeni_tracce.includes(code)) {
+      update(i, { allergeni_tracce: p.allergeni_tracce.filter((c) => c !== code) });
+    } else {
+      update(i, { allergeni_contenuti: [...p.allergeni_contenuti, code] });
+    }
+  };
+
+  const addDish = (categoria?: string) =>
+    setPiatti([...piatti, {
+      nome_piatto: '', categoria: categoria ?? null,
+      allergeni_contenuti: [], allergeni_tracce: [],
+    }]);
+
+  const removeDish = (i: number) =>
+    Alert.alert('Elimina piatto', `Eliminare "${piatti[i]?.nome_piatto || 'piatto senza nome'}"?`, [
+      { text: 'Annulla', style: 'cancel' },
+      { text: 'Elimina', style: 'destructive', onPress: () => setPiatti(piatti.filter((_, j) => j !== i)) },
+    ]);
+
+  const dishesByCategory = useMemo(() => {
+    const map = new Map<string, number[]>();
+    piatti.forEach((p, i) => {
+      const cat = p.categoria?.trim() || 'Senza categoria';
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(i);
+    });
+    const ordered: { cat: string; indices: number[] }[] = [];
+    for (const c of CATEGORIE) {
+      if (map.has(c)) ordered.push({ cat: c, indices: map.get(c)! });
+      map.delete(c);
+    }
+    for (const [cat, indices] of map) ordered.push({ cat, indices });
+    return ordered;
+  }, [piatti]);
+
+  const renderDish = (i: number) => {
+    const p = piatti[i];
+    return (
+      <View key={i} style={styles.dish}>
+        <View style={styles.dishTop}>
+          <TextInput
+            style={styles.dishName}
+            placeholder="Nome del piatto"
+            value={p.nome_piatto}
+            onChangeText={(t) => update(i, { nome_piatto: t })}
+          />
+          <TouchableOpacity onPress={() => removeDish(i)}>
+            <Text style={styles.trash}>🗑</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+          <View style={styles.catRow}>
+            {CATEGORIE.map((c) => {
+              const on = p.categoria === c;
+              return (
+                <TouchableOpacity key={c}
+                  style={[styles.catChip, on && styles.catChipOn]}
+                  onPress={() => update(i, { categoria: on ? null : c })}>
+                  <Text style={[styles.catText, on && styles.catTextOn]}>{c}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+
+        <TextInput
+          style={styles.price}
+          placeholder="Prezzo € (opzionale)"
+          keyboardType="decimal-pad"
+          value={p.prezzo_cents != null ? String(p.prezzo_cents / 100) : ''}
+          onChangeText={(t) => {
+            const n = parseFloat(t.replace(',', '.'));
+            update(i, { prezzo_cents: isNaN(n) ? null : Math.round(n * 100) });
+          }}
+        />
+
+        <TextInput
+          style={styles.imageInput}
+          placeholder="URL Foto del piatto (es. link Unsplash/web, opzionale)"
+          autoCapitalize="none"
+          keyboardType="url"
+          value={p.image_url ?? ''}
+          onChangeText={(t) => update(i, { image_url: t || null })}
+        />
+
+        <Text style={styles.allLabel}>
+          Allergeni — tocca: <Text style={{ color: '#dc2626' }}>contiene</Text> →{' '}
+          <Text style={{ color: '#d97706' }}>tracce</Text> → assente
+        </Text>
+        <View style={styles.allGrid}>
+          {allergens.filter((a) => !a.is_diet).map((a) => {
+            const cont = p.allergeni_contenuti.includes(a.code);
+            const trac = p.allergeni_tracce.includes(a.code);
+            return (
+              <TouchableOpacity key={a.code}
+                style={[styles.allChip, cont && styles.allCont, trac && styles.allTrac]}
+                onPress={() => cycle(i, a.code)}>
+                <Text style={[styles.allText, (cont || trac) && styles.allTextOn]}>
+                  {a.emoji} {a.name_it}{cont ? ' ●' : trac ? ' ◐' : ''}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
 
   if (!current) {
     return (
@@ -78,36 +206,6 @@ export default function MenuEditor() {
       </ScrollView>
     );
   }
-
-  const update = (i: number, patch: Partial<PiattoIn>) =>
-    setPiatti(piatti.map((p, j) => (j === i ? { ...p, ...patch } : p)));
-
-  /** cicla lo stato dell'allergene: assente → contiene → tracce → assente */
-  const cycle = (i: number, code: string) => {
-    const p = piatti[i];
-    if (p.allergeni_contenuti.includes(code)) {
-      update(i, {
-        allergeni_contenuti: p.allergeni_contenuti.filter((c) => c !== code),
-        allergeni_tracce: [...p.allergeni_tracce, code],
-      });
-    } else if (p.allergeni_tracce.includes(code)) {
-      update(i, { allergeni_tracce: p.allergeni_tracce.filter((c) => c !== code) });
-    } else {
-      update(i, { allergeni_contenuti: [...p.allergeni_contenuti, code] });
-    }
-  };
-
-  const addDish = (categoria?: string) =>
-    setPiatti([...piatti, {
-      nome_piatto: '', categoria: categoria ?? null,
-      allergeni_contenuti: [], allergeni_tracce: [],
-    }]);
-
-  const removeDish = (i: number) =>
-    Alert.alert('Elimina piatto', `Eliminare "${piatti[i].nome_piatto || 'piatto senza nome'}"?`, [
-      { text: 'Annulla', style: 'cancel' },
-      { text: 'Elimina', style: 'destructive', onPress: () => setPiatti(piatti.filter((_, j) => j !== i)) },
-    ]);
 
   const pickImageAndAnalyze = async () => {
     Alert.alert(
@@ -230,127 +328,80 @@ export default function MenuEditor() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={styles.container}>
+    <Screen edges={false} style={{ flex: 1 }}>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <HeaderAddButton onPress={() => addDish()} accessibilityLabel="Aggiungi piatto" />
+          ),
+        }}
+      />
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 100 }]}>
         <Text style={styles.header}>
           {current.name} <Text style={styles.headerCode}>#{current.public_code}</Text>
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <DetailSection
-          title="IMPORTA MENÙ"
-          subtitle="Carica foto o link del menù esistente. L'AI propone piatti e allergeni da verificare."
-          card={false}
-        />
+        <CollapseSection
+          icon="cloud-upload"
+          title="Importa menù"
+          preview={piatti.length > 0 ? 'AI foto o link' : 'Inizia da qui'}
+          expanded={importExpanded}
+          onToggle={() => setImportExpanded((v) => !v)}
+        >
         {loaded && (
           <View style={styles.aiBanner}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.aiTitle}>✨ Carica menù con AI</Text>
+              <Text style={styles.aiTitle}>Carica menù con AI</Text>
               <Text style={styles.aiSub}>Riconosci piatti e allergeni da foto o link web</Text>
             </View>
             <View style={styles.aiButtonsRow}>
               <TouchableOpacity style={styles.aiActionBtn} onPress={pickImageAndAnalyze}>
-                <Text style={styles.aiActionText}>📸 Foto</Text>
+                <Text style={styles.aiActionText}>Foto</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.aiActionBtn} onPress={() => setShowUrlModal(true)}>
-                <Text style={styles.aiActionText}>🔗 Link</Text>
+                <Text style={styles.aiActionText}>Link</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
-
         {!loaded && <ActivityIndicator style={{ marginVertical: 20 }} color="#059669" />}
+        </CollapseSection>
 
-        <DetailSection
-          title="ELENCO PIATTI"
-          subtitle="Per ogni piatto indica categoria, prezzo e allergeni. Tocca un allergene per ciclare: contiene → tracce → assente."
-          card={false}
-        />
+        <Section
+          title="Elenco piatti"
+          subtitle={`${piatti.filter((p) => p.nome_piatto.trim()).length} piatti · usa + in alto per aggiungere`}
+        >
+        {dishesByCategory.length === 0 ? (
+          <Text style={styles.emptyHint}>Nessun piatto. Tocca + in alto a destra per iniziare.</Text>
+        ) : (
+          dishesByCategory.map(({ cat, indices }, idx) => {
+            const filled = indices.filter((i) => piatti[i].nome_piatto.trim()).length;
+            const expanded = catExpanded[cat] ?? idx === 0;
+            return (
+              <CollapseSection
+                key={cat}
+                icon="restaurant"
+                title={cat}
+                preview={`${filled} piatti`}
+                badge={indices.length}
+                expanded={expanded}
+                onToggle={() => setCatExpanded((prev) => ({ ...prev, [cat]: !expanded }))}
+              >
+                {indices.map((i) => renderDish(i))}
+              </CollapseSection>
+            );
+          })
+        )}
+        </Section>
 
-        {piatti.map((p, i) => (
-          <View key={i} style={styles.dish}>
-            <View style={styles.dishTop}>
-              <TextInput
-                style={styles.dishName}
-                placeholder="Nome del piatto"
-                value={p.nome_piatto}
-                onChangeText={(t) => update(i, { nome_piatto: t })}
-              />
-              <TouchableOpacity onPress={() => removeDish(i)}>
-                <Text style={styles.trash}>🗑</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* categoria */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-              <View style={styles.catRow}>
-                {CATEGORIE.map((c) => {
-                  const on = p.categoria === c;
-                  return (
-                    <TouchableOpacity key={c}
-                      style={[styles.catChip, on && styles.catChipOn]}
-                      onPress={() => update(i, { categoria: on ? null : c })}>
-                      <Text style={[styles.catText, on && styles.catTextOn]}>{c}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
-
-            {/* prezzo */}
-            <TextInput
-              style={styles.price}
-              placeholder="Prezzo € (opzionale)"
-              keyboardType="decimal-pad"
-              value={p.prezzo_cents != null ? String(p.prezzo_cents / 100) : ''}
-              onChangeText={(t) => {
-                const n = parseFloat(t.replace(',', '.'));
-                update(i, { prezzo_cents: isNaN(n) ? null : Math.round(n * 100) });
-              }}
-            />
-
-            {/* Foto URL */}
-            <TextInput
-              style={styles.imageInput}
-              placeholder="URL Foto del piatto (es. link Unsplash/web, opzionale)"
-              autoCapitalize="none"
-              keyboardType="url"
-              value={p.image_url ?? ''}
-              onChangeText={(t) => update(i, { image_url: t || null })}
-            />
-
-            {/* allergeni: tocca per ciclare assente → contiene → tracce */}
-            <Text style={styles.allLabel}>
-              Allergeni — tocca: <Text style={{ color: '#dc2626' }}>contiene</Text> →{' '}
-              <Text style={{ color: '#d97706' }}>tracce</Text> → assente
-            </Text>
-            <View style={styles.allGrid}>
-              {allergens.filter((a) => !a.is_diet).map((a) => {
-                const cont = p.allergeni_contenuti.includes(a.code);
-                const trac = p.allergeni_tracce.includes(a.code);
-                return (
-                  <TouchableOpacity key={a.code}
-                    style={[styles.allChip, cont && styles.allCont, trac && styles.allTrac]}
-                    onPress={() => cycle(i, a.code)}>
-                    <Text style={[styles.allText, (cont || trac) && styles.allTextOn]}>
-                      {a.emoji} {a.name_it}{cont ? ' ●' : trac ? ' ◐' : ''}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        ))}
-
-        <TouchableOpacity style={styles.add} onPress={() => addDish()}>
-          <Text style={styles.addText}>＋ Aggiungi piatto</Text>
-        </TouchableOpacity>
-
-        <DetailSection
-          title="PUBBLICAZIONE"
-          subtitle="Conferma la correttezza degli allergeni prima di rendere il menù visibile ai clienti."
-          card={false}
-        />
+        <CollapseSection
+          icon="checkmark-circle"
+          title="Pubblicazione"
+          preview={legalAck ? 'Pronto per pubblicare' : 'Conferma allergeni'}
+          expanded={publishExpanded}
+          onToggle={() => setPublishExpanded((v) => !v)}
+        >
         <TouchableOpacity style={styles.legalRow} onPress={() => setLegalAck(!legalAck)}>
           <View style={[styles.checkbox, legalAck && styles.checkboxOn]}>
             {legalAck ? <Text style={styles.checkboxMark}>✓</Text> : null}
@@ -358,8 +409,10 @@ export default function MenuEditor() {
           <Text style={styles.legalText}>
             Confermo di aver verificato ingredienti, allergeni contenuti e possibili tracce.
             So che le informazioni pubblicate sono sotto la responsabilità del locale.
+            Se il menù è stato generato con AI, confermo di averlo rivisto manualmente prima della pubblicazione.
           </Text>
         </TouchableOpacity>
+        </CollapseSection>
         <View style={{ height: 90 }} />
       </ScrollView>
 
@@ -410,7 +463,7 @@ export default function MenuEditor() {
           </View>
         </View>
       </Modal>
-    </View>
+    </Screen>
   );
 }
 
@@ -470,6 +523,7 @@ const styles = StyleSheet.create({
     borderRadius: 14, padding: 14, alignItems: 'center',
   },
   addText: { color: '#047857', fontWeight: '700', fontSize: 15 },
+  emptyHint: { color: '#64748b', fontSize: 13, textAlign: 'center', paddingVertical: 12 },
   legalRow: {
     flexDirection: 'row', gap: 10, alignItems: 'flex-start',
     backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0',

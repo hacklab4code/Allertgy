@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api, hasToken, API, type Allergen, type DishOut, type PublicRestaurant as PublicRestaurantData, type Review, type MenuOutItem } from '../api';
-
-const SEMAFORO_LEGEND = [
-  ['🔴', 'Contiene un tuo allergene dichiarato'],
-  ['🟡', 'Possibili tracce / contaminazione'],
-  ['🟢', 'Nessun allergene dichiarato dal locale'],
-] as const;
+import {
+  ACCOUNT_DISCLAIMER,
+  KITCHEN_SAFE_HINT,
+  SAFETY_REMINDER,
+  SEMAFORO_LEGEND,
+  SEMAFORO_SECTION,
+  guestGreenLabel,
+} from '../consumer/trustCopy';
 
 type GuestSemaforo = {
   stato: 'verde' | 'giallo' | 'rosso';
@@ -14,12 +16,12 @@ type GuestSemaforo = {
 };
 
 function evalGuestDish(dish: DishOut, selected: Set<string>): GuestSemaforo {
-  if (selected.size === 0) return { stato: 'verde', label: 'Seleziona allergie', match: [] };
+  if (selected.size === 0) return { stato: 'verde', label: guestGreenLabel(false), match: [] };
   const contains = dish.allergeni_contenuti.filter((c) => selected.has(c));
-  if (contains.length > 0) return { stato: 'rosso', label: 'Da evitare', match: contains };
+  if (contains.length > 0) return { stato: 'rosso', label: SEMAFORO_SECTION.rosso.dishLabel, match: contains };
   const traces = dish.allergeni_tracce.filter((c) => selected.has(c));
-  if (traces.length > 0) return { stato: 'giallo', label: 'Chiedi conferma', match: traces };
-  return { stato: 'verde', label: 'Compatibile', match: [] };
+  if (traces.length > 0) return { stato: 'giallo', label: SEMAFORO_SECTION.giallo.dishLabel, match: traces };
+  return { stato: 'verde', label: guestGreenLabel(true), match: [] };
 }
 
 /** Pagina pubblica /r/{slug} (o /r/{codice}): visibile senza login, con SEO base. */
@@ -346,9 +348,12 @@ export default function PublicRestaurant({ codeOrSlug }: { codeOrSlug: string })
                   </p>
                 )}
               </div>
-              <div className="flex gap-4 text-[10px] text-slate-500 font-semibold">
+              <div className="flex gap-4 flex-wrap text-[10px] text-slate-500 font-semibold">
                 {SEMAFORO_LEGEND.map(([emoji, label]) => <span key={emoji}>{emoji} {label}</span>)}
               </div>
+              <p className="text-[11px] text-amber-800 font-semibold bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 leading-relaxed">
+                ⚠️ {SAFETY_REMINDER}
+              </p>
               {/* Selettore dei Multi-menù */}
               {data.menus && data.menus.length > 0 && (
                 <div className="flex border-b border-slate-100 gap-2 pb-1 text-xs overflow-x-auto">
@@ -394,7 +399,21 @@ export default function PublicRestaurant({ codeOrSlug }: { codeOrSlug: string })
                           <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${pillClass}`}>
                             {dot} {s.label}
                           </span>
+                          {p.kitchen_protocol_confirmed === 1 && (
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-900 border-emerald-200">
+                              🛡️ Cucina sicura
+                            </span>
+                          )}
                         </div>
+                        {p.kitchen_protocol_confirmed === 1 && (
+                          <p className="text-[10px] text-slate-500 font-semibold mt-0.5">{KITCHEN_SAFE_HINT}</p>
+                        )}
+                        {s.stato === 'verde' && guestAllergens.size > 0 && (
+                          <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">{SEMAFORO_SECTION.verde.sub}</p>
+                        )}
+                        {s.stato === 'giallo' && (
+                          <p className="text-[10px] text-amber-700 font-semibold mt-0.5">{SEMAFORO_SECTION.giallo.sub}</p>
+                        )}
                         {p.descrizione && <span className="text-xs text-slate-500">{p.descrizione}</span>}
                         <div className="flex gap-2 flex-wrap mt-1">
                           {s.match.length > 0 && (
@@ -572,11 +591,16 @@ export default function PublicRestaurant({ codeOrSlug }: { codeOrSlug: string })
           )}
         </section>
 
-        <footer className="text-center text-[10px] text-slate-400 space-x-3">
-          <a href="/termini" className="hover:underline">Termini</a>
-          <a href="/privacy" className="hover:underline">Privacy</a>
-          <a href="/cookie" className="hover:underline">Cookie</a>
-          <a href="/sicurezza" className="hover:underline">Sicurezza</a>
+        <footer className="text-center space-y-3 pb-4">
+          <p className="text-[10px] text-slate-500 leading-relaxed max-w-xl mx-auto px-4">
+            {ACCOUNT_DISCLAIMER}
+          </p>
+          <div className="text-[10px] text-slate-400 space-x-3">
+            <a href="/termini" className="hover:underline">Termini</a>
+            <a href="/privacy" className="hover:underline">Privacy</a>
+            <a href="/cookie" className="hover:underline">Cookie</a>
+            <a href="/sicurezza" className="hover:underline">Sicurezza</a>
+          </div>
         </footer>
       </main>
     </div>

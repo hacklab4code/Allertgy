@@ -1,9 +1,11 @@
-import { router } from 'expo-router';
-import { useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Stack, router } from 'expo-router';
+import { useEffect, useMemo } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useNotifStore } from '../src/store/notifications';
 import type { AppNotification } from '../src/api/client';
-import { colors, radius, shadow, spacing, typography } from '../src/theme';
+import { AppText, ErrorStateCard, GlassScreenScroll, Screen, Section } from '../src/components/ui';
+import { useSession } from '../src/store/session';
+import { colors, spacing } from '../src/theme';
 
 interface Presented { icon: string; title: string; body: string; code?: string }
 
@@ -16,6 +18,15 @@ function present(n: AppNotification): Presented {
       return { icon: '🍽️', title: 'Menù aggiornato', body: 'Un locale tra i tuoi preferiti ha pubblicato un nuovo menù. Controlla il semaforo!', code };
     case 'review_reply':
       return { icon: '💬', title: 'Risposta alla tua recensione', body: 'Il ristoratore ha risposto alla tua recensione.', code };
+    case 'review_received':
+      return {
+        icon: '⭐',
+        title: 'Nuova recensione',
+        body: payload.author_name
+          ? `${payload.author_name} ha lasciato una recensione sul tuo locale.`
+          : 'Hai ricevuto una nuova recensione sul tuo locale.',
+        code,
+      };
     case 'promo':
     case 'broadcast':
       return {
@@ -69,10 +80,42 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
 }
 
+function NotifRow({ n, onOpen }: { n: AppNotification; onOpen: (n: AppNotification) => void }) {
+  const p = present(n);
+  const isUnread = !n.read_at;
+  return (
+    <Pressable
+      style={[styles.item, isUnread && styles.itemUnread]}
+      onPress={() => onOpen(n)}
+    >
+      <View style={styles.itemIconWrap}>
+        <AppText variant="title">{p.icon}</AppText>
+      </View>
+      <View style={{ flex: 1 }}>
+        <View style={styles.itemTop}>
+          <AppText variant="bodyBold" style={{ flexShrink: 1 }}>{p.title}</AppText>
+          {isUnread ? <View style={styles.unreadDot} /> : null}
+        </View>
+        <AppText variant="caption">{p.body}</AppText>
+        <AppText variant="caption" color={colors.textMuted} style={{ marginTop: 4 }}>
+          {timeAgo(n.created_at)}
+        </AppText>
+      </View>
+      {p.code ? <AppText variant="h2" color={colors.textMuted}>›</AppText> : null}
+    </Pressable>
+  );
+}
+
 export default function Notifiche() {
-  const { items, unread, loading, refresh, markRead, markAllRead } = useNotifStore();
+  const { items, unread, loading, error, refresh, markRead, markAllRead } = useNotifStore();
+  const { role } = useSession();
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  const { unreadItems, readItems } = useMemo(() => ({
+    unreadItems: items.filter((n) => !n.read_at),
+    readItems: items.filter((n) => !!n.read_at),
+  }), [items]);
 
   const open = (n: AppNotification) => {
     const p = present(n);
@@ -86,7 +129,12 @@ export default function Notifiche() {
       return;
     }
     if (n.type === 'referral_welcome_pro') {
-      router.push('/(owner)/piano');
+      if (role === 'owner') router.push('/(owner)/piano');
+      else router.push('/(tabs)/account');
+      return;
+    }
+    if (n.type === 'review_received' && role === 'owner') {
+      router.push('/(owner)/recensioni');
       return;
     }
     if (p.code) {
@@ -102,91 +150,88 @@ export default function Notifiche() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.back}>‹ Indietro</Text>
-        </TouchableOpacity>
-        {unread > 0 && (
-          <TouchableOpacity onPress={markAllRead}>
-            <Text style={styles.markAll}>Segna tutte come lette</Text>
-          </TouchableOpacity>
+    <Screen edges={false} ambient>
+      <Stack.Screen
+        options={{
+          title: 'Notifiche',
+          headerRight: unread > 0
+            ? () => (
+              <Pressable onPress={markAllRead} hitSlop={8} style={styles.markAllBtn}>
+                <AppText variant="caption" color={colors.brand}>Segna lette</AppText>
+              </Pressable>
+            )
+            : undefined,
+        }}
+      />
+
+      <GlassScreenScroll showsVerticalScrollIndicator={false}>
+        {loading && items.length === 0 ? (
+          <ActivityIndicator color={colors.brand} style={{ marginTop: spacing.xl }} />
+        ) : error ? (
+          <ErrorStateCard
+            message="Impossibile caricare le notifiche. Controlla la connessione."
+            retryLabel="Riprova"
+            onRetry={refresh}
+            style={{ marginTop: spacing.lg }}
+          />
+        ) : items.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <AppText variant="h1">📭</AppText>
+            <AppText variant="title">Nessuna notifica</AppText>
+            <AppText variant="subtitle" style={{ textAlign: 'center' }}>
+              Qui arriveranno gli avvisi sui tuoi locali preferiti e le risposte alle tue recensioni.
+            </AppText>
+          </View>
+        ) : (
+          <View style={styles.list}>
+            {unreadItems.length > 0 ? (
+              <Section title="Non lette" subtitle={`${unreadItems.length} da leggere`} card padded={false}>
+                {unreadItems.map((n) => <NotifRow key={n.id} n={n} onOpen={open} />)}
+              </Section>
+            ) : null}
+            {readItems.length > 0 ? (
+              <Section title="Lette" subtitle={`${readItems.length} in archivio`} card padded={false}>
+                {readItems.map((n) => <NotifRow key={n.id} n={n} onOpen={open} />)}
+              </Section>
+            ) : null}
+          </View>
         )}
-      </View>
-
-      <Text style={styles.title}>🔔 Notifiche</Text>
-
-      {items.length === 0 ? (
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyEmoji}>📭</Text>
-          <Text style={styles.emptyTitle}>Nessuna notifica</Text>
-          <Text style={styles.emptyText}>
-            {loading ? 'Caricamento…' : 'Qui arriveranno gli avvisi sui tuoi locali preferiti e le risposte alle tue recensioni.'}
-          </Text>
-        </View>
-      ) : (
-        <View style={{ gap: spacing.sm }}>
-          {items.map((n) => {
-            const p = present(n);
-            const isUnread = !n.read_at;
-            return (
-              <TouchableOpacity
-                key={n.id}
-                style={[styles.item, isUnread && styles.itemUnread]}
-                onPress={() => open(n)}
-                activeOpacity={0.85}
-              >
-                <View style={styles.itemIconWrap}>
-                  <Text style={styles.itemIcon}>{p.icon}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.itemTop}>
-                    <Text style={styles.itemTitle}>{p.title}</Text>
-                    {isUnread && <View style={styles.unreadDot} />}
-                  </View>
-                  <Text style={styles.itemBody}>{p.body}</Text>
-                  <Text style={styles.itemTime}>{timeAgo(n.created_at)}</Text>
-                </View>
-                {p.code && <Text style={styles.itemArrow}>›</Text>}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-    </ScrollView>
+      </GlassScreenScroll>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.lg, paddingTop: spacing.xxxl, paddingBottom: 48, backgroundColor: colors.bg, minHeight: '100%' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  back: { color: colors.brandDark, fontWeight: '700', fontSize: 15 },
-  markAll: { color: colors.brandDark, fontWeight: '700', fontSize: 13 },
-  title: { ...typography.h1, color: colors.ink, marginBottom: spacing.lg },
-
+  container: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  markAllBtn: { paddingHorizontal: spacing.sm, minHeight: 44, justifyContent: 'center' },
+  list: { gap: spacing.lg },
   emptyBox: {
-    alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border, padding: spacing.xxxl, marginTop: spacing.lg, gap: spacing.sm,
+    alignItems: 'center',
+    padding: spacing.xxl,
+    marginTop: spacing.lg,
+    gap: spacing.sm,
   },
-  emptyEmoji: { fontSize: 40 },
-  emptyTitle: { ...typography.h3, color: colors.ink },
-  emptyText: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, textAlign: 'center' },
-
   item: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg,
-    borderWidth: 1, borderColor: colors.border, ...shadow.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 0,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minHeight: 72,
+    marginBottom: spacing.sm,
   },
   itemUnread: { borderColor: colors.brand200, backgroundColor: colors.brand50 },
   itemIconWrap: {
-    width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.surface,
-    borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center',
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  itemIcon: { fontSize: 20 },
   itemTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  itemTitle: { ...typography.h3, color: colors.ink, flexShrink: 1 },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brand },
-  itemBody: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 2 },
-  itemTime: { color: colors.textMuted, fontSize: 11.5, fontWeight: '600', marginTop: 4 },
-  itemArrow: { color: colors.textMuted, fontSize: 24, fontWeight: '300' },
 });

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { useSession } from '../store/session';
 import type {
   Allergen,
@@ -18,8 +19,27 @@ import type {
   SubProfileIn,
 } from '../types';
 
+function getDevPackagerHost(): string | null {
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (!hostUri) return null;
+  const host = hostUri.split(':')[0];
+  return host || null;
+}
+
+/** In dev usa l'host di Metro (stesso Mac del backend), anche con Development Build. */
+function resolveApiUrl(): string {
+  const envUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+  if (__DEV__) {
+    const host = getDevPackagerHost();
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      return `http://${host}:8000`;
+    }
+  }
+  return envUrl;
+}
+
 // Su dispositivo fisico imposta EXPO_PUBLIC_API_URL=http://<IP-del-tuo-Mac>:8000
-export const API = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+export const API = resolveApiUrl();
 
 const getWebUrl = () => {
   if (API.includes('localhost')) return 'http://localhost:5173';
@@ -95,6 +115,29 @@ export interface ExtractionResult {
   note: string;
 }
 
+export interface ProductLabelAnalyzeResult {
+  barcode: string;
+  product_name: string;
+  brand: string;
+  ingredients: string;
+  allergeni_contenuti: string[];
+  allergeni_tracce: string[];
+  ai_stub: boolean;
+  from_cache?: boolean;
+  note: string;
+  remaining_this_month: number | null;
+}
+
+export interface ProductLabelCacheResult {
+  barcode: string;
+  product_name: string;
+  brand: string;
+  ingredients: string;
+  allergeni_contenuti: string[];
+  allergeni_tracce: string[];
+  cached_at: string;
+}
+
 export interface Review {
   id: number;
   restaurant_id: number;
@@ -119,6 +162,20 @@ export interface AppNotification {
 }
 
 const REQUEST_TIMEOUT_MS = 15000;
+
+let onUnauthorized: (() => void) | null = null;
+
+/** Registrato in app/_layout.tsx per redirect a welcome su 401. */
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler;
+}
+
+export class SessionExpiredError extends Error {
+  constructor() {
+    super('Sessione scaduta. Accedi di nuovo.');
+    this.name = 'SessionExpiredError';
+  }
+}
 
 async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
   const controller = new AbortController();
@@ -160,6 +217,11 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     );
   }
   if (!res.ok) {
+    if (res.status === 401 && token) {
+      useSession.getState().logout();
+      onUnauthorized?.();
+      throw new SessionExpiredError();
+    }
     const body = await res.json().catch(() => ({} as any));
     throw new Error(body.detail ?? `Errore ${res.status}`);
   }
@@ -351,6 +413,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ expo_token: expoToken }),
     }),
+  unregisterDeviceToken: (expoToken: string) =>
+    req<void>('/profile/device-token', {
+      method: 'DELETE',
+      body: JSON.stringify({ expo_token: expoToken }),
+    }),
   listNotifications: () => req<AppNotification[]>('/profile/notifications'),
   markNotificationRead: (id: number) =>
     req<void>(`/profile/notifications/${id}/read`, { method: 'POST' }),
@@ -387,6 +454,15 @@ export const api = {
     }),
   barcodeScansRemaining: () =>
     req<{ allowed: boolean; remaining: number | null; limit: number | null }>('/profile/barcode-scan/remaining'),
+  analyzeProductLabel: (fileUri: string, barcode: string, mimeType = 'image/jpeg') => {
+    const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
+    const fd = new FormData();
+    fd.append('file', { uri: fileUri, name: `etichetta.${ext}`, type: mimeType } as any);
+    fd.append('barcode', barcode);
+    return req<ProductLabelAnalyzeResult>('/profile/product-label/analyze', { method: 'POST', body: fd });
+  },
+  getProductLabelCache: (barcode: string) =>
+    req<ProductLabelCacheResult>(`/profile/product-label/${encodeURIComponent(barcode)}`),
   startTrial: (restaurantId: number, plan: BusinessPlan) =>
     req<Restaurant>('/billing/start-trial', {
       method: 'POST',

@@ -17,7 +17,7 @@ Decisioni prese come base di questo piano:
 | 3 — Documenti medici + AI | ✅ | Storage privato con URL firmati 5 min, consenso AI per-documento, estrazione Gemini (stub senza API key), conferma manuale obbligatoria, limite 5/mese, access log, cancellazione reale, schermata mobile `documenti.tsx` |
 | 4 — Recensioni + moderazione | ✅ | Upsert 1-per-utente, risposta ristoratore (piano Pro+), segnalazioni, moderazione in InternalAdmin, UI web e mobile |
 | 5 — Stripe end-to-end | ✅ (codice) | Checkout/Portal/webhook/fatture implementati; si attivano inserendo le chiavi `STRIPE_*` in `backend/.env` (senza chiavi: 503 con messaggio chiaro) |
-| 6 — Notifiche | ✅ (parziale) | Tabelle + push Expo su "menù aggiornato" (preferiti server-side) e "risposta a recensione"; email transazionali via Resend (fallback log). Manca il wiring `expo-notifications` nell'app (richiede dev build) |
+| 6 — Notifiche | ✅ (parziale) | Tabelle + push Expo su "menù aggiornato" (preferiti server-side) e "risposta a recensione"; email transazionali via Resend (fallback log). Wiring `expo-notifications` nell'app presente (`_layout.tsx`); serve **dev build** su device per test reali |
 | 7 — Hardening + beta | 🔄 | Codice produzione pronto (Docker, security headers, push deep links, CI). Restano: deploy VPS reale, Stripe live, revisione legale, submit store |
 
 Testi legali (§8): integrali in `backend/app/legal.py`, serviti da `GET /legal/{doc}`, pubblicati su web (`/termini`, `/privacy`, `/cookie`, `/sicurezza`) e in app (`legal-docs.tsx`). **Da far rivedere a un legale prima del lancio.**

@@ -1,89 +1,116 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput,
-  TouchableOpacity, View
+  ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { api } from '../src/api/client';
-import DetailSection from '../src/components/DetailSection';
 import { useSession } from '../src/store/session';
 import type { Allergen, SubProfile } from '../src/types';
-import { colors } from '../src/theme';
+import { colors, radius, spacing } from '../src/theme';
+import { toggleAllergieSelectionWithIntensities } from '../src/engine/allergyLinks';
+import {
+  AppText,
+  AvatarBubble,
+  avatarForIndex,
+  DebossedInput,
+  EmptyStateCard,
+  GlassCard,
+  GlassScreenScroll,
+  HeaderAddButton,
+  PuffyButton,
+  Screen,
+  Section,
+} from '../src/components/ui';
 
 const RELATIONS = [
-  { label: 'Figlio/a', value: 'figlio' },
-  { label: 'Coniuge/Partner', value: 'coniuge' },
-  { label: 'Genitore', value: 'genitore' },
-  { label: 'Amico/a', value: 'amico' },
-  { label: 'Altro', value: 'altro' }
+  { label: 'Figlio/a', labelEn: 'Child', value: 'figlio' },
+  { label: 'Coniuge/Partner', labelEn: 'Spouse/Partner', value: 'coniuge' },
+  { label: 'Genitore', labelEn: 'Parent', value: 'genitore' },
+  { label: 'Amico/a', labelEn: 'Friend', value: 'amico' },
+  { label: 'Altro', labelEn: 'Other', value: 'altro' },
 ];
 
 export default function SubProfilesScreen() {
   const { subProfiles, setSubProfiles, language } = useSession();
+  const params = useLocalSearchParams<{ edit?: string; add?: string }>();
   const [allergens, setAllergens] = useState<Allergen[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  
-  // Stati del form
   const [editingProfile, setEditingProfile] = useState<SubProfile | null>(null);
   const [name, setName] = useState('');
-  const [relationship, setRelationship] = useState('altro');
+  const [relationship, setRelationship] = useState('figlio');
   const [selectedAllergens, setSelectedAllergens] = useState<Record<string, 'lieve' | 'moderata' | 'grave'>>({});
 
   const isIt = language === 'it';
+  const familyProfiles = subProfiles.filter((p) => p.relationship !== 'io');
+  const primaryProfile = subProfiles.find((p) => p.relationship === 'io');
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const all = await api.allergens();
-      setAllergens(all.filter(a => !a.is_diet));
+      setAllergens(all.filter((a) => !a.is_diet));
       const profiles = await api.getSubProfiles();
       setSubProfiles(profiles);
     } catch (e) {
       console.log('Errore caricamento profili:', e);
     }
     setLoading(false);
-  };
+  }, [setSubProfiles]);
 
-  const openAddModal = () => {
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const openAddModal = useCallback(() => {
     setEditingProfile(null);
     setName('');
     setRelationship('figlio');
     setSelectedAllergens({});
     setModalVisible(true);
-  };
+  }, []);
 
-  const openEditModal = (p: SubProfile) => {
+  const openEditModal = useCallback((p: SubProfile) => {
     setEditingProfile(p);
     setName(p.name);
     setRelationship(p.relationship);
-    
     const mapped: Record<string, 'lieve' | 'moderata' | 'grave'> = {};
-    p.allergens.forEach(a => {
+    p.allergens.forEach((a) => {
       mapped[a.code] = a.intensity;
     });
     setSelectedAllergens(mapped);
     setModalVisible(true);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (loading || subProfiles.length === 0) return;
+    if (params.add === '1') {
+      openAddModal();
+      router.setParams({ add: undefined });
+    } else if (params.edit) {
+      const id = Number(params.edit);
+      const target = subProfiles.find((p) => p.id === id);
+      if (target) openEditModal(target);
+      router.setParams({ edit: undefined });
+    }
+  }, [params.add, params.edit, subProfiles, loading, openAddModal, openEditModal]);
 
   const toggleAllergen = (code: string) => {
-    setSelectedAllergens(prev => {
-      const copy = { ...prev };
-      if (copy[code]) {
-        delete copy[code];
-      } else {
-        copy[code] = 'moderata';
-      }
-      return copy;
-    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const selected = new Set(Object.keys(selectedAllergens));
+    const { intensities } = toggleAllergieSelectionWithIntensities(
+      selected,
+      selectedAllergens,
+      code,
+    );
+    setSelectedAllergens(intensities);
   };
 
   const cycleIntensity = (code: string) => {
-    setSelectedAllergens(prev => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedAllergens((prev) => {
       const copy = { ...prev };
       if (!copy[code]) return prev;
       const current = copy[code];
@@ -99,30 +126,26 @@ export default function SubProfilesScreen() {
       Alert.alert(isIt ? 'Attenzione' : 'Warning', isIt ? 'Inserisci un nome valido.' : 'Please enter a valid name.');
       return;
     }
-
     setLoading(true);
     try {
-      const payloadAllergens = Object.keys(selectedAllergens).map(code => ({
+      const payloadAllergens = Object.keys(selectedAllergens).map((code) => ({
         code,
-        intensity: selectedAllergens[code]
+        intensity: selectedAllergens[code],
       }));
-
       const body = {
         name: name.trim(),
         relationship: editingProfile?.relationship === 'io' ? 'io' : relationship,
-        allergens: payloadAllergens
+        allergens: payloadAllergens,
       };
-
       if (editingProfile) {
-        // Modifica
         const updated = await api.updateSubProfile(editingProfile.id, body);
-        setSubProfiles(subProfiles.map(p => p.id === editingProfile.id ? updated : p));
+        setSubProfiles(subProfiles.map((p) => (p.id === editingProfile.id ? updated : p)));
       } else {
-        // Creazione
         const created = await api.createSubProfile(body);
         setSubProfiles([...subProfiles, created]);
       }
       setModalVisible(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       Alert.alert(isIt ? 'Errore' : 'Error', (e as Error).message);
     }
@@ -133,14 +156,13 @@ export default function SubProfilesScreen() {
     if (p.relationship === 'io') {
       Alert.alert(
         isIt ? 'Azione non consentita' : 'Action not allowed',
-        isIt ? 'Non puoi eliminare il tuo profilo principale.' : 'You cannot delete your primary profile.'
+        isIt ? 'Non puoi eliminare il profilo principale.' : 'You cannot delete your primary profile.',
       );
       return;
     }
-
     Alert.alert(
-      isIt ? 'Elimina Profilo' : 'Delete Profile',
-      isIt ? `Sei sicuro di voler eliminare il profilo di ${p.name}?` : `Are you sure you want to delete ${p.name}'s profile?`,
+      isIt ? 'Elimina profilo' : 'Delete profile',
+      isIt ? `Eliminare il profilo di ${p.name}?` : `Delete ${p.name}'s profile?`,
       [
         { text: isIt ? 'Annulla' : 'Cancel', style: 'cancel' },
         {
@@ -150,108 +172,155 @@ export default function SubProfilesScreen() {
             setLoading(true);
             try {
               await api.deleteSubProfile(p.id);
-              setSubProfiles(subProfiles.filter(item => item.id !== p.id));
+              setSubProfiles(subProfiles.filter((item) => item.id !== p.id));
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (e) {
-              Alert.alert('Errore', (e as Error).message);
+              Alert.alert(isIt ? 'Errore' : 'Error', (e as Error).message);
             }
             setLoading(false);
-          }
-        }
-      ]
+          },
+        },
+      ],
     );
   };
 
   const getRelationLabel = (rel: string) => {
-    if (rel === 'io') return isIt ? 'Profilo Principale (Io)' : 'Primary Profile (Me)';
-    const found = RELATIONS.find(r => r.value === rel);
-    return found ? found.label : rel.toUpperCase();
+    if (rel === 'io') return isIt ? 'Profilo principale' : 'Primary profile';
+    const found = RELATIONS.find((r) => r.value === rel);
+    return found ? (isIt ? found.label : found.labelEn) : rel;
+  };
+
+  const intensityStyle = (intensity: string) => {
+    if (intensity === 'lieve') return styles.chipLieve;
+    if (intensity === 'grave') return styles.chipGrave;
+    return styles.chipModerata;
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.header}>
-          <Text style={styles.title}>👥 {isIt ? 'Profili Famiglia' : 'Family Profiles'}</Text>
-          <Text style={styles.sub}>
-            {isIt
-              ? 'Gestisci le allergie di figli, partner o altre persone per controllare la compatibilità dei cibi per tutta la famiglia.'
-              : 'Manage allergies for children, partners, or others to check food compatibility for the whole family.'}
-          </Text>
-        </View>
+    <Screen ambient>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <HeaderAddButton onPress={openAddModal} accessibilityLabel="Aggiungi persona" />
+          ),
+        }}
+      />
+      <GlassScreenScroll showsVerticalScrollIndicator={false}>
+        <AppText variant="subtitle" style={styles.intro}>
+          {isIt
+            ? 'Ogni persona ha allergie separate per scansioni e semaforo.'
+            : 'Each person has separate allergies for scans and traffic light.'}
+        </AppText>
 
-        {loading && <ActivityIndicator color={colors.brand} style={{ marginVertical: 12 }} />}
+        {loading && <ActivityIndicator color={colors.brand} style={{ marginVertical: spacing.md }} />}
 
-        <DetailSection
-          title={isIt ? 'PERSONE REGISTRATE' : 'REGISTERED PROFILES'}
-          subtitle={isIt ? 'Ogni persona ha allergie separate per scansioni e semaforo.' : 'Each person has separate allergies for scans and traffic light.'}
-          card={false}
-        />
-
-        <View style={styles.list}>
-          {subProfiles.map(p => (
-            <View key={p.id} style={[styles.card, p.relationship === 'io' && styles.primaryCard]}>
-              <View style={styles.cardHeader}>
-                <View>
-                  <Text style={styles.cardName}>{p.name}</Text>
-                  <Text style={styles.cardRelation}>{getRelationLabel(p.relationship)}</Text>
-                </View>
-                <View style={styles.cardActions}>
-                  <TouchableOpacity style={styles.editBtn} onPress={() => openEditModal(p)}>
-                    <Text style={styles.editBtnText}>✏️</Text>
-                  </TouchableOpacity>
-                  {p.relationship !== 'io' && (
-                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(p)}>
-                      <Text style={styles.deleteBtnText}>🗑️</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+        {primaryProfile && (
+          <GlassCard style={styles.primaryCard}>
+            <View style={styles.cardRow}>
+              <AvatarBubble {...avatarForIndex(0)} active size={52} />
+              <View style={{ flex: 1 }}>
+                <AppText variant="title">{primaryProfile.name}</AppText>
+                <AppText variant="caption" color={colors.brand}>{getRelationLabel('io')}</AppText>
               </View>
-
-              <View style={styles.cardBody}>
-                {p.allergens.length === 0 ? (
-                  <Text style={styles.noAllergens}>
-                    {isIt ? 'Nessun allergene impostato' : 'No allergens selected'}
-                  </Text>
-                ) : (
-                  <View style={styles.chips}>
-                    {p.allergens.map(a => (
-                      <View key={a.code} style={[styles.chip, a.intensity === 'lieve' ? styles.lieve : a.intensity === 'grave' ? styles.grave : styles.moderata]}>
-                        <Text style={styles.chipText}>
-                          {a.emoji} {a.name_it} ({a.intensity})
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
+              <Pressable
+                style={styles.iconBtn}
+                onPress={() => router.push('/allergie')}
+              >
+                <Ionicons name="create-outline" size={20} color={colors.brand} />
+              </Pressable>
             </View>
-          ))}
-        </View>
-      </ScrollView>
+            <View style={styles.chips}>
+              {primaryProfile.allergens.length === 0 ? (
+                <AppText variant="caption" color={colors.onSurfaceMuted}>
+                  {isIt ? 'Nessun allergene — modifica dal profilo principale' : 'No allergens — edit from primary profile'}
+                </AppText>
+              ) : (
+                primaryProfile.allergens.map((a) => (
+                  <View key={a.code} style={[styles.chip, intensityStyle(a.intensity)]}>
+                    <AppText variant="caption">{a.emoji} {a.name_it}</AppText>
+                  </View>
+                ))
+              )}
+            </View>
+          </GlassCard>
+        )}
 
-      <TouchableOpacity style={styles.addFab} onPress={openAddModal}>
-        <Text style={styles.addFabText}>＋ {isIt ? 'Aggiungi Persona' : 'Add Profile'}</Text>
-      </TouchableOpacity>
+        <Section
+          title={isIt ? 'Altri profili' : 'Other profiles'}
+          subtitle={familyProfiles.length > 0
+            ? `${familyProfiles.length} ${isIt ? 'persone' : 'people'}`
+            : (isIt ? 'Tocca + in alto per aggiungere una persona' : 'Tap + above to add a person')}
+        >
+        {!loading && familyProfiles.length === 0 ? (
+          <EmptyStateCard
+            icon="people"
+            title={isIt ? 'Nessun profilo famiglia' : 'No family profiles'}
+            description={isIt
+              ? 'Aggiungi figli, partner o altri familiari per scansionare con allergie separate.'
+              : 'Add children, partners or others to scan with separate allergies.'}
+          />
+        ) : (
+          <View style={styles.list}>
+            {familyProfiles.map((p, i) => {
+              const av = avatarForIndex(i + 1);
+              return (
+                <GlassCard key={p.id}>
+                  <View style={styles.cardRow}>
+                    <AvatarBubble emoji={av.emoji} color={av.color} size={48} />
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="bodyBold">{p.name}</AppText>
+                      <AppText variant="caption" color={colors.brand}>{getRelationLabel(p.relationship)}</AppText>
+                    </View>
+                    <View style={styles.cardActions}>
+                      <Pressable style={styles.iconBtn} onPress={() => openEditModal(p)}>
+                        <Ionicons name="create-outline" size={20} color={colors.brand} />
+                      </Pressable>
+                      <Pressable style={[styles.iconBtn, styles.iconBtnDanger]} onPress={() => handleDelete(p)}>
+                        <Ionicons name="trash-outline" size={20} color={colors.red} />
+                      </Pressable>
+                    </View>
+                  </View>
+                  <View style={styles.chips}>
+                    {p.allergens.length === 0 ? (
+                      <AppText variant="caption" color={colors.onSurfaceMuted}>
+                        {isIt ? 'Nessun allergene impostato' : 'No allergens set'}
+                      </AppText>
+                    ) : (
+                      p.allergens.map((a) => (
+                        <View key={a.code} style={[styles.chip, intensityStyle(a.intensity)]}>
+                          <AppText variant="caption">
+                            {a.emoji} {a.name_it} ({a.intensity})
+                          </AppText>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                </GlassCard>
+              );
+            })}
+          </View>
+        )}
 
-      {/* MODALE DI AGGIUNTA / MODIFICA */}
-      <Modal visible={modalVisible} animationType="slide" transparent={false} onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
+        </Section>
+      </GlassScreenScroll>
+
+      <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
+        <Screen>
+          <View style={styles.modalHead}>
+            <AppText variant="h2">
               {editingProfile
-                ? (isIt ? 'Modifica Profilo' : 'Edit Profile')
-                : (isIt ? 'Nuovo Profilo' : 'New Profile')}
-            </Text>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text style={styles.closeText}>{isIt ? 'Chiudi' : 'Close'}</Text>
-            </TouchableOpacity>
+                ? (isIt ? 'Modifica profilo' : 'Edit profile')
+                : (isIt ? 'Nuovo profilo' : 'New profile')}
+            </AppText>
+            <Pressable onPress={() => setModalVisible(false)} hitSlop={12}>
+              <AppText variant="bodyBold" color={colors.brand}>{isIt ? 'Chiudi' : 'Close'}</AppText>
+            </Pressable>
           </View>
 
-          <ScrollView contentContainerStyle={styles.modalScroll}>
-            <View style={styles.formGroup}>
-              <Text style={styles.fieldLabel}>{isIt ? 'Nome della persona' : "Person's Name"}</Text>
-              <TextInput
-                style={styles.textInput}
+          <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
+            <View style={styles.field}>
+              <AppText variant="bodyBold">{isIt ? 'Nome' : 'Name'}</AppText>
+              <DebossedInput
                 value={name}
                 onChangeText={setName}
                 placeholder={isIt ? 'es. Sofia, Marco' : 'e.g. Sofia, Marco'}
@@ -259,208 +328,163 @@ export default function SubProfilesScreen() {
             </View>
 
             {editingProfile?.relationship !== 'io' && (
-              <View style={styles.formGroup}>
-                <Text style={styles.fieldLabel}>{isIt ? 'Relazione' : 'Relationship'}</Text>
+              <View style={styles.field}>
+                <AppText variant="bodyBold">{isIt ? 'Relazione' : 'Relationship'}</AppText>
                 <View style={styles.relationsRow}>
-                  {RELATIONS.map(rel => (
-                    <TouchableOpacity
-                      key={rel.value}
-                      style={[styles.relationChip, relationship === rel.value && styles.relationChipOn]}
-                      onPress={() => setRelationship(rel.value)}
-                    >
-                      <Text style={[styles.relationText, relationship === rel.value && styles.relationTextOn]}>
-                        {rel.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {RELATIONS.map((rel) => {
+                    const on = relationship === rel.value;
+                    return (
+                      <Pressable
+                        key={rel.value}
+                        style={[styles.relationChip, on && styles.relationChipOn]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          setRelationship(rel.value);
+                        }}
+                      >
+                        <AppText variant="caption" color={on ? colors.brand : colors.onSurfaceMuted}>
+                          {isIt ? rel.label : rel.labelEn}
+                        </AppText>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
             )}
 
-            <View style={styles.formGroup}>
-              <Text style={styles.fieldLabel}>
-                {isIt ? 'Allergie e Intolleranze' : 'Allergies & Intolerances'}
-              </Text>
-              <Text style={styles.helperText}>
+            <View style={styles.field}>
+              <AppText variant="bodyBold">{isIt ? 'Allergie e intolleranze' : 'Allergies & intolerances'}</AppText>
+              <AppText variant="caption">
                 {isIt
-                  ? 'Seleziona gli allergeni e tocca l\'intensità per cambiarla (lieve, moderata, grave).'
-                  : 'Select allergens and tap on intensity to change it (mild, moderate, severe).'}
-              </Text>
-
-              <View style={styles.allergenSelectorList}>
-                {allergens.map(a => {
+                  ? 'Seleziona gli allergeni. Tocca l\'intensità per cambiarla.'
+                  : 'Select allergens. Tap intensity to change it.'}
+              </AppText>
+              <View style={styles.allergenList}>
+                {allergens.map((a) => {
                   const isSelected = !!selectedAllergens[a.code];
                   const intensity = selectedAllergens[a.code] || 'moderata';
                   return (
-                    <View key={a.code} style={[styles.allergenSelectorItem, isSelected && styles.selectorItemOn]}>
-                      <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }} onPress={() => toggleAllergen(a.code)}>
-                        <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
-                          {isSelected && <Text style={styles.checkboxMark}>✓</Text>}
-                        </View>
-                        <Text style={[styles.selectorLabel, isSelected && styles.selectorLabelOn]}>
-                          {a.emoji} {a.name_it}
-                        </Text>
-                      </TouchableOpacity>
-
+                    <Pressable
+                      key={a.code}
+                      style={[styles.allergenRow, isSelected && styles.allergenRowOn]}
+                      onPress={() => toggleAllergen(a.code)}
+                    >
+                      <View style={[styles.checkbox, isSelected && styles.checkboxOn]}>
+                        {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+                      </View>
+                      <AppText variant="bodyBold" style={{ flex: 1 }}>
+                        {a.emoji} {a.name_it}
+                      </AppText>
                       {isSelected && (
-                        <TouchableOpacity style={[styles.intensityBadge, intensity === 'lieve' ? styles.lieveBadge : intensity === 'grave' ? styles.graveBadge : styles.moderataBadge]} onPress={() => cycleIntensity(a.code)}>
-                          <Text style={styles.intensityBadgeText}>
-                            {intensity.toUpperCase()} 🔄
-                          </Text>
-                        </TouchableOpacity>
+                        <Pressable
+                          style={[styles.intensityBadge, intensityStyle(intensity)]}
+                          onPress={() => cycleIntensity(a.code)}
+                        >
+                          <AppText variant="caption">{intensity.toUpperCase()}</AppText>
+                        </Pressable>
                       )}
-                    </View>
+                    </Pressable>
                   );
                 })}
               </View>
             </View>
 
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-              <Text style={styles.saveBtnText}>{isIt ? 'Salva Profilo' : 'Save Profile'}</Text>
-            </TouchableOpacity>
-            <View style={{ height: 40 }} />
+            <PuffyButton
+              label={isIt ? 'Salva profilo' : 'Save profile'}
+              onPress={handleSave}
+              loading={loading}
+            />
           </ScrollView>
-        </View>
+        </Screen>
       </Modal>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  scroll: { padding: 16, paddingBottom: 100 },
-  header: { marginBottom: 20 },
-  title: { fontSize: 22, fontWeight: '900', color: colors.ink, marginBottom: 6 },
-  sub: { fontSize: 13, color: '#64748b', lineHeight: 19 },
-  list: { gap: 12 },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0'
-  },
-  primaryCard: {
-    borderColor: colors.brand,
-    backgroundColor: '#f0fdf4'
-  },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 10, marginBottom: 10 },
-  cardName: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
-  cardRelation: { fontSize: 11, fontWeight: '700', color: colors.brand, textTransform: 'uppercase', marginTop: 2 },
-  cardActions: { flexDirection: 'row', gap: 10 },
-  editBtn: { padding: 6, backgroundColor: '#f1f5f9', borderRadius: 8 },
-  editBtnText: { fontSize: 14 },
-  deleteBtn: { padding: 6, backgroundColor: '#fee2e2', borderRadius: 8 },
-  deleteBtnText: { fontSize: 14 },
-  cardBody: {},
-  noAllergens: { fontSize: 12, color: '#94a3b8', fontStyle: 'italic' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    borderWidth: 1
-  },
-  chipText: { fontSize: 11, fontWeight: '700' },
-  lieve: { backgroundColor: '#fef3c7', borderColor: '#f59e0b' },
-  moderata: { backgroundColor: '#ffedd5', borderColor: '#ea580c' },
-  grave: { backgroundColor: '#fee2e2', borderColor: '#dc2626' },
-  addFab: {
-    position: 'absolute',
-    bottom: 24,
-    left: 24,
-    right: 24,
-    backgroundColor: colors.brand,
-    borderRadius: 16,
-    padding: 16,
+  scroll: { padding: spacing.xl, paddingBottom: 48, gap: spacing.lg },
+  intro: { marginBottom: spacing.xs },
+  primaryCard: { gap: spacing.md },
+  sectionHead: { gap: 4, paddingHorizontal: 2 },
+  list: { gap: spacing.md },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  cardActions: { flexDirection: 'row', gap: spacing.sm },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.sm,
+    backgroundColor: colors.brand50,
     alignItems: 'center',
-    shadowColor: colors.brand,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4
+    justifyContent: 'center',
   },
-  addFabText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  
-  // Modale
-  modalContainer: { flex: 1, backgroundColor: '#fff' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', backgroundColor: '#f8fafc' },
-  modalTitle: { fontSize: 18, fontWeight: '900', color: '#0f172a' },
-  closeText: { fontSize: 14, fontWeight: '800', color: colors.brand },
-  modalScroll: { padding: 16, gap: 20 },
-  formGroup: { gap: 8 },
-  fieldLabel: { fontSize: 14, fontWeight: '800', color: '#1e293b' },
-  textInput: {
+  iconBtnDanger: { backgroundColor: colors.redSoft },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: spacing.sm },
+  chip: {
+    borderRadius: radius.pill,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 15,
-    backgroundColor: '#f8fafc'
   },
-  relationsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  relationChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#fff'
-  },
-  relationChipOn: {
-    borderColor: colors.brand,
-    backgroundColor: '#f0fdf4'
-  },
-  relationText: { fontSize: 12, fontWeight: '700', color: '#64748b' },
-  relationTextOn: { color: colors.brand },
-  helperText: { fontSize: 11, color: '#64748b', marginBottom: 4 },
-  allergenSelectorList: { gap: 8 },
-  allergenSelectorItem: {
+  chipLieve: { backgroundColor: colors.yellowSoft, borderColor: colors.yellow },
+  chipModerata: { backgroundColor: colors.amberBg, borderColor: colors.amber },
+  chipGrave: { backgroundColor: colors.redSoft, borderColor: colors.red },
+  addBtn: { marginTop: spacing.sm },
+  modalHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1.2,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#fff'
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  selectorItemOn: {
+  modalScroll: { padding: spacing.xl, gap: spacing.lg, paddingBottom: 48 },
+  field: { gap: spacing.sm },
+  relationsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  relationChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  relationChipOn: {
     borderColor: colors.brand,
-    backgroundColor: '#f0fdf4'
+    backgroundColor: colors.brand50,
+  },
+  allergenList: { gap: spacing.sm },
+  allergenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  allergenRowOn: {
+    borderColor: colors.brand,
+    backgroundColor: colors.brand50,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: '#cbd5e1',
+    borderColor: colors.borderStrong,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
   },
   checkboxOn: {
     backgroundColor: colors.brand,
-    borderColor: colors.brand
+    borderColor: colors.brand,
   },
-  checkboxMark: { color: '#fff', fontWeight: '900', fontSize: 12 },
-  selectorLabel: { fontSize: 14, fontWeight: '600', color: '#475569' },
-  selectorLabelOn: { fontWeight: '700', color: '#0f172a' },
   intensityBadge: {
-    paddingVertical: 5,
+    paddingVertical: 4,
     paddingHorizontal: 10,
-    borderRadius: 8,
-    borderWidth: 1
+    borderRadius: radius.sm,
+    borderWidth: 1,
   },
-  lieveBadge: { backgroundColor: '#fef3c7', borderColor: '#f59e0b' },
-  moderataBadge: { backgroundColor: '#ffedd5', borderColor: '#ea580c' },
-  graveBadge: { backgroundColor: '#fee2e2', borderColor: '#dc2626' },
-  intensityBadgeText: { fontSize: 10, fontWeight: '800', color: '#0f172a' },
-  saveBtn: {
-    backgroundColor: colors.brand,
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 12
-  },
-  saveBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 }
 });

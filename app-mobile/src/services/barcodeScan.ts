@@ -12,6 +12,8 @@ export interface ScannedProduct {
   match_tracce: string[];
   match_esclusi: string[];
   date: string;
+  source?: 'off' | 'ai_label' | 'community_cache';
+  aiNote?: string;
 }
 
 /** Analizza un prodotto Open Food Facts e calcola il semaforo per il profilo utente. */
@@ -85,6 +87,54 @@ export function analyzeOffProduct(
     match_tracce: esito.match_tracce || [],
     match_esclusi: esito.match_esclusi || [],
     date: new Date().toISOString(),
+    source: 'off',
+  };
+}
+
+export interface ProductLabelAiResult {
+  barcode: string;
+  product_name: string;
+  brand: string;
+  ingredients: string;
+  allergeni_contenuti: string[];
+  allergeni_tracce: string[];
+  note?: string;
+}
+
+/** Converte dati etichetta (AI o archivio) in ScannedProduct con semaforo profilo. */
+export function analyzeFromLabelAi(
+  data: ProductLabelAiResult,
+  allergie: readonly string[],
+  ingredientiEsclusi: readonly string[] = [],
+  opts?: { source?: 'ai_label' | 'community_cache'; aiNote?: string },
+): ScannedProduct {
+  const activeAllergies = [...allergie];
+  if (allergie.includes('senza_glutine') && !activeAllergies.includes('glutine')) activeAllergies.push('glutine');
+  if (allergie.includes('senza_lattosio') && !activeAllergies.includes('latte')) activeAllergies.push('latte');
+
+  const piatto: PiattoAllergeni = {
+    nome_piatto: data.product_name || 'Prodotto sconosciuto',
+    descrizione: data.ingredients,
+    allergeni_contenuti: data.allergeni_contenuti,
+    allergeni_tracce: data.allergeni_tracce,
+  };
+
+  const esito = calcolaSemaforo(activeAllergies, piatto, ingredientiEsclusi);
+  const source = opts?.source ?? 'ai_label';
+
+  return {
+    barcode: data.barcode,
+    name: data.product_name || 'Prodotto sconosciuto',
+    brand: data.brand || 'Marca non specificata',
+    image: null,
+    status: esito.stato,
+    ingredients: data.ingredients,
+    match_contenuti: esito.match_contenuti || [],
+    match_tracce: esito.match_tracce || [],
+    match_esclusi: esito.match_esclusi || [],
+    date: new Date().toISOString(),
+    source,
+    aiNote: opts?.aiNote ?? data.note,
   };
 }
 
@@ -94,12 +144,54 @@ export async function fetchAndAnalyzeBarcode(
   allergie: readonly string[],
   ingredientiEsclusi: readonly string[] = [],
 ): Promise<ScannedProduct> {
-  const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`, {
-    headers: { 'User-Agent': 'AllerTgyApp/1.0 (contact@allertgy.com)' },
-  });
-  const data = await response.json();
-  if (data.status !== 1 || !data.product) {
-    throw new Error('Prodotto non trovato nel database di Open Food Facts');
+  const candidates = barcodeCandidates(barcode);
+  let lastError: Error | null = null;
+
+  for (const candidate of candidates) {
+    try {
+      const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${candidate}.json`, {
+        headers: { 'User-Agent': 'AllerTgyApp/1.0 (contact@allertgy.com)' },
+      });
+      if (!response.ok) {
+        lastError = new Error(`HTTP ${response.status}`);
+        continue;
+      }
+      const data = await response.json();
+      if (data.status === 1 && data.product) {
+        return analyzeOffProduct(candidate, data.product, allergie, ingredientiEsclusi);
+      }
+      lastError = new Error('Prodotto non trovato nel database di Open Food Facts');
+    } catch (e: unknown) {
+      lastError = e instanceof Error ? e : new Error('Errore di rete');
+    }
   }
-  return analyzeOffProduct(barcode, data.product, allergie, ingredientiEsclusi);
+
+  throw lastError ?? new Error('Prodotto non trovato nel database di Open Food Facts');
+}
+
+/** Estrae un codice prodotto da stringa scanner (EAN, UPC, GS1 QR). */
+export function extractProductBarcode(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const gs1 = trimmed.match(/\(01\)(\d{13,14})/);
+  if (gs1) return gs1[1];
+
+  const digitsOnly = trimmed.replace(/\D/g, '');
+  if (digitsOnly.length >= 8 && digitsOnly.length <= 14) return digitsOnly;
+
+  const urlMatch = trimmed.match(/\/(\d{8,14})(?:[/?#]|$)/);
+  if (urlMatch) return urlMatch[1];
+
+  return null;
+}
+
+function barcodeCandidates(barcode: string): string[] {
+  const digits = barcode.replace(/\D/g, '');
+  if (!digits) return [];
+  const out = new Set<string>([digits]);
+  if (digits.length === 12) out.add(`0${digits}`);
+  if (digits.length < 13) out.add(digits.padStart(13, '0'));
+  if (digits.length === 13 && digits.startsWith('0')) out.add(digits.slice(1));
+  return [...out];
 }

@@ -127,3 +127,44 @@ def remaining_barcode_scans(user: User, db: Session) -> int | None:
         return None
     used = count_monthly_usage(db, user.id, "barcode_scan")
     return max(0, limit - used)
+
+
+def customer_product_label_ai_limit(user: User) -> int | None:
+    if not customer_has_plus(user):
+        return 0
+    plan = CUSTOMER_PLANS_BY_CODE.get(user.customer_plan or "customer_free", {})
+    return plan.get("product_label_ai_limit_month")
+
+
+def ensure_product_label_ai_allowed(user: User, db: Session) -> int | None:
+    """Analisi AI etichette prodotto — solo piano Plus Famiglia."""
+    if user.role != "customer":
+        raise HTTPException(403, "Solo i clienti possono analizzare etichette prodotto")
+    if not customer_has_plus(user):
+        raise HTTPException(
+            403,
+            "L'analisi AI delle etichette è inclusa nel piano Plus Famiglia. "
+            "Attivalo dall'area Account.",
+        )
+    limit = customer_product_label_ai_limit(user)
+    if limit is None:
+        record_usage(db, user.id, "product_label_ai")
+        return None
+    used = count_monthly_usage(db, user.id, "product_label_ai")
+    if used >= limit:
+        raise HTTPException(
+            429,
+            f"Hai raggiunto il limite di {limit} analisi etichette AI questo mese.",
+        )
+    record_usage(db, user.id, "product_label_ai")
+    return max(0, limit - used - 1)
+
+
+def remaining_product_label_ai_scans(user: User, db: Session) -> int | None:
+    limit = customer_product_label_ai_limit(user)
+    if limit is None:
+        return None
+    if limit <= 0:
+        return 0
+    used = count_monthly_usage(db, user.id, "product_label_ai")
+    return max(0, limit - used)

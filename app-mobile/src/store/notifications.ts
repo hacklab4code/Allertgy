@@ -6,6 +6,7 @@ interface NotifState {
   items: AppNotification[];
   unread: number;
   loading: boolean;
+  error: string | null;
   refresh: () => Promise<void>;
   markRead: (id: number) => Promise<void>;
   markAllRead: () => Promise<void>;
@@ -17,17 +18,18 @@ export const useNotifStore = create<NotifState>((set, get) => ({
   items: [],
   unread: 0,
   loading: false,
+  error: null,
   refresh: async () => {
     if (!useSession.getState().token) {
-      set({ items: [], unread: 0 });
+      set({ items: [], unread: 0, error: null });
       return;
     }
-    set({ loading: true });
+    set({ loading: true, error: null });
     try {
       const items = await api.listNotifications();
-      set({ items, unread: items.filter((n) => !n.read_at).length });
+      set({ items, unread: items.filter((n) => !n.read_at).length, error: null });
     } catch {
-      // offline / sessione scaduta: mantieni lo stato precedente
+      set({ error: 'network' });
     }
     set({ loading: false });
   },

@@ -2,16 +2,21 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { api } from '../../src/api/client';
-import DetailSection from '../../src/components/DetailSection';
+import {
+  AppText,
+  CollapseSection,
+  GlassCard,
+  GlassScreenScroll,
+  MetricTile,
+  PuffyButton,
+  Screen,
+} from '../../src/components/ui';
 import { useOwner } from '../../src/store/owner';
-import { colors, radius, shadow, spacing, typography } from '../../src/theme';
+import { colors, radius, spacing } from '../../src/theme';
 
 function dateLabel(iso: string) {
   return new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
@@ -21,6 +26,8 @@ export default function OwnerStatistiche() {
   const { current } = useOwner();
   const locale = current;
   const [loading, setLoading] = useState(true);
+  const [chartExpanded, setChartExpanded] = useState(true);
+  const [allergensExpanded, setAllergensExpanded] = useState(false);
   const [analytics, setAnalytics] = useState<{
     total_views: number;
     total_allergen_queries: number;
@@ -46,133 +53,220 @@ export default function OwnerStatistiche() {
 
   if (!locale) {
     return (
-      <View style={styles.empty}>
-        <Text style={styles.emptyText}>Seleziona un locale dalla scheda Attività.</Text>
-        <TouchableOpacity style={styles.btn} onPress={() => router.push('/(owner)/locali')}>
-          <Text style={styles.btnText}>Vai ad Attività</Text>
-        </TouchableOpacity>
-      </View>
+      <Screen edges={false}>
+        <View style={styles.empty}>
+          <AppText variant="eyebrow">Statistiche</AppText>
+          <AppText variant="h1" style={styles.emptyTitle}>Prima scegli un locale</AppText>
+          <AppText variant="body" color={colors.onSurfaceMuted} style={styles.emptyText}>
+            Seleziona l’attività di cui vuoi leggere andamento e preferenze.
+          </AppText>
+          <PuffyButton label="Vai ad Attività" onPress={() => router.push('/(owner)/locali')} />
+        </View>
+      </Screen>
     );
   }
 
   const maxSeries = analytics ? Math.max(...analytics.time_series.map((d) => d.count), 1) : 1;
+  const bestDay = analytics?.time_series.reduce(
+    (best, point) => (point.count > best.count ? point : best),
+    analytics.time_series[0] ?? { date: '', count: 0 },
+  );
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <Screen edges={false}>
+    <GlassScreenScroll>
+      <View style={styles.pageHead}>
+        <AppText variant="eyebrow">Dati del locale</AppText>
+        <AppText variant="h1">Statistiche</AppText>
+        <AppText variant="subtitle" numberOfLines={2}>
+          {locale.name} · scansioni QR e filtri allergici
+        </AppText>
+      </View>
+
       {loading ? (
-        <ActivityIndicator color={colors.brand} style={{ marginTop: 24 }} />
+        <ActivityIndicator color={colors.brand} style={styles.loader} />
       ) : !analytics ? (
-        <DetailSection
-          title="PANORAMICA"
-          subtitle={`${locale.name} · scansioni QR e filtri allergici sul menù.`}
-          style={{ marginTop: 0 }}
-          card={false}
-        >
-          <View style={styles.card}>
-            <Text style={styles.muted}>
+        <GlassCard style={{ borderLeftWidth: 3, borderLeftColor: colors.brand }}>
+          <AppText variant="eyebrow" color={colors.brandDark}>Piano Pro</AppText>
+          <AppText variant="h2">I numeri che fanno crescere il menù</AppText>
+          <AppText variant="body" color={colors.onSurfaceMuted}>
               Statistiche disponibili con piano Pro attivo. Passa a Pro per vedere scansioni e allergeni più cercati.
-            </Text>
-            <TouchableOpacity style={styles.btn} onPress={() => router.push('/(owner)/piano')}>
-              <Text style={styles.btnText}>Vedi piani</Text>
-            </TouchableOpacity>
-          </View>
-        </DetailSection>
+          </AppText>
+          <PuffyButton label="Scopri i piani" onPress={() => router.push('/(owner)/piano')} />
+        </GlassCard>
       ) : (
         <>
-          <DetailSection
-            title="PANORAMICA"
-            subtitle={`${locale.name} · scansioni QR e filtri allergici sul menù.`}
-            style={{ marginTop: 0 }}
-            card={false}
-          >
-          <View style={styles.kpiRow}>
-            <View style={styles.kpi}>
-              <Text style={styles.kpiVal}>{analytics.total_views}</Text>
-              <Text style={styles.kpiLabel}>Visualizzazioni menù</Text>
+          <View style={styles.sectionHead}>
+            <View>
+              <AppText variant="eyebrow">Panoramica</AppText>
+              <AppText variant="h2">In breve</AppText>
             </View>
-            <View style={styles.kpi}>
-              <Text style={[styles.kpiVal, { color: colors.brand }]}>{analytics.total_allergen_queries}</Text>
-              <Text style={styles.kpiLabel}>Filtri allergici</Text>
-            </View>
+            <AppText variant="caption" color={colors.onSurfaceMuted}>Ultimi 30 giorni</AppText>
           </View>
-          </DetailSection>
 
-          <DetailSection
-            title="ANDAMENTO VISITE"
-            subtitle="Visualizzazioni del menù negli ultimi 30 giorni."
-            card={false}
+          <View style={styles.kpiRow}>
+            <MetricTile
+              style={styles.kpi}
+              value={analytics.total_views}
+              label="Visualizzazioni menù"
+              detail="totali"
+              accent={colors.onSurface}
+            />
+            <MetricTile
+              style={styles.kpi}
+              value={analytics.total_allergen_queries}
+              label="Filtri allergici"
+              detail="ricerche"
+              tint="brand"
+              accent={colors.brandDark}
+            />
+          </View>
+
+          <CollapseSection
+            icon="bar-chart"
+            title="Andamento visite"
+            preview={bestDay?.count ? `Picco: ${bestDay.count} visite` : 'Ultimi 30 giorni'}
+            expanded={chartExpanded}
+            onToggle={() => setChartExpanded((v) => !v)}
           >
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Visite · ultimi 30 giorni</Text>
+          <View style={styles.panelBody}>
+            <View style={styles.chartHead}>
+              <View>
+                <AppText variant="eyebrow">Volume giornaliero</AppText>
+                <AppText variant="title">Visite al menù</AppText>
+              </View>
+              <AppText variant="metric" color={colors.brandDark}>{maxSeries}</AppText>
+            </View>
             <View style={styles.chart}>
-              {analytics.time_series.map((point) => {
+              {analytics.time_series.map((point, index) => {
                 const h = Math.max(4, Math.round((point.count / maxSeries) * 80));
+                const showLabel = index === 0
+                  || index === analytics.time_series.length - 1
+                  || index % 7 === 0;
                 return (
                   <View key={point.date} style={styles.barCol}>
                     <View style={[styles.bar, { height: h }]} />
-                    <Text style={styles.barLabel}>{dateLabel(point.date)}</Text>
+                    <AppText variant="caption" style={styles.barLabel}>
+                      {showLabel ? dateLabel(point.date) : ''}
+                    </AppText>
                   </View>
                 );
               })}
             </View>
           </View>
-          </DetailSection>
+          </CollapseSection>
 
-          <DetailSection
-            title="ALLERGENI PIÙ CERCATI"
-            subtitle="Cosa filtrano i clienti quando consultano il tuo menù."
-            card={false}
+          <CollapseSection
+            icon="nutrition"
+            title="Allergeni più cercati"
+            preview={`${analytics.distribution.length} allergeni`}
+            expanded={allergensExpanded}
+            onToggle={() => setAllergensExpanded((v) => !v)}
           >
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Allergeni più cercati</Text>
+          <View style={styles.panelBody}>
             {analytics.distribution.length === 0 ? (
-              <Text style={styles.muted}>Nessun filtro applicato dai clienti.</Text>
+              <AppText variant="body" color={colors.onSurfaceMuted}>
+                Nessun filtro applicato dai clienti.
+              </AppText>
             ) : (
-              analytics.distribution.slice(0, 8).map((item) => {
+              analytics.distribution.slice(0, 8).map((item, index) => {
                 const pct = analytics.total_allergen_queries
                   ? Math.round((item.count / analytics.total_allergen_queries) * 100)
                   : 0;
                 return (
                   <View key={item.code} style={styles.distRow}>
-                    <Text style={styles.distName}>{item.emoji} {item.name}</Text>
-                    <View style={styles.distBarBg}>
-                      <View style={[styles.distBar, { width: `${pct}%` }]} />
+                    <AppText variant="eyebrow" style={styles.distRank}>
+                      {String(index + 1).padStart(2, '0')}
+                    </AppText>
+                    <View style={styles.distBody}>
+                      <View style={styles.distMeta}>
+                        <AppText variant="bodyBold" numberOfLines={1}>{item.name}</AppText>
+                        <AppText variant="caption" color={colors.onSurfaceMuted}>
+                          {item.count} ricerche
+                        </AppText>
+                      </View>
+                      <View style={styles.distBarBg}>
+                        <View style={[styles.distBar, { width: `${Math.max(4, pct)}%` }]} />
+                      </View>
                     </View>
-                    <Text style={styles.distPct}>{pct}%</Text>
+                    <AppText variant="bodyBold" color={colors.brandDark} style={styles.distPct}>
+                      {pct}%
+                    </AppText>
                   </View>
                 );
               })
             )}
           </View>
-          </DetailSection>
+          </CollapseSection>
         </>
       )}
-    </ScrollView>
+    </GlassScreenScroll>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.lg, paddingBottom: 48, backgroundColor: colors.bg, gap: spacing.lg },
-  heroTitle: { ...typography.h1, color: colors.ink },
-  heroSub: { color: colors.textSecondary, fontSize: 13 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
-  emptyText: { color: colors.textSecondary, textAlign: 'center' },
+  pageHead: { gap: spacing.xs, paddingBottom: spacing.sm },
+  loader: { marginVertical: spacing.xl },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    gap: spacing.md,
+  },
+  emptyTitle: { textAlign: 'center' },
+  emptyText: { textAlign: 'center', maxWidth: 300 },
+  upgradeCard: { gap: spacing.md, paddingVertical: spacing.xl },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    marginTop: spacing.sm,
+    paddingHorizontal: 2,
+  },
   kpiRow: { flexDirection: 'row', gap: spacing.md },
-  kpi: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, ...shadow.card },
-  kpiVal: { fontSize: 28, fontWeight: '900', color: colors.ink },
-  kpiLabel: { color: colors.textSecondary, fontSize: 11, marginTop: 4, fontWeight: '600' },
-  card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, gap: spacing.sm, ...shadow.card },
-  cardTitle: { ...typography.h3, color: colors.ink },
-  chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 100, marginTop: spacing.sm },
+  kpi: { flex: 1 },
+  panelBody: { gap: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.lg },
+  chartHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  chart: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 2,
+    height: 112,
+    paddingTop: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceTertiary,
+  },
   barCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%' },
-  bar: { width: '80%', backgroundColor: colors.brand, borderRadius: 3, minHeight: 4 },
-  barLabel: { fontSize: 7, color: colors.textMuted, marginTop: 4 },
-  distRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
-  distName: { flex: 1, fontSize: 12, fontWeight: '700', color: colors.inkSoft },
-  distBarBg: { flex: 1, height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' },
-  distBar: { height: '100%', backgroundColor: colors.brand, borderRadius: 3 },
-  distPct: { width: 32, textAlign: 'right', fontSize: 10, color: colors.textMuted, fontWeight: '700' },
-  muted: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
-  btn: { backgroundColor: colors.brand, borderRadius: radius.md, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
-  btnText: { color: colors.white, fontWeight: '800', fontSize: 14 },
+  bar: { width: '74%', backgroundColor: colors.brand, borderRadius: radius.pill, minHeight: 4 },
+  barLabel: { fontSize: 8, lineHeight: 12, minHeight: 14, marginTop: 4 },
+  distRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  distRank: { width: 22 },
+  distBody: { flex: 1, gap: spacing.sm },
+  distMeta: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  distBarBg: {
+    height: 7,
+    backgroundColor: colors.surfaceTertiary,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+  distBar: { height: '100%', backgroundColor: colors.brand, borderRadius: radius.pill },
+  distPct: { width: 38, textAlign: 'right' },
 });

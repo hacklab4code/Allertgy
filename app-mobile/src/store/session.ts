@@ -26,6 +26,10 @@ interface SessionState {
   /** profilo allergie completato anche quando l'utente dichiara nessuna allergia */
   profileCompleted: boolean;
   disclaimerAccepted: boolean;
+  /** tour guidato post-onboarding completato (cliente o ristoratore) */
+  tourCompleted: boolean;
+  /** cliente in fase registrazione — passo allergie dedicato */
+  registerAllergieStep: boolean;
   /** ultimi locali visitati */
   recents: RecentPlace[];
   /** locali salvati come preferiti */
@@ -51,6 +55,8 @@ interface SessionState {
   setLegalStatus: (legalAccepted: boolean, healthDataConsent: boolean) => void;
   setProfileCompleted: (v: boolean) => void;
   setDisclaimer: (v: boolean) => void;
+  setTourCompleted: (v: boolean) => void;
+  setRegisterAllergieStep: (v: boolean) => void;
   addRecent: (code: string, name: string) => void;
   toggleFavorite: (code: string, name: string) => void;
   setFavorites: (favorites: RecentPlace[]) => void;
@@ -76,6 +82,8 @@ export const useSession = create<SessionState>()(
       healthDataConsent: false,
       profileCompleted: false,
       disclaimerAccepted: false,
+      tourCompleted: false,
+      registerAllergieStep: false,
       recents: [],
       favorites: [],
       language: 'it',
@@ -96,6 +104,8 @@ export const useSession = create<SessionState>()(
       setLegalStatus: (legalAccepted, healthDataConsent) => set({ legalAccepted, healthDataConsent }),
       setProfileCompleted: (profileCompleted) => set({ profileCompleted }),
       setDisclaimer: (disclaimerAccepted) => set({ disclaimerAccepted }),
+      setTourCompleted: (tourCompleted) => set({ tourCompleted }),
+      setRegisterAllergieStep: (registerAllergieStep) => set({ registerAllergieStep }),
       addRecent: (code, name) => {
         const others = get().recents.filter((r) => r.code !== code);
         set({
@@ -122,7 +132,7 @@ export const useSession = create<SessionState>()(
         set({
           token: null, email: null, role: 'customer', allergie: [], allergyIntensities: {},
           legalAccepted: false, healthDataConsent: false, profileCompleted: false,
-          disclaimerAccepted: false, recents: [], favorites: [], language: 'it', languageSelected: false, 
+          disclaimerAccepted: false, tourCompleted: false, registerAllergieStep: false, recents: [], favorites: [], language: 'it', languageSelected: false, 
           emergencyMedicines: null, emergencyContactName: null, emergencyContactPhone: null, ingredientiEsclusi: [],
           subProfiles: [], activeProfileId: null,
         }),

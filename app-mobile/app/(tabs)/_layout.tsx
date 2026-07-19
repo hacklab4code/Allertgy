@@ -1,53 +1,32 @@
-import { Tabs, router } from 'expo-router';
-import { Text, TouchableOpacity, View } from 'react-native';
-import NotificationBell from '../../src/components/NotificationBell';
+import { Tabs } from 'expo-router';
+import { View } from 'react-native';
+import { OnboardingRedirect } from '../../src/hooks/onboardingGuard';
+import { ProfileContextSheet } from '../../src/components/ui/ProfileContextSheet';
+import { PuffyTabBar } from '../../src/components/ui/PuffyTabBar';
+import { AmbientMesh } from '../../src/components/ui/AmbientMesh';
+import { HeaderFloatingActions } from '../../src/components/ui/HeaderFloatingActions';
 
-const icon = (emoji: string) =>
-  ({ focused }: { focused: boolean }) => (
-    <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>{emoji}</Text>
-  );
-
-/** Schede principali dell'app cliente. */
+/** 4 route tab + Scansiona (azione su /scanner) — barra custom con 5 voci. */
 export default function TabsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerTintColor: '#047857',
-        headerTitleStyle: { fontWeight: '700' },
-        tabBarActiveTintColor: '#047857',
-        tabBarInactiveTintColor: '#94a3b8',
-        tabBarLabelStyle: { fontWeight: '700', fontSize: 11 },
-        tabBarStyle: { height: 84, paddingTop: 6 },
-        sceneStyle: { backgroundColor: '#f8fafc' },
-        headerRight: () => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
-            <NotificationBell />
-            <TouchableOpacity
-              onPress={() => router.push('/emergency')}
-              style={{
-                backgroundColor: '#fee2e2',
-                borderRadius: 12,
-                borderWidth: 1.5,
-                borderColor: '#fca5a5',
-                paddingVertical: 5,
-                paddingHorizontal: 10,
-                shadowColor: '#dc2626',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.08,
-                shadowRadius: 4,
-                elevation: 1,
-              }}
-            >
-              <Text style={{ color: '#b91c1c', fontWeight: '900', fontSize: 11, letterSpacing: 0.2 }}>🚨 SOS</Text>
-            </TouchableOpacity>
-          </View>
-        ),
-      }}
-    >
-      <Tabs.Screen name="home" options={{ title: 'Scansiona menu', tabBarLabel: 'Scansiona', tabBarIcon: icon('🔍') }} />
-      <Tabs.Screen name="spesa" options={{ title: 'Spesa', tabBarLabel: 'Spesa', tabBarIcon: icon('🛒') }} />
-      <Tabs.Screen name="locali" options={{ title: 'Ristoranti', tabBarLabel: 'Ristoranti', tabBarIcon: icon('🍽️') }} />
-      <Tabs.Screen name="account" options={{ title: 'Profilo e impostazioni', tabBarLabel: 'Profilo', tabBarIcon: icon('👤') }} />
-    </Tabs>
+    <View className="flex-1 bg-transparent">
+      <AmbientMesh />
+      <OnboardingRedirect area="customer" />
+      <Tabs
+        tabBar={(props) => <PuffyTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+          sceneStyle: { backgroundColor: 'transparent' },
+        }}
+      >
+        <Tabs.Screen name="home" options={{ title: 'Home', tabBarLabel: 'Home' }} />
+        <Tabs.Screen name="locali" options={{ title: 'Ristoranti', tabBarLabel: 'Ristoranti' }} />
+        <Tabs.Screen name="preferiti" options={{ title: 'Preferiti', tabBarLabel: 'Preferiti' }} />
+        <Tabs.Screen name="account" options={{ title: 'Profilo', tabBarLabel: 'Profilo' }} />
+        <Tabs.Screen name="scan" options={{ href: null }} />
+      </Tabs>
+      <HeaderFloatingActions />
+      <ProfileContextSheet />
+    </View>
   );
 }

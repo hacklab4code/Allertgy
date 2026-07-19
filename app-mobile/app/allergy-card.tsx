@@ -5,12 +5,10 @@ import {
   Text,
   TouchableOpacity,
   View,
-  ScrollView,
-  SafeAreaView,
   Dimensions,
 } from 'react-native';
 import { useSession } from '../src/store/session';
-import DetailSection from '../src/components/DetailSection';
+import { GlassScreenScroll, Screen, Section } from '../src/components/ui';
 import { colors, radius, shadow, spacing, typography } from '../src/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -198,13 +196,11 @@ export default function AllergyCardScreen() {
           headerTitleStyle: { fontWeight: '800' },
         }}
       />
-      <SafeAreaView style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.container}>
-          <DetailSection
-            title={isIt ? 'LINGUA DEL PASS' : 'PASS LANGUAGE'}
+      <Screen edges={false} ambient>
+      <GlassScreenScroll>
+          <Section
+            title={isIt ? 'Lingua del pass' : 'Pass language'}
             subtitle={isIt ? 'Scegli la lingua in cui mostrare allergie e messaggio allo staff.' : 'Choose the language for allergens and the message to staff.'}
-            style={{ marginTop: 0, width: '100%' }}
-            card={false}
           >
           <View style={styles.langSelector}>
             <Text style={styles.langLabel}>{isIt ? 'Traduci in:' : 'Translate to:'}</Text>
@@ -231,15 +227,13 @@ export default function AllergyCardScreen() {
               })}
             </View>
           </View>
-          </DetailSection>
+          </Section>
 
-          <DetailSection
-            title={isIt ? 'MOSTRA ALLO STAFF' : 'SHOW TO STAFF'}
+          <Section
+            title={isIt ? 'Mostra allo staff' : 'Show to staff'}
             subtitle={isIt
               ? 'Tesserino digitale per camerieri — utile all\'estero o in locali non convenzionati.'
               : 'Digital pass for waiters — useful abroad or in non-partner venues.'}
-            card={false}
-            style={{ width: '100%' }}
           >
           <View style={styles.cardFrame}>
             <View style={styles.cardGradientOverlay}>
@@ -276,13 +270,13 @@ export default function AllergyCardScreen() {
               </View>
             </View>
           </View>
-          </DetailSection>
+          </Section>
 
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Text style={styles.backBtnText}>{isIt ? 'Torna Indietro' : 'Go Back'}</Text>
           </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
+        </GlassScreenScroll>
+      </Screen>
     </>
   );
 }

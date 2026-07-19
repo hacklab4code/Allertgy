@@ -1,13 +1,17 @@
 /**
  * RestaurantCard — Card premium con indicatore circolare di compatibilità %,
  * rating, preferiti animati e badge semaforo.
- * Usa un approccio View-based per l'anello (senza dipendenze SVG).
  */
 import { router } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View, Linking, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle } from 'react-native-svg';
 import { compatibilitaColor, type CompatibilitaResult } from '../engine/compatibility';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, font, radius, spacing, typography, WIREFRAME_MODE } from '../theme';
+import { wireBox } from '../wireframe';
+import { GlassCard } from './ui/GlassCard';
+import { StatoVerdictPill } from './ui/Traffic';
 
 interface Props {
   code: string;
@@ -26,41 +30,74 @@ interface Props {
   boostActive?: boolean;
 }
 
-const RING_SIZE = 62;
-
-/** Semicerchio destro o sinistro (per comporre l'anello animato) */
-function HalfRing({
+function CompatibilityRing({
+  percentage,
   color,
-  rotation,
+  trackColor,
+  hasMenu,
+  compact,
 }: {
+  percentage: number;
   color: string;
-  rotation: string;
+  trackColor: string;
+  hasMenu: boolean;
+  compact: boolean;
 }) {
+  const size = compact ? 62 : 70;
+  const strokeWidth = compact ? 5 : 6;
+  const circleRadius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * circleRadius;
+  const normalizedPercentage = Math.max(0, Math.min(100, percentage));
+  const dashOffset = circumference * (1 - normalizedPercentage / 100);
+
   return (
-    <View style={[halfRingStyles.wrap, { transform: [{ rotate: rotation }] }]}>
-      <View
-        style={[
-          halfRingStyles.arc,
-          { borderColor: color, borderRightColor: 'transparent', borderBottomColor: 'transparent' },
-        ]}
-      />
+    <View
+      style={[styles.ringWrap, { width: size, height: size, backgroundColor: trackColor }]}
+      accessibilityLabel={hasMenu ? `Compatibilità ${normalizedPercentage} percento` : 'Compatibilità non disponibile'}
+    >
+      <Svg width={size} height={size} style={styles.ringSvg}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={circleRadius}
+          fill="none"
+          stroke={trackColor}
+          strokeWidth={strokeWidth}
+        />
+        {hasMenu ? (
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={circleRadius}
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={`${circumference} ${circumference}`}
+            strokeDashoffset={dashOffset}
+            rotation="-90"
+            origin={`${size / 2}, ${size / 2}`}
+          />
+        ) : null}
+      </Svg>
+      <View style={styles.ringCenter}>
+        <View style={styles.percentageRow}>
+          <Text
+            style={[
+              styles.percentageValue,
+              compact && styles.percentageValueCompact,
+              { color: hasMenu ? color : colors.textMuted },
+            ]}
+          >
+            {hasMenu ? normalizedPercentage : '—'}
+          </Text>
+          {hasMenu ? <Text style={[styles.percentageSymbol, { color }]}>%</Text> : null}
+        </View>
+        <Text style={styles.percentageLabel}>{hasMenu ? 'MATCH' : 'N/D'}</Text>
+      </View>
     </View>
   );
 }
-
-const halfRingStyles = StyleSheet.create({
-  wrap: {
-    position: 'absolute',
-    width: RING_SIZE,
-    height: RING_SIZE,
-  },
-  arc: {
-    width: RING_SIZE,
-    height: RING_SIZE,
-    borderRadius: RING_SIZE / 2,
-    borderWidth: 4.5,
-  },
-});
 
 export default function RestaurantCard({
   code,
@@ -100,256 +137,283 @@ export default function RestaurantCard({
     : dominantColor === 'rosso' ? colors.redBg
     : colors.surfaceAlt;
 
-  const statusLabel = dominantColor === 'verde' ? 'Sicuro'
-    : dominantColor === 'giallo' ? 'Attenzione'
-    : dominantColor === 'rosso' ? 'A rischio'
-    : 'N/D';
+  const statusLabel = dominantColor === 'verde' ? 'Alta compatibilità'
+    : dominantColor === 'giallo' ? 'Compatibilità parziale'
+    : dominantColor === 'rosso' ? 'Bassa compatibilità'
+    : 'Non calcolata';
 
-  const statusBadgeBg = dominantColor === 'verde' ? colors.greenBg
-    : dominantColor === 'giallo' ? colors.amberBg
-    : dominantColor === 'rosso' ? colors.redBg
-    : colors.surfaceAlt;
+  const cardTint = dominantColor === 'verde' ? 'green'
+    : dominantColor === 'giallo' ? 'yellow'
+    : dominantColor === 'rosso' ? 'red'
+    : 'none';
 
-  const statusBadgeBorder = dominantColor === 'verde' ? colors.greenBorder
-    : dominantColor === 'giallo' ? colors.amberBorder
-    : dominantColor === 'rosso' ? colors.redBorder
-    : colors.border;
+  if (WIREFRAME_MODE) {
+    return (
+      <TouchableOpacity
+        style={[wireBox(), styles.wfCard]}
+        onPress={() => router.push(`/menu/${code}`)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.wfTitle}>{name}</Text>
+        <Text style={styles.wfMeta}>
+          {city ? `${city} · ` : ''}#{code}
+          {distanceLabel ? ` · ${distanceLabel}` : ''}
+          {hasMenu ? ` · ${pct}%` : ''}
+        </Text>
+        <TouchableOpacity onPress={animateFav}>
+          <Text style={styles.wfMeta}>{isFavorite ? '[★ fav]' : '[☆]'}</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  }
 
-  const statusBadgeText = dominantColor === 'verde' ? colors.greenText
-    : dominantColor === 'giallo' ? colors.amberText
-    : dominantColor === 'rosso' ? colors.redText
-    : colors.textMuted;
+  const openDirections = () => {
+    if (!latitude || !longitude) return;
+    const scheme = Platform.select({ ios: 'maps://0,0?q=', android: 'geo:0,0?q=' });
+    const latLng = `${latitude},${longitude}`;
+    const url = Platform.select({
+      ios: `${scheme}${encodeURIComponent(name)}@${latLng}`,
+      android: `${scheme}${latLng}(${encodeURIComponent(name)})`,
+    });
+    if (url) Linking.openURL(url).catch(() => {});
+  };
 
   return (
     <TouchableOpacity
-      style={[styles.card, compact && styles.cardCompact]}
+      activeOpacity={0.92}
       onPress={() => router.push(`/menu/${code}`)}
-      activeOpacity={0.85}
     >
-      {/* Indicatore circolare compatibilità */}
-      <View style={[styles.ringOuter, { backgroundColor: ringBg }]}>
-        {/* Track di sfondo */}
-        <View style={[styles.ringTrack, { borderColor: statusBadgeBorder }]} />
-        {/* Archi di progresso — ruotati proporzionalmente alla % */}
-        {hasMenu && pct > 0 && (
-          <>
-            <HalfRing color={ringColor} rotation="-135deg" />
-            {pct > 25 && <HalfRing color={ringColor} rotation="-45deg" />}
-            {pct > 50 && <HalfRing color={ringColor} rotation="45deg" />}
-            {pct > 75 && <HalfRing color={ringColor} rotation="135deg" />}
-          </>
-        )}
-        {/* Centro con percentuale */}
-        <View style={[styles.ringInner, { backgroundColor: ringBg }]}>
-          {hasMenu ? (
-            <Text style={[styles.ringPct, { color: ringColor }]}>{pct}%</Text>
-          ) : (
-            <Text style={styles.ringNA}>—</Text>
-          )}
-        </View>
-      </View>
+      <GlassCard
+        padded={false}
+        tint={cardTint}
+        accentColor={hasMenu ? ringColor : undefined}
+        cardRadius={radius.lg}
+        style={[styles.card, compact && styles.cardCompact]}
+      >
+      <View style={styles.cardInner}>
+        <CompatibilityRing
+          percentage={pct}
+          color={ringColor}
+          trackColor={ringBg}
+          hasMenu={hasMenu}
+          compact={compact}
+        />
 
-      {/* Info ristorante */}
-      <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>{name}</Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {city ? `${city} · ` : ''}{distanceLabel ? `${distanceLabel} · ` : ''}#{code}
-        </Text>
-
-        {/* Badge semaforo + conteggio piatti */}
-        <View style={styles.badgeRow}>
-          {boostActive && (
-            <View style={[styles.badge, { backgroundColor: '#FEF9C3', borderColor: '#FDE047' }]}>
-              <Text style={[styles.badgeText, { color: '#854D0E' }]}>🚀 In evidenza</Text>
-            </View>
-          )}
-          <View style={[styles.badge, { backgroundColor: statusBadgeBg, borderColor: statusBadgeBorder }]}>
-            <Text style={[styles.badgeText, { color: statusBadgeText }]}>{statusLabel}</Text>
+        <View style={styles.info}>
+          <View style={styles.titleRow}>
+            <Text style={styles.name} numberOfLines={1}>{name}</Text>
+            {boostActive ? (
+              <View style={styles.featuredBadge}>
+                <Text style={styles.featuredText}>✨ In evidenza</Text>
+              </View>
+            ) : null}
           </View>
-          {hasMenu && (
-            <Text style={styles.dishCounts}>
-              🟢{compatibility!.verde} · 🟡{compatibility!.giallo} · 🔴{compatibility!.rosso}
+          <View style={styles.locationRow}>
+            <Ionicons name="location-outline" size={14} color={colors.onSurfaceMuted} />
+            <Text style={styles.meta} numberOfLines={1}>
+              {[city, distanceLabel].filter(Boolean).join(' · ') || `Codice ${code}`}
             </Text>
-          )}
+          </View>
+          <View style={styles.statusRow}>
+            <StatoVerdictPill
+              stato={dominantColor}
+              label={statusLabel}
+              size="sm"
+            />
+            {hasMenu ? (
+              <Text style={styles.menuMeta}>
+                {compatibility!.totaleDishes} {compatibility!.totaleDishes === 1 ? 'piatto' : 'piatti'} analizzati
+              </Text>
+            ) : (
+              <Text style={styles.menuMeta}>Menù non disponibile</Text>
+            )}
+            {ratingAvg != null && ratingCount != null && ratingCount > 0 ? (
+              <View style={styles.ratingRow}>
+                <Text style={styles.ratingStar}>⭐</Text>
+                <Text style={styles.ratingText}>{ratingAvg.toFixed(1)}</Text>
+              </View>
+            ) : null}
+          </View>
         </View>
 
-        {/* Rating & Naviga */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: 4 }}>
-          {ratingAvg != null && ratingCount != null && ratingCount > 0 ? (
-            <View style={styles.ratingRow}>
-              <Text style={styles.ratingStar}>★</Text>
-              <Text style={styles.ratingText}>{ratingAvg.toFixed(1)}</Text>
-              <Text style={styles.ratingCount}>({ratingCount})</Text>
-            </View>
-          ) : null}
-          
-          {latitude && longitude ? (
+        <View style={styles.actions}>
+          {!compact && latitude && longitude ? (
             <TouchableOpacity
               onPress={(e) => {
                 e.stopPropagation();
-                const scheme = Platform.select({ ios: 'maps://0,0?q=', android: 'geo:0,0?q=' });
-                const latLng = `${latitude},${longitude}`;
-                const label = name;
-                const url = Platform.select({
-                  ios: `${scheme}${encodeURIComponent(label)}@${latLng}`,
-                  android: `${scheme}${latLng}(${encodeURIComponent(label)})`
-                });
-                if (url) {
-                  Linking.openURL(url).catch(() => {});
-                }
+                openDirections();
               }}
-              style={styles.navBtn}
-              activeOpacity={0.7}
+              style={styles.iconButton}
+              hitSlop={8}
             >
-              <Text style={styles.navBtnText}>🗺️ Naviga</Text>
+              <Ionicons name="navigate" size={18} color={colors.onSurface} />
             </TouchableOpacity>
           ) : null}
+          <Animated.View style={{ transform: [{ scale: favScale }] }}>
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                animateFav();
+              }}
+              hitSlop={8}
+              style={styles.iconButton}
+            >
+              <Ionicons
+                name={isFavorite ? 'heart' : 'heart-outline'}
+                size={18}
+                color={isFavorite ? colors.red : colors.onSurface}
+              />
+            </TouchableOpacity>
+          </Animated.View>
+          <Ionicons name="chevron-forward" size={16} color={colors.onSurfaceMuted} />
         </View>
       </View>
-
-      {/* Bottone preferito con animazione bounce */}
-      <Animated.View style={{ transform: [{ scale: favScale }] }}>
-        <TouchableOpacity
-          onPress={animateFav}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          style={styles.favBtn}
-        >
-          <Text style={styles.favEmoji}>{isFavorite ? '⭐️' : '☆'}</Text>
-        </TouchableOpacity>
-      </Animated.View>
+      </GlassCard>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
+  wfCard: { padding: spacing.md, gap: 4, marginBottom: spacing.sm },
+  wfTitle: { fontSize: 14, fontWeight: '700', color: '#000' },
+  wfMeta: { fontSize: 12, color: '#444' },
   card: {
+    marginBottom: spacing.sm,
+  },
+  cardInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadow.card,
-  },
-  cardCompact: {
     padding: spacing.md,
   },
-
-  // Anello
-  ringOuter: {
-    width: RING_SIZE,
-    height: RING_SIZE,
-    borderRadius: RING_SIZE / 2,
+  cardCompact: {
+    paddingVertical: 0,
+  },
+  ringWrap: {
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: colors.border,
   },
-  ringTrack: {
+  ringSvg: {
     position: 'absolute',
-    width: RING_SIZE,
-    height: RING_SIZE,
-    borderRadius: RING_SIZE / 2,
-    borderWidth: 4.5,
-    opacity: 0.25,
+    left: 0,
+    top: 0,
   },
-  ringInner: {
-    width: RING_SIZE - 12,
-    height: RING_SIZE - 12,
-    borderRadius: (RING_SIZE - 12) / 2,
+  ringCenter: {
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
   },
-  ringPct: {
-    fontSize: 15,
+  percentageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  percentageValue: {
+    fontFamily: font.displayBold,
+    fontSize: 22,
+    lineHeight: 24,
     fontWeight: '900',
-    letterSpacing: -0.5,
+    letterSpacing: -1,
   },
-  ringNA: {
-    fontSize: 18,
+  percentageValueCompact: {
+    fontSize: 19,
+    lineHeight: 21,
+  },
+  percentageSymbol: {
+    fontFamily: font.bold,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '900',
+    marginLeft: 1,
+  },
+  percentageLabel: {
+    fontFamily: font.bold,
+    fontSize: 7,
+    lineHeight: 9,
     fontWeight: '800',
-    color: colors.textMuted,
+    letterSpacing: 0.8,
+    color: colors.onSurfaceMuted,
+    marginTop: 1,
   },
-
-  // Info
   info: {
     flex: 1,
-    gap: 2,
+    gap: 5,
+    minWidth: 0,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   name: {
     ...typography.h3,
     color: colors.ink,
+    flexShrink: 1,
   },
-  meta: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '500',
+  featuredBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand50,
+    borderWidth: 1,
+    borderColor: colors.brand200,
   },
-  badgeRow: {
+  featuredText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: colors.onSurface,
+  },
+  locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: 4,
+    gap: 3,
   },
-  badge: {
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 2,
-  },
-  badgeText: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  dishCounts: {
-    fontSize: 11,
-    color: colors.textSecondary,
+  meta: {
+    color: colors.onSurfaceMuted,
+    fontSize: 12,
     fontWeight: '600',
+    flexShrink: 1,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    minWidth: 0,
+    flexWrap: 'wrap',
+  },
+  menuMeta: {
+    fontSize: 10.5,
+    color: colors.onSurfaceMuted,
+    fontWeight: '600',
+    flexShrink: 1,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    marginTop: 2,
+    gap: 2,
+    marginLeft: 'auto',
   },
-  ratingStar: {
-    fontSize: 12,
-    color: '#f59e0b',
-  },
+  ratingStar: { fontSize: 11 },
   ratingText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     color: colors.ink,
   },
-  ratingCount: {
-    fontSize: 11,
-    color: colors.textMuted,
-    fontWeight: '600',
+  actions: {
+    alignItems: 'center',
+    gap: 6,
   },
-  navBtn: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  iconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceTertiary,
     borderWidth: 1,
     borderColor: colors.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  navBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.brandDark,
-  },
-
-  // Preferito
-  favBtn: {
-    paddingLeft: spacing.xs,
-  },
-  favEmoji: {
-    fontSize: 24,
   },
 });

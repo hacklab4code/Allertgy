@@ -12,6 +12,8 @@ import {
   PLAN_LABELS, PLAN_PRICES, PLAN_FEATURES, centsToEuro,
   restaurantCanUseMenu, restaurantCanPushNotify,
 } from './data/plans';
+import OwnerWebShell, { type OwnerTab } from './owner/OwnerWebShell';
+import { WireBtn, WireRow, WireZone } from './wireframe/WireframeUi';
 
 type Props = {
   onLogout: () => void;
@@ -87,8 +89,8 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
     return TRANSLATIONS[webLang]?.[key] ?? TRANSLATIONS['it']?.[key] ?? key;
   };
 
-  // Navigazione interna Ristorante (SaaS tabs)
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'menu' | 'settings' | 'plan' | 'crescita' | 'qr' | 'recensioni'>('overview');
+  // Navigazione — allineata ai 4 tab mobile + sezioni secondarie da Profilo
+  const [activeSubTab, setActiveSubTab] = useState<OwnerTab>('attivita');
 
   // Campi form Impostazioni Ristorante
   const [address, setAddress] = useState('');
@@ -148,7 +150,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
 
   // Inizializza la mappa interattiva per le impostazioni locale
   useEffect(() => {
-    if (activeSubTab !== 'settings') {
+    if (activeSubTab !== 'attivita') {
       if (settingsMapRef.current) {
         settingsMapRef.current.remove();
         settingsMapRef.current = null;
@@ -225,7 +227,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
 
   const selectRestaurant = async (r: Restaurant) => {
     setCurrent(r); setPiatti(null); setApproved(null); setError('');
-    setActiveSubTab('overview');
+    setActiveSubTab('attivita');
     try {
       const m = await api.publicMenu(r.public_code);
       setHasPublished(m.piatti.length > 0);
@@ -277,7 +279,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
     if (!current || !piatti) return;
     if (!restaurantCanUseMenu(current)) {
       setError('Il menu digitale con allergeni per piatto è incluso nel piano Base (€9/mese) o superiore.');
-      setActiveSubTab('plan');
+      setActiveSubTab('piano');
       return;
     }
     if (!menuLegalAck) {
@@ -416,7 +418,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
       setCurrent(res);
       setRestaurants(restaurants.map(r => r.id === res.id ? res : r));
       alert("Impostazioni salvate con successo!");
-      setActiveSubTab('overview');
+      setActiveSubTab('attivita');
     } catch (e) { setError((e as Error).message); }
     setBusy(false);
   };
@@ -438,60 +440,34 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
   const currentPlanPrice = current?.plan_price_cents ?? PLAN_PRICES[currentPlan];
   const currentPlanLabel = PLAN_LABELS[currentPlan];
 
+  const step1 = !!(current?.address && current?.phone && current?.email_contact);
+  const step2 = !!current?.opening_hours;
+  const step3 = !!(current?.image_url || photos.length > 0);
+  const step4 = !!(piatti && piatti.length > 0);
+  const step5 = !!(menuLegalAck || hasPublished);
+  const setupDone = [step1, step2, step3, step4, step5].filter(Boolean).length;
+  const setupComplete = setupDone >= 5;
+  const hasMenu = !!current?.menu_updated_at;
+  const hasPublicProfile = !!(current?.city && current?.address && current?.phone);
+  const hasLegalData = !!(current?.vat_number && current?.allergen_manager);
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 pb-20 selection:bg-emerald-150">
-      
-      {/* Header */}
-      <header className="bg-emerald-900 border-b border-emerald-800 text-white shadow-md">
-        <div className="max-w-5xl mx-auto flex items-center justify-between px-6 py-4">
-          <button onClick={() => onBackToLanding()} className="flex items-center gap-2 hover:opacity-90">
-            <span className="text-2xl">🥗</span>
-            <span className="text-lg font-black tracking-tight">AllerTgy <span className="text-emerald-300 font-light text-xs uppercase tracking-widest ml-2">Dashboard Ristoratori</span></span>
-          </button>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowGuide(!showGuide)}
-              className="text-xs font-bold text-emerald-200 hover:text-white transition-colors"
-            >
-              ❓ Come Funziona
-            </button>
-            <NotificationsPanel />
-            <button
-              onClick={onLogout}
-              className="bg-emerald-800/60 hover:bg-emerald-800 border border-emerald-700/50 text-emerald-100 font-bold px-3 py-1.5 rounded-xl text-xs transition-all"
-            >
-              Esci
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
-        
-        {/* Guida rapida a comparsa */}
-        {showGuide && (
-          <div className="bg-emerald-50/70 border border-emerald-200 rounded-3xl p-6 text-slate-700 space-y-3 relative shadow-inner">
-            <h3 className="font-extrabold text-emerald-800 text-sm flex items-center gap-1.5">
-              <span>💡</span> Istruzioni per la compilazione
-            </h3>
-            <ol className="list-decimal ml-5 text-xs space-y-2 leading-relaxed">
-              <li><b>Registra o Scegli il tuo locale</b>: otterrai il codice univoco per la scansione.</li>
-              <li><b>Configura Indirizzo, Contatti e Orari</b>: vai nella sezione <i>Impostazioni Locale</i> per descrivere la tua attività.</li>
-              <li><b>Prepara il menù</b>: puoi caricare una foto del tuo menù cartaceo (il nostro motore AI leggerà e compilerà i piatti) oppure caricarli manualmente da zero.</li>
-              <li><b>Pubblica e Stampa</b>: approva il menù e genera il QR Code da mettere sui tavoli.</li>
-            </ol>
-          </div>
-        )}
-
-        {error && <div className="p-4 rounded-2xl bg-rose-50 border border-rose-250 text-rose-700 text-xs font-semibold">{error}</div>}
-
-        {/* locale non selezionato: passo 1 selezione/creazione locale */}
-        {!current && (
-          <section className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-6">
-            <div>
-              <h2 className="text-xl font-black text-slate-800">Il tuo locale</h2>
-              <p className="text-xs text-slate-500 mt-1">Crea un nuovo punto ristorazione o seleziona un ristorante esistente per gestirne il menù:</p>
-            </div>
+    <>
+    <OwnerWebShell
+      onBackToLanding={onBackToLanding}
+      onLogout={onLogout}
+      activeTab={activeSubTab}
+      onTabChange={setActiveSubTab}
+      venueName={current?.name}
+      venueCode={current?.public_code}
+      onChangeVenue={current ? () => { setCurrent(null); setPiatti(null); setApproved(null); } : undefined}
+      headerExtra={<NotificationsPanel />}
+      showGuide={showGuide}
+      onToggleGuide={() => setShowGuide(!showGuide)}
+      error={error}
+      noVenue={
+        <WireZone label="SELEZIONE LOCALE — come tab Attività mobile">
+          <p className="text-xs mb-3">Crea un nuovo locale o seleziona uno esistente:</p>
             
             {restaurants.length > 0 && (
               <div className="space-y-2">
@@ -642,106 +618,14 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                 </div>
               </div>
             </div>
-          </section>
-        )}
-
-        {/* locale selezionato: dashboard SaaS a schede */}
-        {current && (
-          <div className="grid md:grid-cols-12 gap-6 items-start">
-            
-            {/* Sidebar di Navigazione Locale */}
-            <aside className="md:col-span-3 bg-white rounded-3xl border border-slate-200 p-4 shadow-sm space-y-4">
-              <div className="px-2 py-1 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="font-extrabold text-slate-800 text-base leading-tight truncate">{current.name}</h3>
-                  <span className="inline-block bg-emerald-50 text-emerald-800 font-mono font-bold text-[10px] px-2 py-0.5 rounded-lg mt-1">
-                    Codice #{current.public_code}
-                  </span>
-                </div>
-                <select
-                  value={webLang}
-                  onChange={(e) => setWebLang(e.target.value)}
-                  className="bg-slate-100 text-slate-700 border-none rounded-lg px-1.5 py-1 text-[10px] font-bold focus:outline-none cursor-pointer shrink-0"
-                >
-                  <option value="it">🇮🇹 IT</option>
-                  <option value="en">🇬🇧 EN</option>
-                </select>
-              </div>
-              
-              <div className="flex flex-col gap-1">
-                <button
-                  onClick={() => { setApproved(null); setActiveSubTab('overview'); }}
-                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2
-                    ${activeSubTab === 'overview' ? 'bg-emerald-800 text-white shadow shadow-emerald-700/10' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <span>📊</span>
-                  <span>Panoramica</span>
-                </button>
-                <button
-                  onClick={() => { setApproved(null); setActiveSubTab('menu'); }}
-                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2
-                    ${activeSubTab === 'menu' ? 'bg-emerald-800 text-white shadow shadow-emerald-700/10' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <span>🍽️</span>
-                  <span>Gestisci Menù</span>
-                </button>
-                <button
-                  onClick={() => { setApproved(null); setActiveSubTab('settings'); }}
-                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2
-                    ${activeSubTab === 'settings' ? 'bg-emerald-800 text-white shadow shadow-emerald-700/10' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <span>⚙️</span>
-                  <span>Impostazioni Locale</span>
-                </button>
-                <button
-                  onClick={() => { setApproved(null); setActiveSubTab('plan'); }}
-                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2
-                    ${activeSubTab === 'plan' ? 'bg-emerald-800 text-white shadow shadow-emerald-700/10' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <span>💳</span>
-                  <span>Piano e funzioni</span>
-                </button>
-                <button
-                  onClick={() => { setApproved(null); setActiveSubTab('crescita'); }}
-                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2
-                    ${activeSubTab === 'crescita' ? 'bg-emerald-800 text-white shadow shadow-emerald-700/10' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <span>🚀</span>
-                  <span>Crescita</span>
-                </button>
-                <button
-                  onClick={() => { setApproved(null); setActiveSubTab('recensioni'); }}
-                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2
-                    ${activeSubTab === 'recensioni' ? 'bg-emerald-800 text-white shadow shadow-emerald-700/10' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <span>⭐</span>
-                  <span>Recensioni</span>
-                </button>
-                <button
-                  onClick={() => { setApproved(null); setActiveSubTab('qr'); }}
-                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2
-                    ${activeSubTab === 'qr' ? 'bg-emerald-800 text-white shadow shadow-emerald-700/10' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <span>📋</span>
-                  <span>Registro & QR Code</span>
-                </button>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100">
-                <button
-                  onClick={() => { setCurrent(null); setPiatti(null); setApproved(null); }}
-                  className="w-full text-left px-4 py-2.5 rounded-2xl text-xs font-semibold text-slate-400 hover:text-slate-700 transition-colors"
-                >
-                  ← Cambia Locale
-                </button>
-              </div>
-            </aside>
-
-            {/* Area Contenuto Tab Attiva */}
-            <main className="md:col-span-9 space-y-6">
+        </WireZone>
+      }
+    >
+      {current && (
+          <div className="space-y-6">
 
               {/* TAB 1: PANORAMICA */}
-              {activeSubTab === 'overview' && (
+              {activeSubTab === 'attivita' && (
                 <div className="space-y-6">
 
                   {/* Guida al Completamento Profilo (Onboarding Wizard) */}
@@ -788,7 +672,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-lg">{step1 ? '✅' : '📍'}</span>
                               <button 
-                                onClick={() => setActiveSubTab('settings')}
+                                onClick={() => setActiveSubTab('attivita')}
                                 className="text-[9px] uppercase tracking-wider font-extrabold hover:text-white transition-colors bg-white/5 px-2 py-0.5 rounded-md cursor-pointer"
                               >
                                 Configura
@@ -803,7 +687,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-lg">{step2 ? '✅' : '🕐'}</span>
                               <button 
-                                onClick={() => setActiveSubTab('settings')}
+                                onClick={() => setActiveSubTab('attivita')}
                                 className="text-[9px] uppercase tracking-wider font-extrabold hover:text-white transition-colors bg-white/5 px-2 py-0.5 rounded-md cursor-pointer"
                               >
                                 Configura
@@ -818,7 +702,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-lg">{step3 ? '✅' : '📸'}</span>
                               <button 
-                                onClick={() => setActiveSubTab('settings')}
+                                onClick={() => setActiveSubTab('attivita')}
                                 className="text-[9px] uppercase tracking-wider font-extrabold hover:text-white transition-colors bg-white/5 px-2 py-0.5 rounded-md cursor-pointer"
                               >
                                 Galleria
@@ -923,7 +807,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-black text-emerald-800">{centsToEuro(currentPlanPrice)} / mese</span>
                       <button
-                        onClick={() => setActiveSubTab('plan')}
+                        onClick={() => setActiveSubTab('piano')}
                         className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold px-4 py-2 rounded-xl text-xs"
                       >
                         Vedi piani
@@ -975,81 +859,6 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                       </div>
                     </div>
                   </div>
-
-                  {/* Statistiche & Analytics (Fase 2) */}
-                  {analytics && (
-                    <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-6">
-                      <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
-                        <div>
-                          <h4 className="font-black text-base text-slate-800 flex items-center gap-2">
-                            <span>📊</span> Statistiche e Ricerche Clienti
-                          </h4>
-                          <p className="text-[10px] text-slate-400 mt-0.5">Analisi in tempo reale delle scansioni del QR code e degli allergeni cercati dai clienti</p>
-                        </div>
-                        <span className="bg-emerald-50 text-emerald-800 text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider border border-emerald-100">Live</span>
-                      </div>
-
-                      {/* KPI Grid */}
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Visualizzazioni Totali</span>
-                          <span className="text-2xl font-black text-slate-800 mt-1 block">{analytics.total_views}</span>
-                          <p className="text-[10px] text-slate-450 mt-1">Scansioni del menù QR del tuo locale</p>
-                        </div>
-                        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Allergeni Ricercati</span>
-                          <span className="text-2xl font-black text-emerald-700 mt-1 block">{analytics.total_allergen_queries}</span>
-                          <p className="text-[10px] text-slate-450 mt-1">Richieste di match con filtri allergici</p>
-                        </div>
-                        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 col-span-2 md:col-span-1">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Allergene Principale</span>
-                          <span className="text-xl font-black text-rose-700 mt-1 block truncate">
-                            {analytics.distribution.length > 0 
-                              ? `${analytics.distribution[0].emoji} ${analytics.distribution[0].name}` 
-                              : 'Nessun dato'}
-                          </span>
-                          <p className="text-[10px] text-slate-450 mt-1">La ricerca più frequente nei filtri</p>
-                        </div>
-                      </div>
-
-                      {/* Allergen Distribution */}
-                      <div className="space-y-3">
-                        <h5 className="font-extrabold text-xs text-slate-700 uppercase tracking-wider">Distribuzione dei Filtri Allergici Comuni</h5>
-                        {analytics.distribution.length === 0 ? (
-                          <p className="text-xs text-slate-400 italic">Nessun filtro allergico applicato finora dai tuoi clienti.</p>
-                        ) : (
-                          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-                            {analytics.distribution.slice(0, 6).map((item) => {
-                              const pct = analytics.total_allergen_queries > 0 
-                                ? Math.round((item.count / analytics.total_allergen_queries) * 100) 
-                                : 0;
-                              return (
-                                <div key={item.code} className="p-3 bg-white border border-slate-150 rounded-xl space-y-2">
-                                  <div className="flex justify-between items-center text-xs font-bold text-slate-700">
-                                    <span className="truncate">{item.emoji} {item.name}</span>
-                                    <span className="text-slate-400">{item.count}</span>
-                                  </div>
-                                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                    <div 
-                                      className="bg-emerald-600 h-full rounded-full" 
-                                      style={{ width: `${pct}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-[9px] text-slate-400 block text-right font-semibold">{pct}% del totale</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Serie temporale visite */}
-                      <div className="space-y-3">
-                        <h5 className="font-extrabold text-xs text-slate-700 uppercase tracking-wider">Visite menù · ultimi 30 giorni</h5>
-                        <TimeSeriesChart data={analytics.time_series} label="Visite" />
-                      </div>
-                    </div>
-                  )}
 
                   {/* Storico modifiche menù */}
                   {current && restaurantCanUseMenu(current) && (
@@ -1181,6 +990,79 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                 </div>
               )}
 
+              {/* TAB: STATISTICHE — tab nascosto su mobile */}
+              {activeSubTab === 'statistiche' && analytics && (
+                <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-6">
+                  <div className="border-b border-slate-100 pb-3">
+                    <h4 className="font-black text-base text-slate-800 flex items-center gap-2">
+                      <span>📊</span> Statistiche e ricerche clienti
+                    </h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Visite menù e allergeni cercati (Pro)</p>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Visualizzazioni</span>
+                      <span className="text-2xl font-black">{analytics.total_views}</span>
+                    </div>
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Allergie cercate</span>
+                      <span className="text-2xl font-black">{analytics.total_allergen_queries}</span>
+                    </div>
+                  </div>
+                  <TimeSeriesChart data={analytics.time_series} label="Visite" />
+                </div>
+              )}
+
+              {/* TAB: PROFILO — come account mobile ristoratore */}
+              {activeSubTab === 'profilo' && current && (
+                <div className="space-y-3">
+                  <WireZone label="HERO — Account ristoratore">
+                    <p className="text-xs font-bold">Ristoratore</p>
+                    <p className="text-xs text-neutral-600">{current.name} · #{current.public_code}</p>
+                    <select
+                      value={webLang}
+                      onChange={(e) => setWebLang(e.target.value)}
+                      className="mt-2 border border-black px-2 py-1 text-xs"
+                    >
+                      <option value="it">IT</option>
+                      <option value="en">EN</option>
+                    </select>
+                  </WireZone>
+
+                  <WireZone label="LA MIA ATTIVITÀ">
+                    <WireRow label={current.name} value={`${setupDone}/5 setup`} onClick={() => setActiveSubTab('attivita')} />
+                    <div className="flex gap-2 p-2 text-xs border-t border-black">
+                      <span>Menù: {hasMenu ? 'OK' : 'NO'}</span>
+                      <span>· Piano: {currentPlanLabel}</span>
+                    </div>
+                  </WireZone>
+
+                  <WireZone label="CHECKLIST OBBLIGATORIA — collassabile">
+                    <WireRow label={hasPublicProfile ? '✓ Scheda pubblica' : '! Scheda pubblica'} onClick={() => setActiveSubTab('attivita')} />
+                    <WireRow label={hasMenu ? '✓ Menù pubblicato' : '! Menù pubblicato'} onClick={() => setActiveSubTab('menu')} />
+                    <WireRow label={hasLegalData ? '✓ Dati legali' : '! P.IVA e referente'} onClick={() => setActiveSubTab('attivita')} />
+                    <WireRow label={currentPlan !== 'free' ? '✓ Piano attivo' : '! Piano attivo'} onClick={() => setActiveSubTab('piano')} />
+                    <p className="text-[10px] p-2 border-t border-black">
+                      {setupComplete ? 'Setup completato' : `${setupDone}/5 passaggi`}
+                    </p>
+                  </WireZone>
+
+                  <WireZone label="CRESCITA — link sezioni secondarie">
+                    <WireRow label="QR code tavoli" onClick={() => setActiveSubTab('qr')} />
+                    <WireRow label="Statistiche" onClick={() => setActiveSubTab('statistiche')} />
+                    <WireRow label="Piano e fatturazione" onClick={() => setActiveSubTab('piano')} />
+                    <WireRow label="Boost e notifiche push" onClick={() => setActiveSubTab('crescita')} />
+                    <WireRow label="Recensioni" onClick={() => setActiveSubTab('recensioni')} />
+                  </WireZone>
+
+                  <WireZone label="ASSISTENZA">
+                    <WireRow label="supporto@allertgy.it" onClick={() => window.location.href = 'mailto:supporto@allertgy.it'} />
+                  </WireZone>
+
+                  <WireBtn variant="danger" onClick={onLogout}>Esci dall&apos;account</WireBtn>
+                </div>
+              )}
+
               {/* TAB 2: GESTIONE MENU */}
               {activeSubTab === 'menu' && (
                 <div className="space-y-6">
@@ -1216,7 +1098,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                           </p>
                         </div>
                         <button
-                          onClick={() => setActiveSubTab('plan')}
+                          onClick={() => setActiveSubTab('piano')}
                           className="bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-3 rounded-2xl text-xs font-black"
                         >
                           Confronta i piani
@@ -1528,7 +1410,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
               )}
 
               {/* TAB 3: IMPOSTAZIONI LOCALE */}
-              {activeSubTab === 'settings' && (
+              {activeSubTab === 'attivita' && (
                 <section className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-6">
                   <div>
                     <h2 className="text-xl font-black text-slate-800">Impostazioni Locale</h2>
@@ -1888,7 +1770,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
               )}
 
               {/* TAB 4: PIANO E FUNZIONI */}
-              {activeSubTab === 'plan' && (
+              {activeSubTab === 'piano' && (
                 <section className="space-y-6">
                   {/* Stato abbonamento attuale */}
                   <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1966,21 +1848,25 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                                 if (!current) return;
                                 setBusy(true); setError('');
                                 try {
-                                  const res = await api.billingCheckout(current.id, plan.code);
-                                  window.location.href = res.checkout_url;
+                                  const updated = await api.billingStartTrial(current.id, plan.code);
+                                  setCurrent(updated);
+                                  setRestaurants(restaurants.map(r => r.id === updated.id ? updated : r));
                                 } catch (e) {
                                   const msg = (e as Error).message;
-                                  if (/STRIPE|Pagamenti non ancora attivi/i.test(msg)) {
-                                    if (window.confirm(`I pagamenti online non sono ancora attivi. Vuoi attivare subito il piano "${plan.name}" (prova gratuita 14 giorni per test)?`)) {
-                                      try {
-                                        const updated = await api.billingStartTrial(current.id, plan.code);
-                                        setCurrent(updated);
-                                        setRestaurants(restaurants.map(r => r.id === updated.id ? updated : r));
-                                        alert(`Piano "${plan.name}" attivato con successo!`);
-                                      } catch (err) {
-                                        alert((err as Error).message);
+                                  if (/già un piano|già stata utilizzata|piano attivo/i.test(msg)) {
+                                    try {
+                                      const res = await api.billingCheckout(current.id, plan.code);
+                                      window.location.href = res.checkout_url;
+                                    } catch (checkoutErr) {
+                                      const checkoutMsg = (checkoutErr as Error).message;
+                                      if (/STRIPE|Pagamenti non ancora attivi/i.test(checkoutMsg)) {
+                                        setError('I pagamenti online non sono ancora attivi sul server.');
+                                      } else {
+                                        setError(checkoutMsg);
                                       }
                                     }
+                                  } else if (/STRIPE|Pagamenti non ancora attivi/i.test(msg)) {
+                                    setError('I pagamenti online non sono ancora attivi sul server.');
                                   } else {
                                     setError(msg);
                                   }
@@ -2085,7 +1971,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                         </p>
                       </div>
                       <button
-                        onClick={() => setActiveSubTab('plan')}
+                        onClick={() => setActiveSubTab('piano')}
                         className="bg-white text-slate-900 hover:bg-slate-100 px-5 py-3 rounded-2xl text-xs font-black whitespace-nowrap"
                       >
                         Passa a Pro
@@ -2301,7 +2187,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                       </p>
                     </div>
                     <button
-                      onClick={() => setActiveSubTab('plan')}
+                      onClick={() => setActiveSubTab('piano')}
                       className="bg-emerald-700 hover:bg-emerald-800 text-white px-6 py-3 rounded-2xl text-xs font-black"
                     >
                       Vedi piano Pro
@@ -2310,11 +2196,9 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                 )
               )}
 
-            </main>
           </div>
-        )}
-
-      </div>
+      )}
+    </OwnerWebShell>
       
       {/* Container di Stampa Registro Allergeni (nascosto su schermo, visibile solo in stampa) */}
       <div id="printable-allergen-registry" className="hidden p-8 bg-white text-slate-800">
@@ -2376,6 +2260,6 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
           </p>
         </div>
       </div>
-    </div>
+    </>
   );
 }

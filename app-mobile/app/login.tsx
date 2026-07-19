@@ -1,22 +1,36 @@
 import { Stack, router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
-  Text, TextInput, TouchableOpacity, View,
+  KeyboardAvoidingView, Platform, Pressable, StyleSheet,
+  TextInput, TouchableOpacity, View, InteractionManager,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../src/api/client';
 import { useSession, type Role } from '../src/store/session';
 import { useNotifStore } from '../src/store/notifications';
-import type { Allergen } from '../src/types';
 import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
 import { useTranslation } from '../src/constants/translations';
-import { TRANSLATED_ALLERGENS } from '../src/engine/translations';
-import { registraPushToken } from '../src/services/geofencing';
 import { syncFavoritesFromServer } from '../src/services/favorites';
+import { resolveAuthenticatedRoute } from '../src/hooks/onboardingGuard';
+import { AppText, DebossedInput, GlassCard, GlassScreenScroll, PuffyButton, Screen } from '../src/components/ui';
+import { colors, spacing, radius, puffyShadow, MIN_TOUCH_TARGET } from '../src/theme';
+
+async function loadCustomerSessionData() {
+  await syncFavoritesFromServer();
+  const profiles = await api.getSubProfiles().catch(() => []);
+  useSession.getState().setSubProfiles(profiles);
+}
+
+function navigateAfterLogin(href: string) {
+  InteractionManager.runAfterInteractions(() => {
+    router.replace(href as '/');
+  });
+}
 
 export default function Login() {
   const session = useSession();
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const isIt = (session.language || 'it').toLowerCase() === 'it';
 
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
@@ -31,44 +45,6 @@ export default function Login() {
   const [acceptOwnerResponsibility, setAcceptOwnerResponsibility] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-
-  const [allAllergens, setAllAllergens] = useState<Allergen[]>([]);
-  const [selectedAllergens, setSelectedAllergens] = useState<Set<string>>(new Set());
-  const [intensities, setIntensities] = useState<Record<string, 'lieve' | 'moderata' | 'grave'>>({});
-
-  useEffect(() => {
-    if (mode === 'register') {
-      api.allergens().then(setAllAllergens).catch(() => {});
-    }
-  }, [mode]);
-
-  const toggleAllergen = (code: string) => {
-    const next = new Set(selectedAllergens);
-    next.has(code) ? next.delete(code) : next.add(code);
-    setSelectedAllergens(next);
-  };
-
-  const updateIntensity = (code: string, level: 'lieve' | 'moderata' | 'grave') => {
-    if (!selectedAllergens.has(code)) {
-      const next = new Set(selectedAllergens);
-      next.add(code);
-      setSelectedAllergens(next);
-    }
-    setIntensities((prev) => ({ ...prev, [code]: level }));
-  };
-
-  const onLongPressAllergen = (code: string, name: string) => {
-    Alert.alert(
-      isIt ? `Intensità: ${name}` : `Severity: ${name}`,
-      isIt ? `Imposta quanto è grave questa allergia:` : `Set how severe this allergy is:`,
-      [
-        { text: isIt ? 'Lieve' : 'Mild', onPress: () => updateIntensity(code, 'lieve') },
-        { text: isIt ? 'Moderata' : 'Moderate', onPress: () => updateIntensity(code, 'moderata') },
-        { text: isIt ? 'Grave/Anafilassi' : 'Severe/Anaphylaxis', onPress: () => updateIntensity(code, 'grave'), style: 'destructive' },
-        { text: isIt ? 'Annulla' : 'Cancel', style: 'cancel' },
-      ]
-    );
-  };
 
   const legalOk = mode !== 'register' || (
     acceptTerms &&
@@ -104,18 +80,23 @@ export default function Login() {
       session.setToken(res.access_token);
       session.setEmail(email.trim());
       session.setRole(res.role === 'owner' ? 'owner' : 'customer');
-      registraPushToken().catch(() => {});
+      session.setTourCompleted(mode === 'login');
+      if (mode === 'login') session.setRegisterAllergieStep(false);
+      if (!useSession.getState().languageSelected) {
+        session.setLanguage(useSession.getState().language || 'it');
+      }
       if (res.role !== 'owner') {
         if (mode === 'register') {
-          const codes = [...selectedAllergens];
-          await api.saveAllergens(codes, intensities).catch(e => {
-            console.log("Errore salvataggio allergeni in registrazione:", e);
-          });
-          session.setAllergie(codes, intensities);
           session.setLegalStatus(true, true);
-          session.setProfileCompleted(true);
+          session.setProfileCompleted(false);
+          session.setRegisterAllergieStep(true);
           session.setDisclaimer(false);
           session.setEmergencyMedicines(null);
+          await loadCustomerSessionData();
+          useNotifStore.getState().refresh();
+          navigateAfterLogin('/register-allergies');
+          setBusy(false);
+          return;
         } else {
           const profile = await api.getProfile();
           session.setLegalStatus(profile.legal_consents_ok, !!profile.health_data_consent_at);
@@ -132,12 +113,12 @@ export default function Login() {
           });
           session.setAllergie(mine.map((a) => a.code), intensitiesMap);
         }
-        await syncFavoritesFromServer();
+        await loadCustomerSessionData();
         useNotifStore.getState().refresh();
       } else {
         session.setLegalStatus(true, false);
       }
-      router.replace('/');
+      navigateAfterLogin(resolveAuthenticatedRoute(useSession.getState()));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -145,156 +126,109 @@ export default function Login() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.screen}
-    >
-      <Stack.Screen options={{ headerRight: undefined }} />
-      <LanguageFlagsRow />
+    <Screen edges={false} ambient style={styles.screen}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <Stack.Screen options={{ headerRight: () => <LanguageFlagsRow inHeader /> }} />
 
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.logo}>AllerTgy</Text>
+        <GlassScreenScroll
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+        <AppText variant="h2" color={colors.brand}>AllerTgy</AppText>
         <View style={styles.heading}>
-          <Text style={styles.title}>
+          <AppText variant="h1">
             {mode === 'login' ? t('login_title')
               : mode === 'forgot' ? t('forgot_title')
               : t('register_title')}
-          </Text>
-          <Text style={styles.tagline}>
+          </AppText>
+          <AppText variant="subtitle">
             {mode === 'login'
               ? t('login_subtitle')
               : mode === 'forgot'
               ? t('forgot_subtitle')
+              : role === 'customer'
+              ? (isIt ? 'Passo 1 di 2: account. Nel passo successivo imposterai le allergie.' : 'Step 1 of 2: account. Next you will set up your allergies.')
               : t('register_subtitle')}
-          </Text>
+          </AppText>
         </View>
 
-        {/* Scelta ruolo (solo in registrazione) */}
         {mode === 'register' && (
           <View style={styles.roles}>
-            <TouchableOpacity
-              style={[styles.role, role === 'customer' && styles.roleOn]}
+            <GlassCard
               onPress={() => setRole('customer')}
+              style={[styles.roleCard, role === 'customer' && styles.roleOn]}
             >
-              <Text style={styles.roleEmoji}>🙋</Text>
-              <Text style={[styles.roleText, role === 'customer' && styles.roleTextOn]}>
+              <AppText style={{ fontSize: 24 }}>🙋</AppText>
+              <AppText variant="bodyBold" color={role === 'customer' ? colors.brand : colors.onSurface}>
                 {isIt ? 'Sono un cliente' : 'I am a customer'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.role, role === 'owner' && styles.roleOn]}
+              </AppText>
+            </GlassCard>
+            <GlassCard
               onPress={() => setRole('owner')}
+              style={[styles.roleCard, role === 'owner' && styles.roleOn]}
             >
-              <Text style={styles.roleEmoji}>👨‍🍳</Text>
-              <Text style={[styles.roleText, role === 'owner' && styles.roleTextOn]}>
+              <AppText style={{ fontSize: 24 }}>👨‍🍳</AppText>
+              <AppText variant="bodyBold" color={role === 'owner' ? colors.brand : colors.onSurface}>
                 {isIt ? 'Ho un ristorante' : 'I own a restaurant'}
-              </Text>
-            </TouchableOpacity>
+              </AppText>
+            </GlassCard>
           </View>
         )}
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
         {mode === 'register' && (
           <View style={styles.field}>
-            <Text style={styles.label}>{t('name_label')}</Text>
-            <TextInput
-              style={styles.input} placeholder={isIt ? "Il tuo nome" : "Your name"} autoCapitalize="words"
-              value={displayName} onChangeText={setDisplayName}
+            <AppText variant="caption">{t('name_label')}</AppText>
+            <DebossedInput
+              placeholder={isIt ? 'Il tuo nome' : 'Your name'}
+              autoCapitalize="words"
+              value={displayName}
+              onChangeText={setDisplayName}
+              style={{ letterSpacing: 0 }}
             />
           </View>
         )}
 
         <View style={styles.field}>
-          <Text style={styles.label}>{t('email_label')}</Text>
-          <TextInput
-            style={styles.input} placeholder="nome@email.it" autoCapitalize="none"
-            keyboardType="email-address" value={email} onChangeText={setEmail}
+          <AppText variant="caption">{t('email_label')}</AppText>
+          <DebossedInput
+            placeholder="nome@email.it"
+            autoCapitalize="none"
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
+            style={{ letterSpacing: 0 }}
           />
         </View>
         {mode !== 'forgot' && (
           <View style={styles.field}>
-            <Text style={styles.label}>{t('password_label')}</Text>
-            <TextInput
-              style={styles.input} placeholder={isIt ? "Minimo 8 caratteri" : "Minimum 8 characters"}
-              secureTextEntry value={password} onChangeText={setPassword}
+            <AppText variant="caption">{t('password_label')}</AppText>
+            <DebossedInput
+              placeholder={isIt ? 'Minimo 8 caratteri' : 'Minimum 8 characters'}
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              style={{ letterSpacing: 0 }}
             />
             {mode === 'login' && (
               <TouchableOpacity onPress={() => { setMode('forgot'); setError(''); setForgotSent(false); }}>
-                <Text style={styles.forgotLink}>{t('forgot_password_link')}</Text>
+                <AppText variant="caption" color={colors.brand} style={{ textAlign: 'right', marginTop: 4 }}>
+                  {t('forgot_password_link')}
+                </AppText>
               </TouchableOpacity>
             )}
           </View>
         )}
 
         {mode === 'forgot' && forgotSent && (
-          <View style={styles.legalBox}>
-            <Text style={styles.checkText}>
-              📧 {isIt 
-                ? "Se l'indirizzo esiste, riceverai un'email con il link per reimpostare la password. Il link scade tra 30 minuti." 
-                : "If the email exists, you will receive a link to reset your password. The link expires in 30 minutes."}
-            </Text>
-          </View>
-        )}
-
-        {mode === 'register' && role === 'customer' && allAllergens.length > 0 && (
-          <View style={styles.allergenSection}>
-            <Text style={styles.allergenSectionTitle}>{t('select_allergies_title')}</Text>
-            <Text style={styles.allergenSectionSubtitle}>
-              {isIt 
-                ? "Tocca per selezionare, tieni premuto per impostare la gravità (Lieve/Mod./Grave)." 
-                : "Tap to select, hold to set severity (Mild/Mod./Severe)."}
-            </Text>
-            
-            <Text style={styles.allergenSubsectionTitle}>{isIt ? "Allergeni principali" : "Main allergens"}</Text>
-            <View style={styles.allergenGrid}>
-              {allAllergens.filter(a => !a.is_diet).map((a) => {
-                const on = selectedAllergens.has(a.code);
-                return (
-                  <TouchableOpacity
-                    key={a.code}
-                    style={[styles.allergenChip, on && styles.chipOnAllergy]}
-                    onPress={() => toggleAllergen(a.code)}
-                    onLongPress={() => onLongPressAllergen(a.code, isIt ? a.name_it : (TRANSLATED_ALLERGENS[a.code.toLowerCase()]?.en || a.name_it))}
-                    delayLongPress={300}
-                  >
-                    <Text style={[styles.allergenChipText, on && styles.chipTextOnAllergy]}>
-                      {a.emoji} {isIt ? a.name_it : (TRANSLATED_ALLERGENS[a.code.toLowerCase()]?.en || a.name_it)}
-                      {on && intensities[a.code] === 'lieve' && (isIt ? ' (Lieve)' : ' (Mild)')}
-                      {on && (!intensities[a.code] || intensities[a.code] === 'moderata') && ' (Mod.)'}
-                      {on && intensities[a.code] === 'grave' && (isIt ? ' (Grave)' : ' (Severe)')}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {allAllergens.some(a => a.is_diet) && (
-              <>
-                <Text style={styles.allergenSubsectionTitle}>{isIt ? "Preferenze alimentari" : "Dietary preferences"}</Text>
-                <View style={styles.allergenGrid}>
-                  {allAllergens.filter(a => a.is_diet).map((a) => {
-                    const on = selectedAllergens.has(a.code);
-                    return (
-                      <TouchableOpacity
-                        key={a.code}
-                        style={[styles.allergenChip, on && styles.chipOnDiet]}
-                        onPress={() => toggleAllergen(a.code)}
-                        onLongPress={() => onLongPressAllergen(a.code, isIt ? a.name_it : (TRANSLATED_ALLERGENS[a.code.toLowerCase()]?.en || a.name_it))}
-                        delayLongPress={300}
-                      >
-                        <Text style={[styles.allergenChipText, on && styles.chipTextOnDiet]}>
-                          {a.emoji} {isIt ? a.name_it : (TRANSLATED_ALLERGENS[a.code.toLowerCase()]?.en || a.name_it)}
-                          {on && intensities[a.code] === 'lieve' && (isIt ? ' (Lieve)' : ' (Mild)')}
-                          {on && (!intensities[a.code] || intensities[a.code] === 'moderata') && ' (Mod.)'}
-                          {on && intensities[a.code] === 'grave' && (isIt ? ' (Grave)' : ' (Severe)')}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </>
-            )}
+          <View style={[styles.legalBox, puffyShadow(4)]}>
+            <AppText variant="body">
+              📧 {isIt
+                ? "Se l'indirizzo esiste, riceverai un'email con il link per reimpostare la password. Il link scade tra 30 minuti."
+                : 'If the email exists, you will receive a link to reset your password. The link expires in 30 minutes.'}
+            </AppText>
           </View>
         )}
 
@@ -330,30 +264,29 @@ export default function Login() {
           </View>
         )}
 
-        <TouchableOpacity
-          style={[styles.button, (busy || !formOk) && styles.disabled]}
-          disabled={busy || !formOk}
-          onPress={submit}
-        >
-          {busy
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.buttonText}>
-                {mode === 'login' ? t('login_btn') : mode === 'forgot' ? t('forgot_btn') : t('register_btn')}
-              </Text>}
-        </TouchableOpacity>
+        {error ? <AppText variant="caption" color={colors.red} style={{ marginTop: spacing.sm }}>{error}</AppText> : null}
+        </GlassScreenScroll>
 
-        <TouchableOpacity
-          style={styles.switchButton}
-          onPress={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setForgotSent(false); }}
-        >
-          <Text style={styles.switch}>
-            {mode === 'login' ? t('no_account_prompt')
-              : mode === 'forgot' ? t('back_to_login_link')
-              : t('have_account_prompt')}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
+          <PuffyButton
+            label={mode === 'login' ? t('login_btn') : mode === 'forgot' ? t('forgot_btn') : t('register_btn')}
+            onPress={submit}
+            disabled={busy || !formOk}
+            loading={busy}
+          />
+          <Pressable
+            style={styles.switchButton}
+            onPress={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setForgotSent(false); }}
+          >
+            <AppText variant="bodyBold" color={colors.brand} style={{ textAlign: 'center' }}>
+              {mode === 'login' ? t('no_account_prompt')
+                : mode === 'forgot' ? t('back_to_login_link')
+                : t('have_account_prompt')}
+            </AppText>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
 
@@ -361,73 +294,44 @@ function CheckRow({ checked, onPress, text }: { checked: boolean; onPress: () =>
   return (
     <TouchableOpacity style={styles.checkRow} onPress={onPress}>
       <View style={[styles.checkbox, checked && styles.checkboxOn]}>
-        {checked ? <Text style={styles.checkboxMark}>✓</Text> : null}
+        {checked ? <AppText style={styles.checkboxMark}>✓</AppText> : null}
       </View>
-      <Text style={styles.checkText}>{text}</Text>
+      <AppText variant="caption" style={{ flex: 1 }}>{text}</AppText>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F7FAF8' },
-  container: { flexGrow: 1, padding: 24, paddingTop: 24, paddingBottom: 32 },
-  logo: { fontSize: 22, fontWeight: '800', color: '#0B5D4D', marginBottom: 28 },
-  heading: { gap: 6, marginBottom: 20 },
-  title: { fontSize: 26, lineHeight: 32, fontWeight: '800', color: '#10201B' },
-  tagline: { color: '#596B63', fontSize: 15, lineHeight: 22 },
-  roles: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  role: {
-    flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: '#DDE8E2',
-    borderRadius: 12, padding: 12, alignItems: 'center',
+  screen: { flex: 1, backgroundColor: colors.surface },
+  container: { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.md },
+  bottomBar: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    gap: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  roleOn: { borderColor: '#0F8A6A', backgroundColor: '#DDF8EA' },
-  roleEmoji: { fontSize: 24 },
-  roleText: { fontSize: 13, fontWeight: '600', color: '#596B63', marginTop: 4 },
-  roleTextOn: { color: '#0B5D4D', fontWeight: '800' },
-  field: { gap: 6, marginBottom: 12 },
-  label: { fontSize: 12, fontWeight: '600', color: '#596B63' },
-  input: {
-    height: 48,
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#DDE8E2',
-    borderRadius: 12, paddingHorizontal: 14, fontSize: 15,
-    color: '#10201B',
-  },
-  button: {
-    height: 52,
-    backgroundColor: '#0F8A6A', borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center', marginTop: 4,
-  },
-  disabled: { opacity: 0.4 },
-  buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  switchButton: { height: 48, alignItems: 'center', justifyContent: 'center' },
-  forgotLink: { color: '#0B5D4D', fontWeight: '600', fontSize: 12.5, textAlign: 'right', marginTop: 4 },
-  switch: { textAlign: 'center', color: '#0B5D4D', fontWeight: '600' },
-  error: { color: '#dc2626', marginBottom: 12, fontWeight: '700' },
+  heading: { gap: spacing.xs, marginBottom: spacing.lg, marginTop: spacing.md },
+  roles: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  roleCard: { flex: 1, alignItems: 'center', gap: spacing.xs, padding: spacing.md },
+  roleOn: { borderColor: colors.brand, backgroundColor: colors.brand50 },
+  field: { gap: spacing.xs, marginBottom: spacing.md },
+  switchButton: { minHeight: MIN_TOUCH_TARGET, alignItems: 'center', justifyContent: 'center' },
   legalBox: {
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#DDE8E2',
-    borderRadius: 12, padding: 12, marginBottom: 12, gap: 10,
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
   },
-  checkRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  checkRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
   checkbox: {
-    width: 22, height: 22, borderRadius: 7, borderWidth: 1,
-    borderColor: '#C9D8D0', alignItems: 'center', justifyContent: 'center',
-    marginTop: 1,
+    width: 22, height: 22, borderRadius: 8, borderWidth: 1.5,
+    borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center', marginTop: 1,
   },
-  checkboxOn: { backgroundColor: '#0F8A6A', borderColor: '#0F8A6A' },
-  checkboxMark: { color: '#fff', fontWeight: '900', fontSize: 14 },
-  checkText: { flex: 1, color: '#596B63', fontSize: 12.5, lineHeight: 18, fontWeight: '600' },
-  allergenSection: { gap: 10, marginTop: 12, marginBottom: 16 },
-  allergenSectionTitle: { fontSize: 16, fontWeight: '800', color: '#10201B' },
-  allergenSectionSubtitle: { fontSize: 12.5, color: '#596B63', lineHeight: 18, marginBottom: 6 },
-  allergenSubsectionTitle: { fontSize: 13, fontWeight: '700', color: '#0B5D4D', marginTop: 10, marginBottom: 6 },
-  allergenGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  allergenChip: {
-    borderWidth: 1.5, borderColor: '#DDE8E2', backgroundColor: '#ffffff',
-    borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12,
-  },
-  chipOnAllergy: { borderColor: '#fca5a5', backgroundColor: '#fff5f5' },
-  chipTextOnAllergy: { color: '#e11d48', fontWeight: '800' },
-  chipOnDiet: { borderColor: '#86efac', backgroundColor: '#f0fdf4' },
-  chipTextOnDiet: { color: '#16a34a', fontWeight: '800' },
-  allergenChipText: { color: '#596B63', fontSize: 12.5, fontWeight: '600' },
+  checkboxOn: { backgroundColor: colors.brand, borderColor: colors.brand },
+  checkboxMark: { color: colors.onBrand, fontWeight: '900', fontSize: 14 },
 });

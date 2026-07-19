@@ -7,9 +7,20 @@
     "dev:backend": "cd backend && .venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
     "dev:web": "cd dashboard-web && npm run dev",
     "dev:mobile": "cd app-mobile && EXPO_PUBLIC_API_URL=http://$(ipconfig getifaddr en0 || ipconfig getifaddr en1 || ifconfig | grep 'inet ' | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1):8000 npm run start",
+    "dev:mobile-only": "bash scripts/avvia-mobile.sh casa",
+    "dev:mobile-fuori": "bash scripts/avvia-mobile.sh fuori",
+    "servizio:installa": "bash scripts/avvia-stabile.sh",
+    "servizio:ferma": "npx pm2 delete all 2>/dev/null; bash scripts/ferma-servizio-remoto.sh",
+    "servizio:stato": "npx pm2 status 2>/dev/null || cat ~/Library/Logs/AllerTgy/status.txt 2>/dev/null || echo 'Servizio non attivo'",
+    "servizio:log": "npx pm2 logs --lines 30",
+    "dev:remote": "bash scripts/dev-remote.sh tailscale",
+    "expo:setup": "bash scripts/expo-setup.sh",
+    "dev:remote:ngrok": "bash scripts/dev-remote.sh ngrok",
+    "dev:remote:cloudflare": "bash scripts/dev-remote.sh cloudflare",
     "dev": "concurrently --names \"BACKEND,WEB,MOBILE\" -c \"magenta.bold,cyan.bold,green.bold\" \"npm run dev:backend\" \"npm run dev:web\" \"npm run dev:mobile\""
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "pm2": "^5.4.3"
   }
 }

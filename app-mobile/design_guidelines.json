@@ -1,0 +1,186 @@
+{
+  "app_name": "allerTgy",
+  "concept": "Calm clinical clarity — tipografia forte, superfici sobrie, semaforo preciso",
+  "personality": "Lavanda aria + violet ink — due colori puri, look professionale e leggibile",
+  "personality_one_liner": "Canvas lavanda soft, azioni violet deep, sezioni tipografiche pulite, card bianche discrete, semaforo intatto.",
+  "color": {
+    "surface": "#F6F2FC",
+    "onSurface": "#1A1A1A",
+    "onSurfaceMuted": "#6B6575",
+    "surfaceSecondary": "#FFFFFF",
+    "onSurfaceSecondary": "#1A1A1A",
+    "surfaceTertiary": "#EDE6FA",
+    "onSurfaceTertiary": "#36255C",
+    "surfaceInverse": "#36255C",
+    "onSurfaceInverse": "#FFFFFF",
+    "brand": "#36255C",
+    "brandPrimary": "#36255C",
+    "onBrandPrimary": "#FFFFFF",
+    "onBrand": "#FFFFFF",
+    "brandSecondary": "#D2C3F6",
+    "onBrandSecondary": "#36255C",
+    "brandTertiary": "#D2C3F6",
+    "onBrandTertiary": "#36255C",
+    "brandDark": "#2A1C48",
+    "brandDarker": "#1E1435",
+    "brand50": "#F8F5FD",
+    "brand100": "#EDE6FA",
+    "brand200": "#D2C3F6",
+    "brand300": "#B9A6E8",
+    "brandInk": "#36255C",
+    "success": "#34D399",
+    "onSuccess": "#065F46",
+    "warning": "#FBBF24",
+    "onWarning": "#92400E",
+    "error": "#F87171",
+    "onError": "#991B1B",
+    "border": "#E6DFF5",
+    "borderStrong": "#D2C3F6",
+    "divider": "rgba(54, 37, 92, 0.06)",
+    "shadow": "rgba(54, 37, 92, 0.10)",
+    "overlay": "rgba(54, 37, 92, 0.40)",
+    "white": "#FFFFFF",
+    "ink": "#1A1A1A",
+    "inkSoft": "#3D3D3D",
+    "textSecondary": "#6B6575",
+    "textMuted": "#948E9C"
+  },
+  "verdict": {
+    "green": {
+      "solid": "#34D399",
+      "soft": "#D1FAE5",
+      "on": "#065F46",
+      "border": "#6EE7B7",
+      "emoji": "🟢"
+    },
+    "yellow": {
+      "solid": "#FBBF24",
+      "soft": "#FEF3C7",
+      "on": "#92400E",
+      "border": "#FCD34D",
+      "emoji": "🟡"
+    },
+    "red": {
+      "solid": "#F87171",
+      "soft": "#FEE2E2",
+      "on": "#991B1B",
+      "border": "#FCA5A5",
+      "emoji": "🔴"
+    }
+  },
+  "glass": {
+    "blurIntensityIos": 40,
+    "blurIntensityAndroid": 80,
+    "tint": "systemUltraThinMaterialLight",
+    "fill": "rgba(255, 255, 255, 0.62)",
+    "borderTop": "rgba(255, 255, 255, 0.82)",
+    "borderSide": "rgba(210, 195, 246, 0.45)",
+    "shadowColor": "rgba(54, 37, 92, 0.10)",
+    "shadowRadius": 18,
+    "shadowOffsetY": 8,
+    "overlayColor": "rgba(255, 255, 255, 0.42)",
+    "brandTint": "rgba(210, 195, 246, 0.22)"
+  },
+  "marshmallow": {
+    "glossTop": "rgba(255, 255, 255, 0.92)",
+    "glossEdge": "rgba(255, 255, 255, 0.55)",
+    "shadowColor": "#36255C",
+    "pressScale": 0.91
+  },
+  "scanSphere": {
+    "size": 72,
+    "colors": ["#34D399", "#FBBF24", "#F87171"],
+    "glowColor": "rgba(210, 195, 246, 0.45)",
+    "breatheMin": 1,
+    "breatheMax": 1.08,
+    "breatheDurationMs": 1800
+  },
+  "shadow": {
+    "color": "#36255C",
+    "cardElevation": 2,
+    "raisedElevation": 4,
+    "defaultElevation": 2,
+    "puffyOpacity": 0.07,
+    "puffyRadius": 12,
+    "puffyOffsetY": 5
+  },
+  "fonts": {
+    "displayMedium": "Fredoka-Medium",
+    "displaySemibold": "Fredoka-SemiBold",
+    "displayBold": "Fredoka-Bold",
+    "regular": "Nunito-Regular",
+    "semibold": "Nunito-SemiBold",
+    "bold": "Nunito-Bold"
+  },
+  "typography": {
+    "displayFontFamily": "Fredoka",
+    "textFontFamily": "Nunito",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous spacing on lavanda canvas; calm cards for interactive groups only. Home header is name-first, no avatar.",
+    "xs": 4,
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "xl": 32,
+    "2xl": 48,
+    "3xl": 64
+  },
+  "radius_tokens": {
+    "sm": 12,
+    "md": 16,
+    "lg": 24,
+    "xl": 32,
+    "pill": 999
+  },
+  "shadow_tier": 1,
+  "navigation": "bottom_tabs_liquid_glass_violet",
+  "icon_set": "emoji_first",
+  "glassmorphism": {
+    "enabled": true,
+    "structure": "Liquid Glass lavanda soft — solo tab bar, header e overlay",
+    "interactive": "Puffy solid — pulsanti, card, chip allergeni, semaforo emoji",
+    "do's": [
+      "Atmosphere = soft lavender mist, never dark violet flood",
+      "Primary actions and ink = exact violet #36255C",
+      "Soft fills and glass frost = exact lavender #D2C3F6",
+      "White puffy cards on lavanda canvas",
+      "Reserve traffic-light colors for verdicts — never use them as brand fill"
+    ],
+    "dont's": [
+      "Don't invent muddy mid-purples between lavender and violet",
+      "Don't wash the whole screen with dark violet gradients",
+      "Don't use green/teal as brand color — it competes with semaforo verde",
+      "Don't blur traffic-light verdict badges — keep them solid and glossy"
+    ]
+  },
+  "components_rules": {
+    "icons_and_imagery": {
+      "type": "emoji_first",
+      "phase": "icons_now_emoji_later",
+      "rule": "Fase 1: Ionicons + semaforo colorato. Fase 2: emoji in bolle puffy. Ionicons solo per back, close, chevron."
+    }
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-blur systemUltraThinMaterialLight",
+      "android": "expo-blur dimezisBlurView",
+      "web": "backdrop-filter blur(20px) saturate(150%)"
+    },
+    "blur": "expo-blur",
+    "animation": "react-native-reanimated"
+  },
+  "instructions_to_main_agent": [
+    "Two pure colors only: lavender #D2C3F6 (air/soft/glass) and violet #36255C (ink/actions).",
+    "Background is soft lavanda mist #F6F2FC — never a dark violet canopy.",
+    "Cards are white; glass is white frost + lavender tint like the Instagram cards.",
+    "Semaforo stays green/yellow/red forever."
+  ]
+}

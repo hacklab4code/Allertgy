@@ -1,7 +1,9 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../src/api/client';
+import { AppText, GlassScreenScroll, Screen, Section } from '../src/components/ui';
+import { colors, spacing } from '../src/theme';
 
 interface LegalDoc { doc: string; title: string; version: string; content_markdown: string }
 
@@ -21,7 +23,7 @@ export default function LegalDocs() {
   }, []);
 
   useEffect(() => {
-    if (params.tab && DOCS.includes(params.tab as any)) {
+    if (params.tab && DOCS.includes(params.tab as typeof DOCS[number])) {
       setActive(params.tab);
     }
   }, [params.tab]);
@@ -29,59 +31,64 @@ export default function LegalDocs() {
   const current = docs.find((d) => d.doc === active);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <TouchableOpacity onPress={() => router.back()}>
-        <Text style={styles.back}>‹ Indietro</Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>📜 Documenti legali</Text>
+    <Screen edges={false} ambient>
+      <Stack.Screen options={{ title: 'Documenti legali' }} />
+      <GlassScreenScroll showsVerticalScrollIndicator={false}>
+        {error ? <AppText variant="caption" color={colors.red}>{error}</AppText> : null}
+        {docs.length === 0 && !error ? <ActivityIndicator color={colors.brand} style={{ marginTop: spacing.lg }} /> : null}
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {docs.length === 0 && !error && <ActivityIndicator color="#059669" style={{ marginTop: 24 }} />}
+        {docs.length > 0 ? (
+          <Section title="Seleziona documento" subtitle="Termini, privacy, sicurezza e cookie.">
+            <View style={styles.tabs}>
+              {docs.map((d) => (
+                <Pressable
+                  key={d.doc}
+                  style={[styles.tab, active === d.doc && styles.tabOn]}
+                  onPress={() => setActive(d.doc)}
+                >
+                  <AppText variant="caption" style={active === d.doc ? styles.tabTextOn : styles.tabText}>
+                    {d.title}
+                  </AppText>
+                </Pressable>
+              ))}
+            </View>
+          </Section>
+        ) : null}
 
-      <View style={styles.tabs}>
-        {docs.map((d) => (
-          <TouchableOpacity
-            key={d.doc}
-            style={[styles.tab, active === d.doc && styles.tabOn]}
-            onPress={() => setActive(d.doc)}
-          >
-            <Text style={[styles.tabText, active === d.doc && styles.tabTextOn]}>{d.title}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {current && (
-        <View style={styles.docBox}>
-          <Text style={styles.version}>Versione {current.version}</Text>
-          {current.content_markdown.trim().split(/\n\n+/).map((block, i) => (
-            <Text key={i} style={block.startsWith('# ') ? styles.docTitle : styles.docText}>
-              {block.replace(/^# /, '').replace(/\*\*/g, '').replace(/(^|\s)\*([^*]+)\*/g, '$1$2')}
-            </Text>
-          ))}
-        </View>
-      )}
-    </ScrollView>
+        {current ? (
+          <Section title={current.title} subtitle={`Versione ${current.version}`}>
+            <View style={styles.docBox}>
+              {current.content_markdown.trim().split(/\n\n+/).map((block, i) => (
+                <AppText
+                  key={i}
+                  variant={block.startsWith('# ') ? 'title' : 'body'}
+                  style={styles.docText}
+                >
+                  {block.replace(/^# /, '').replace(/\*\*/g, '').replace(/(^|\s)\*([^*]+)\*/g, '$1$2')}
+                </AppText>
+              ))}
+            </View>
+          </Section>
+        ) : null}
+      </GlassScreenScroll>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 24, paddingTop: 60, paddingBottom: 48, backgroundColor: '#F7FAF8' },
-  back: { color: '#0B5D4D', fontWeight: '700', fontSize: 15, marginBottom: 12 },
-  title: { fontSize: 24, fontWeight: '800', color: '#10201B', marginBottom: 14 },
-  error: { color: '#dc2626', fontWeight: '700', marginBottom: 12 },
-  tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  container: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
+  tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   tab: {
-    borderWidth: 1, borderColor: '#DDE8E2', backgroundColor: '#fff',
-    borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  tabOn: { backgroundColor: '#DDF8EA', borderColor: '#0F8A6A' },
-  tabText: { fontSize: 12.5, color: '#596B63', fontWeight: '600' },
-  tabTextOn: { color: '#0B5D4D', fontWeight: '800' },
-  docBox: {
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#DDE8E2',
-    borderRadius: 16, padding: 16, gap: 10,
-  },
-  version: { fontSize: 11, color: '#8AA096', fontWeight: '700', textTransform: 'uppercase' },
-  docTitle: { fontSize: 18, fontWeight: '800', color: '#10201B' },
-  docText: { fontSize: 13.5, color: '#475569', lineHeight: 20 },
+  tabOn: { backgroundColor: colors.brand50, borderColor: colors.brand },
+  tabText: { color: colors.onSurfaceMuted, fontWeight: '600' },
+  tabTextOn: { color: colors.brand, fontWeight: '800' },
+  docBox: { gap: spacing.sm },
+  docText: { color: colors.onSurfaceMuted, lineHeight: 20 },
 });

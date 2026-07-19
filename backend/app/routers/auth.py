@@ -92,7 +92,8 @@ def forgot_password(data: ForgotPasswordIn, request: Request, db: Session = Depe
         ))
         db.commit()
         reset_url = f"{settings.public_web_url}/reset-password?token={token}"
-        send_password_reset(user.email, reset_url)
+        mobile_reset_url = f"allertgy://reset-password?token={token}"
+        send_password_reset(user.email, reset_url, mobile_reset_url=mobile_reset_url)
     return {"detail": "Se l'indirizzo esiste, riceverai un'email con le istruzioni."}
 
 

@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { router } from 'expo-router';
 import { AppState } from 'react-native';
 import { registraPushToken } from './geofencing';
@@ -24,6 +25,9 @@ function routeFromPush(data: PushData | undefined) {
 }
 
 export function initPushNotifications() {
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+    return () => {};
+  }
   const subResponse = Notifications.addNotificationResponseReceivedListener((response) => {
     routeFromPush(response.notification.request.content.data as PushData);
   });

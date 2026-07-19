@@ -1,9 +1,17 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { api } from '../../src/api/client';
 import { useSession } from '../../src/store/session';
 import type { SharedProfile } from '../../src/types';
+import {
+  AppText,
+  GlassCard,
+  GlassScreenScroll,
+  PuffyButton,
+  Screen,
+} from '../../src/components/ui';
+import { colors, spacing, radius } from '../../src/theme';
 
 export default function SharedProfileScreen() {
   const { token } = useLocalSearchParams<{ token: string }>();
@@ -24,7 +32,7 @@ export default function SharedProfileScreen() {
   const useProfileNow = () => {
     if (!profile) return;
     const intensities = Object.fromEntries(
-      profile.allergens.map((a) => [a.code, a.intensity])
+      profile.allergens.map((a) => [a.code, a.intensity]),
     ) as Record<string, 'lieve' | 'moderata' | 'grave'>;
     setAllergie(profile.allergens.map((a) => a.code), intensities);
     setProfileCompleted(true);
@@ -32,88 +40,79 @@ export default function SharedProfileScreen() {
   };
 
   return (
-    <View style={styles.root}>
+    <Screen edges={false} ambient>
       <Stack.Screen options={{ title: isIt ? 'Profilo condiviso' : 'Shared profile' }} />
-      <ScrollView contentContainerStyle={styles.container}>
+      <GlassScreenScroll>
         {loading ? (
-          <ActivityIndicator color="#059669" />
+          <ActivityIndicator color={colors.brand} />
         ) : error ? (
-          <View style={styles.card}>
-            <Text style={styles.icon}>⚠️</Text>
-            <Text style={styles.title}>{isIt ? 'Link non disponibile' : 'Link unavailable'}</Text>
-            <Text style={styles.text}>{error}</Text>
-          </View>
+          <GlassCard style={styles.card}>
+            <AppText style={styles.icon}>⚠️</AppText>
+            <AppText variant="h2">{isIt ? 'Link non disponibile' : 'Link unavailable'}</AppText>
+            <AppText variant="body" color={colors.onSurfaceMuted}>{error}</AppText>
+          </GlassCard>
         ) : profile ? (
           <>
-            <View style={styles.card}>
-              <Text style={styles.icon}>🔗</Text>
-              <Text style={styles.kicker}>{isIt ? 'Profilo AllerTgy condiviso' : 'Shared AllerTgy profile'}</Text>
-              <Text style={styles.title}>{profile.profile_name}</Text>
-              <Text style={styles.text}>
+            <GlassCard style={styles.card}>
+              <AppText style={styles.icon}>🔗</AppText>
+              <AppText variant="eyebrow" color={colors.brand}>
+                {isIt ? 'Profilo AllerTgy condiviso' : 'Shared AllerTgy profile'}
+              </AppText>
+              <AppText variant="h1">{profile.profile_name}</AppText>
+              <AppText variant="body" color={colors.onSurfaceMuted}>
                 {profile.expires_at
                   ? (isIt ? 'Valido temporaneamente per spesa, festa o uscita.' : 'Temporarily valid for shopping, parties, or dining out.')
                   : (isIt ? 'Condivisione permanente per famiglia o caregiver.' : 'Permanent sharing for family or caregivers.')}
-              </Text>
-            </View>
+              </AppText>
+            </GlassCard>
 
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>{isIt ? 'Allergie condivise' : 'Shared allergies'}</Text>
+            <GlassCard style={styles.card}>
+              <AppText variant="title">
+                {isIt ? 'Allergie condivise' : 'Shared allergies'}
+              </AppText>
               {profile.allergens.length === 0 ? (
-                <Text style={styles.text}>{isIt ? 'Nessuna allergia indicata.' : 'No allergies listed.'}</Text>
+                <AppText variant="body" color={colors.onSurfaceMuted}>
+                  {isIt ? 'Nessuna allergia indicata.' : 'No allergies listed.'}
+                </AppText>
               ) : (
                 <View style={styles.chips}>
                   {profile.allergens.map((a) => (
                     <View key={a.code} style={styles.chip}>
-                      <Text style={styles.chipText}>{a.emoji} {a.name_it} · {a.intensity}</Text>
+                      <AppText variant="caption">
+                        {a.emoji} {a.name_it} · {a.intensity}
+                      </AppText>
                     </View>
                   ))}
                 </View>
               )}
-            </View>
+            </GlassCard>
 
-            <TouchableOpacity style={styles.primary} onPress={useProfileNow}>
-              <Text style={styles.primaryText}>
-                {isIt ? 'Usa questo profilo ora' : 'Use this profile now'}
-              </Text>
-            </TouchableOpacity>
+            <PuffyButton
+              label={isIt ? 'Usa questo profilo ora' : 'Use this profile now'}
+              onPress={useProfileNow}
+            />
 
-            <Text style={styles.disclaimer}>
+            <AppText variant="caption" color={colors.onSurfaceMuted} style={styles.disclaimer}>
               {isIt
                 ? 'Il profilo condiviso aiuta a capire cosa evitare, ma non sostituisce la conferma del ristorante o del produttore.'
                 : 'A shared profile helps understand what to avoid, but does not replace confirmation from the restaurant or producer.'}
-            </Text>
+            </AppText>
           </>
         ) : null}
-      </ScrollView>
-    </View>
+      </GlassScreenScroll>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f8fafc' },
-  container: { padding: 18, paddingBottom: 40, gap: 14 },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+  card: { gap: spacing.sm },
+  icon: { fontSize: 34 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chip: {
+    backgroundColor: colors.greenSoft,
+    borderRadius: radius.pill,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
   },
-  icon: { fontSize: 34, marginBottom: 8 },
-  kicker: { color: '#059669', fontWeight: '900', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8 },
-  title: { color: '#10201B', fontSize: 24, fontWeight: '900', marginTop: 4 },
-  sectionTitle: { color: '#10201B', fontSize: 16, fontWeight: '900', marginBottom: 10 },
-  text: { color: '#596B63', fontSize: 13, lineHeight: 19, marginTop: 8 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: '#d1fae5', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 10 },
-  chipText: { color: '#065f46', fontSize: 12, fontWeight: '800' },
-  primary: {
-    backgroundColor: '#059669',
-    borderRadius: 14,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryText: { color: '#fff', fontWeight: '900', fontSize: 15 },
-  disclaimer: { color: '#64748b', fontSize: 11, lineHeight: 16, textAlign: 'center', paddingHorizontal: 10 },
+  disclaimer: { textAlign: 'center', paddingHorizontal: spacing.md, lineHeight: 18 },
 });

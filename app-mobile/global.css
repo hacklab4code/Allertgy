@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Brand AllerTgy — lavanda + violet ink (design_guidelines.json) */
+@layer base {
+  :root {
+    --background: 264 63% 97%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 259 43% 25%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 258 74% 86%;
+    --secondary-foreground: 259 43% 25%;
+    --muted: 262 67% 98%;
+    --muted-foreground: 262 7% 43%;
+    --accent: 258 52% 92%;
+    --accent-foreground: 259 43% 25%;
+    --destructive: 0 91% 71%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 259 52% 92%;
+    --input: 259 52% 92%;
+    --ring: 259 43% 25%;
+    --radius: 0.875rem;
+    --chart-1: 158 64% 52%;
+    --chart-2: 43 96% 56%;
+    --chart-3: 0 91% 71%;
+    --chart-4: 258 74% 86%;
+    --chart-5: 259 43% 25%;
+  }
+
+  .dark:root {
+    --background: 259 43% 12%;
+    --foreground: 0 0% 98%;
+    --card: 259 35% 16%;
+    --card-foreground: 0 0% 98%;
+    --popover: 259 35% 16%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 258 74% 86%;
+    --primary-foreground: 259 43% 18%;
+    --secondary: 259 30% 22%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 259 30% 22%;
+    --muted-foreground: 262 10% 70%;
+    --accent: 259 30% 22%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 259 25% 24%;
+    --input: 259 25% 24%;
+    --ring: 258 74% 86%;
+    --chart-1: 158 64% 52%;
+    --chart-2: 43 96% 56%;
+    --chart-3: 0 91% 71%;
+    --chart-4: 258 74% 86%;
+    --chart-5: 259 43% 45%;
+  }
+}

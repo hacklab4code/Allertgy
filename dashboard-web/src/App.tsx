@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { hasToken, clearToken } from './api';
-import ClientArea from './components/ClientArea';
+import { useEffect, useState } from 'react';
+import { api, clearToken, hasToken } from './api';
+import ConsumerWebApp from './consumer/ConsumerWebApp';
 import InternalAdmin from './components/InternalAdmin';
 import LegalPage from './components/LegalPage';
 import Login from './components/Login';
@@ -35,25 +35,72 @@ export default function App() {
   const [logged, setLogged] = useState(hasToken());
   const [role, setRole] = useState<'customer' | 'owner' | null>(null);
   const [defaultRole, setDefaultRole] = useState<'customer' | 'owner'>('owner');
+  const [sessionLoading, setSessionLoading] = useState(hasToken());
+
+  useEffect(() => {
+    if (!hasToken()) {
+      setSessionLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await api.getProfile();
+        if (cancelled) return;
+        const userRole = profile.role === 'owner' ? 'owner' : 'customer';
+        setLogged(true);
+        setRole(userRole);
+      } catch {
+        if (!cancelled) {
+          clearToken();
+          setLogged(false);
+          setRole(null);
+        }
+      } finally {
+        if (!cancelled) setSessionLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const switchAccount = (target: 'customer' | 'owner') => {
+    clearToken();
+    setLogged(false);
+    setRole(null);
+    setDefaultRole(target);
+    setView('login');
+  };
 
   const handleOwnerEntry = () => {
-    if (logged) {
-      if (role === 'owner') setView('app');
-      else alert("Questo account è registrato come Cliente. Disconnettiti dall'area clienti per accedere come Ristoratore.");
-    } else {
-      setDefaultRole('owner');
-      setView('login');
+    if (sessionLoading) return;
+    if (logged && role === 'owner') {
+      setView('app');
+      return;
     }
+    if (logged && role === 'customer') {
+      if (confirm('Sei loggato come Cliente.\n\nVuoi uscire e accedere come Ristoratore?')) {
+        switchAccount('owner');
+      }
+      return;
+    }
+    setDefaultRole('owner');
+    setView('login');
   };
 
   const handleCustomerEntry = () => {
-    if (logged) {
-      if (role === 'customer') setView('client');
-      else alert("Questo account è registrato come Ristoratore. Disconnettiti dalla dashboard per accedere come Cliente.");
-    } else {
-      setDefaultRole('customer');
-      setView('login');
+    if (sessionLoading) return;
+    if (logged && role === 'customer') {
+      setView('client');
+      return;
     }
+    if (logged && role === 'owner') {
+      if (confirm('Sei loggato come Ristoratore.\n\nVuoi uscire e accedere come Cliente?')) {
+        switchAccount('customer');
+      }
+      return;
+    }
+    setDefaultRole('customer');
+    setView('login');
   };
 
   const handleLogout = () => {
@@ -63,11 +110,19 @@ export default function App() {
     setView('landing');
   };
 
+  if (sessionLoading) {
+    return (
+      <div className="min-h-screen bg-[#FFF8F0] flex items-center justify-center">
+        <p className="text-[#4A3B32] font-semibold">Caricamento sessione...</p>
+      </div>
+    );
+  }
+
   if (view === 'landing') {
     return <Landing onEnter={handleOwnerEntry} onClienti={handleCustomerEntry} />;
   }
   if (view === 'client') {
-    return <ClientArea onBack={() => setView('landing')} onLogout={handleLogout} />;
+    return <ConsumerWebApp onBack={() => setView('landing')} onLogout={handleLogout} />;
   }
   if (view === 'login' || !logged) {
     return (

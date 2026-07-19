@@ -1,10 +1,23 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
-  Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../src/api/client';
+import {
+  AppText,
+  DebossedInput,
+  GlassCard,
+  GlassScreenScroll,
+  PuffyButton,
+  Screen,
+} from '../src/components/ui';
+import { colors, spacing } from '../src/theme';
 
 /** Aperta dal deep link allertgy://reset-password?token=... nell'email di recupero. */
 export default function ResetPassword() {
@@ -14,6 +27,7 @@ export default function ResetPassword() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const submit = async () => {
     if (password !== confirm) {
@@ -32,73 +46,72 @@ export default function ResetPassword() {
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.logo}>AllerTgy</Text>
-        <View style={styles.heading}>
-          <Text style={styles.title}>Nuova password</Text>
-          <Text style={styles.tagline}>Scegli una nuova password per il tuo account.</Text>
-        </View>
-
-        {!token && <Text style={styles.error}>Link non valido: manca il token. Richiedi un nuovo link.</Text>}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        {done ? (
-          <View style={{ gap: 16 }}>
-            <Text style={styles.success}>✅ Password aggiornata. Ora puoi accedere.</Text>
-            <TouchableOpacity style={styles.button} onPress={() => router.replace('/login')}>
-              <Text style={styles.buttonText}>Vai all'accesso</Text>
-            </TouchableOpacity>
+    <Screen edges={false} ambient>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <GlassScreenScroll keyboardShouldPersistTaps="handled">
+          <AppText variant="h2" color={colors.brand}>AllerTgy</AppText>
+          <View style={styles.heading}>
+            <AppText variant="h1">Nuova password</AppText>
+            <AppText variant="subtitle">
+              Scegli una nuova password per il tuo account.
+            </AppText>
           </View>
-        ) : (
-          <>
-            <View style={styles.field}>
-              <Text style={styles.label}>Nuova password</Text>
-              <TextInput
-                style={styles.input} placeholder="Minimo 8 caratteri, maiuscole e numeri"
-                secureTextEntry value={password} onChangeText={setPassword}
+
+          {!token ? (
+            <AppText variant="caption" color={colors.red}>
+              Link non valido: manca il token. Richiedi un nuovo link.
+            </AppText>
+          ) : null}
+          {error ? <AppText variant="caption" color={colors.red}>{error}</AppText> : null}
+
+          {done ? (
+            <GlassCard style={styles.doneCard}>
+              <AppText variant="body" color={colors.brand}>
+                Password aggiornata. Ora puoi accedere.
+              </AppText>
+              <PuffyButton label="Vai all'accesso" onPress={() => router.replace('/login')} />
+            </GlassCard>
+          ) : (
+            <GlassCard style={styles.formCard}>
+              <View style={styles.field}>
+                <AppText variant="caption">Nuova password</AppText>
+                <DebossedInput
+                  placeholder="Minimo 8 caratteri, maiuscole e numeri"
+                  secureTextEntry
+                  value={password}
+                  onChangeText={setPassword}
+                />
+              </View>
+              <View style={styles.field}>
+                <AppText variant="caption">Conferma password</AppText>
+                <DebossedInput
+                  placeholder="Ripeti la nuova password"
+                  secureTextEntry
+                  value={confirm}
+                  onChangeText={setConfirm}
+                />
+              </View>
+              <PuffyButton
+                label="Imposta password"
+                onPress={submit}
+                disabled={busy || !token || password.length < 8}
+                loading={busy}
               />
-            </View>
-            <View style={styles.field}>
-              <Text style={styles.label}>Conferma password</Text>
-              <TextInput
-                style={styles.input} placeholder="Ripeti la nuova password"
-                secureTextEntry value={confirm} onChangeText={setConfirm}
-              />
-            </View>
-            <TouchableOpacity
-              style={[styles.button, (busy || !token || password.length < 8) && styles.disabled]}
-              disabled={busy || !token || password.length < 8}
-              onPress={submit}
-            >
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Imposta password</Text>}
-            </TouchableOpacity>
-          </>
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+            </GlassCard>
+          )}
+        </GlassScreenScroll>
+      </KeyboardAvoidingView>
+      <View style={{ height: Math.max(insets.bottom, spacing.md) }} />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F7FAF8' },
-  container: { flexGrow: 1, padding: 24, paddingTop: 70 },
-  logo: { fontSize: 22, fontWeight: '800', color: '#0B5D4D', marginBottom: 28 },
-  heading: { gap: 6, marginBottom: 20 },
-  title: { fontSize: 26, fontWeight: '800', color: '#10201B' },
-  tagline: { color: '#596B63', fontSize: 15, lineHeight: 22 },
-  field: { gap: 6, marginBottom: 12 },
-  label: { fontSize: 12, fontWeight: '600', color: '#596B63' },
-  input: {
-    height: 48, backgroundColor: '#fff', borderWidth: 1, borderColor: '#DDE8E2',
-    borderRadius: 12, paddingHorizontal: 14, fontSize: 15, color: '#10201B',
-  },
-  button: {
-    height: 52, backgroundColor: '#0F8A6A', borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center', marginTop: 4,
-  },
-  disabled: { opacity: 0.4 },
-  buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  error: { color: '#dc2626', marginBottom: 12, fontWeight: '700' },
-  success: { color: '#0B5D4D', fontWeight: '700', fontSize: 15 },
+  heading: { gap: spacing.xs, marginBottom: spacing.lg, marginTop: spacing.md },
+  field: { gap: spacing.xs, marginBottom: spacing.md },
+  formCard: { gap: spacing.sm },
+  doneCard: { gap: spacing.md },
 });

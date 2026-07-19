@@ -28,6 +28,10 @@ _settings.db_password = "test"
 _settings.jwt_secret = "test-secret-che-non-deve-mai-essere-usato-in-produzione"
 _settings.cors_origins = "*"
 _settings.internal_admin_key = "test-admin-key"
+_settings.stripe_secret_key = ""
+_settings.stripe_webhook_secret = ""
+_settings.resend_api_key = ""
+_settings.app_env = "development"
 
 # Disabilita run_migrations PRIMA di importare app.main (che la chiama all'avvio)
 import app.database as db_module

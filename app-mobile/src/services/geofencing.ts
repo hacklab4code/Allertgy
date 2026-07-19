@@ -1,9 +1,13 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { useSession } from '../store/session';
 import { api } from '../api/client';
 import { calcolaCompatibilita } from '../engine/compatibility';
 import type { RestaurantSummary } from '../types';
+
+const PUSH_TOKEN_STORAGE_KEY = 'allertgy-expo-push-token';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -16,6 +20,9 @@ Notifications.setNotificationHandler({
 });
 
 export async function registraPushToken() {
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+    return null;
+  }
   const settings = await Notifications.getPermissionsAsync();
   const finalSettings = settings.granted || !settings.canAskAgain
     ? settings
@@ -25,6 +32,7 @@ export async function registraPushToken() {
   try {
     const token = await Notifications.getExpoPushTokenAsync();
     await api.registerDeviceToken(token.data);
+    await AsyncStorage.setItem(PUSH_TOKEN_STORAGE_KEY, token.data);
     return token.data;
   } catch (e) {
     console.log('Registrazione push token non disponibile:', e);
@@ -35,7 +43,16 @@ export async function registraPushToken() {
 const notificheInviate: Record<string, number> = {};
 let watcherSub: Location.LocationSubscription | null = null;
 
-function calcolaDistanzaMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+/** Raggio usato da notifiche geofencing e prompt contestuale in Home */
+export const VENUE_PROXIMITY_RADIUS_M = 150;
+
+export type ProximityVenue = {
+  code: string;
+  name: string;
+  distanceM: number;
+};
+
+export function distanzaMetri(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371e3;
   const phi1 = (lat1 * Math.PI) / 180;
   const phi2 = (lat2 * Math.PI) / 180;
@@ -50,6 +67,35 @@ function calcolaDistanzaMeters(lat1: number, lon1: number, lat2: number, lon2: n
   return R * c;
 }
 
+/** Trova il locale recente più vicino entro il raggio indicato. */
+export function trovaLocaleRecenteVicino(
+  lat: number,
+  lon: number,
+  recents: Array<{ code: string; name: string }>,
+  coordsByCode: Map<string, { latitude: number; longitude: number }>,
+  radiusM = VENUE_PROXIMITY_RADIUS_M,
+): ProximityVenue | null {
+  let best: ProximityVenue | null = null;
+
+  for (const recent of recents) {
+    const coords = coordsByCode.get(recent.code);
+    if (!coords) continue;
+
+    const distanceM = distanzaMetri(lat, lon, coords.latitude, coords.longitude);
+    if (distanceM > radiusM) continue;
+
+    if (!best || distanceM < best.distanceM) {
+      best = { code: recent.code, name: recent.name, distanceM: Math.round(distanceM) };
+    }
+  }
+
+  return best;
+}
+
+function calcolaDistanzaMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  return distanzaMetri(lat1, lon1, lat2, lon2);
+}
+
 export function fermaGeofencing() {
   if (watcherSub) {
     watcherSub.remove();
@@ -60,15 +106,16 @@ export function fermaGeofencing() {
 export async function avviaGeofencing(restaurants: RestaurantSummary[]) {
   fermaGeofencing();
 
-  const settings = await Notifications.getPermissionsAsync();
-  if (!settings.granted && settings.canAskAgain) {
-    await Notifications.requestPermissionsAsync();
-  }
+  try {
+    const settings = await Notifications.getPermissionsAsync();
+    if (!settings.granted && settings.canAskAgain) {
+      await Notifications.requestPermissionsAsync();
+    }
 
-  const locPerm = await Location.getForegroundPermissionsAsync();
-  if (!locPerm.granted) return;
+    const locPerm = await Location.getForegroundPermissionsAsync();
+    if (!locPerm.granted) return;
 
-  watcherSub = await Location.watchPositionAsync(
+    watcherSub = await Location.watchPositionAsync(
     {
       accuracy: Location.Accuracy.Balanced,
       timeInterval: 30000,
@@ -80,7 +127,9 @@ export async function avviaGeofencing(restaurants: RestaurantSummary[]) {
       const isIt = (language || 'it').toLowerCase() === 'it';
 
       const activeProfile = activeProfileId ? subProfiles.find(p => p.id === activeProfileId) : null;
-      const activeAllergies = activeProfile ? activeProfile.allergens.map(a => a.code) : primaryAllergies;
+      const activeAllergies = activeProfile?.allergens?.length
+        ? activeProfile.allergens.map(a => a.code)
+        : primaryAllergies;
       const targetName = activeProfile ? activeProfile.name : (isIt ? 'il tuo profilo' : 'your profile');
 
       for (const r of restaurants) {
@@ -88,7 +137,7 @@ export async function avviaGeofencing(restaurants: RestaurantSummary[]) {
 
         const dist = calcolaDistanzaMeters(latitude, longitude, r.latitude, r.longitude);
 
-        if (dist <= 150) {
+        if (dist <= VENUE_PROXIMITY_RADIUS_M) {
           const key = `${r.public_code}_${activeProfileId || 'self'}`;
           const ora = Date.now();
 
@@ -114,5 +163,8 @@ export async function avviaGeofencing(restaurants: RestaurantSummary[]) {
         }
       }
     },
-  );
+    );
+  } catch {
+    fermaGeofencing();
+  }
 }

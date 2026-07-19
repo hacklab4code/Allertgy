@@ -200,6 +200,7 @@ def run_migrations():
         _run_v13_migrations(db)
         _run_v14_migrations(db)
         _run_v15_migrations(db)
+        _run_v16_migrations(db)
         _seed_allergens(db)
     finally:
         db.close()
@@ -789,4 +790,24 @@ def _run_v15_migrations(db) -> None:
         except Exception as e:
             print(f"❌ Errore migrazione v15 (kinship): {e}")
             db.rollback()
+
+
+def _run_v16_migrations(db) -> None:
+    """Migrazione v16: cache condivisa etichette prodotto (barcode → ingredienti AI)."""
+    _create_table_if_missing(db, "product_label_cache", """
+        CREATE TABLE IF NOT EXISTS product_label_cache (
+          id                      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          barcode                 VARCHAR(20) NOT NULL,
+          product_name            VARCHAR(255) NOT NULL DEFAULT '',
+          brand                   VARCHAR(255) NOT NULL DEFAULT '',
+          ingredients             TEXT NOT NULL,
+          allergeni_contenuti_json TEXT NOT NULL DEFAULT '[]',
+          allergeni_tracce_json   TEXT NOT NULL DEFAULT '[]',
+          created_by_user_id      INT UNSIGNED NULL,
+          created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_product_label_cache_barcode (barcode),
+          FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    """)
 

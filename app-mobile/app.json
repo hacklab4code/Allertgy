@@ -6,20 +6,65 @@
     "scheme": "allertgy",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "ios": { "supportsTablet": false, "bundleIdentifier": "com.allertgy.app" },
-    "android": { "package": "com.allertgy.app" },
+    "web": {
+      "bundler": "metro"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.allertgy.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        },
+        "NSLocalNetworkUsageDescription": "AllerTgy si connette al Mac per scaricare gli aggiornamenti dell'app durante lo sviluppo.",
+        "NSBonjourServices": ["_expo._tcp"]
+      }
+    },
+    "android": {
+      "package": "com.allertgy.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS"
+      ]
+    },
     "plugins": [
+      [
+        "expo-dev-client",
+        {
+          "launchMode": "most-recent"
+        }
+      ],
       "expo-router",
-      ["expo-camera", { "cameraPermission": "AllerTgy usa la fotocamera per scansionare il QR al tavolo e scoprire cosa puoi mangiare in quel ristorante, o i codici a barre per la spesa." }],
-      ["expo-contacts", { "contactsPermission": "AllerTgy accede alla rubrica per inviare il tuo profilo allergie ai contatti del telefono o agli utenti AllerTgy." }],
-      ["expo-notifications", {
-        "color": "#059669"
-      }]
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "AllerTgy usa la fotocamera per scansionare il QR al tavolo e scoprire cosa puoi mangiare in quel ristorante, o i codici a barre per la spesa."
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "AllerTgy accede alla rubrica per inviare il tuo profilo allergie ai contatti del telefono o agli utenti AllerTgy."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#36255C"
+        }
+      ],
+      "expo-font"
     ],
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "INSERISCI_EAS_PROJECT_ID"
+        "projectId": "6400a697-ac85-4aa6-99ac-efe425e760b4"
       }
-    }
+    },
+    "owner": "lerry34534"
   }
 }

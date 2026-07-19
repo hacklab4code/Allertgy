@@ -47,14 +47,29 @@ from ..schemas import (
     AppContactMatch,
     RecentAppContactOut,
     BarcodeScanOut,
+    ProductLabelAnalyzeOut,
+    ProductLabelCacheOut,
 )
 from ..security import get_current_user
 from ..rate_limit import rate_limiter
 from ..legal import LEGAL_TERMS_VERSION, PRIVACY_VERSION, SAFETY_DISCLAIMER_VERSION
 from ..services import storage
 from ..services.medical_document_analyze import analyze_medical_document
+from ..services.product_label_analyze import analyze_product_label
+from ..services.product_label_cache import (
+    cache_allergeni_contenuti,
+    cache_allergeni_tracce,
+    canonical_barcode,
+    get_cached_label,
+    upsert_cached_label,
+)
 from ..services.push import notify_users
-from ..services.plan_limits import ensure_barcode_scan_allowed, remaining_barcode_scans
+from ..services.plan_limits import (
+    ensure_barcode_scan_allowed,
+    ensure_product_label_ai_allowed,
+    remaining_barcode_scans,
+    remaining_product_label_ai_scans,
+)
 from ..services.referrals import (
     customer_has_plus,
     ensure_customer_invite_code,
@@ -140,6 +155,106 @@ def barcode_scans_remaining(
     remaining = remaining_barcode_scans(user, db)
     limit = customer_barcode_limit(user)
     return BarcodeScanOut(allowed=True, remaining=remaining, limit=limit)
+
+
+def _label_cache_to_out(row) -> ProductLabelCacheOut:
+    return ProductLabelCacheOut(
+        barcode=row.barcode,
+        product_name=row.product_name,
+        brand=row.brand,
+        ingredients=row.ingredients,
+        allergeni_contenuti=cache_allergeni_contenuti(row),
+        allergeni_tracce=cache_allergeni_tracce(row),
+        cached_at=row.updated_at or row.created_at,
+    )
+
+
+@router.get("/product-label/{barcode}", response_model=ProductLabelCacheOut)
+def get_product_label_cache(
+    barcode: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Etichetta già analizzata in passato — nessuna chiamata AI."""
+    if user.role != "customer":
+        raise HTTPException(403, "Solo i clienti possono consultare i prodotti scansionati")
+    row = get_cached_label(db, barcode)
+    if not row:
+        raise HTTPException(404, "Etichetta non ancora in archivio")
+    return _label_cache_to_out(row)
+
+
+@router.post(
+    "/product-label/analyze",
+    response_model=ProductLabelAnalyzeOut,
+    dependencies=[Depends(rate_limiter(10, 300))],
+)
+async def analyze_product_label_image(
+    file: UploadFile = File(...),
+    barcode: str = Form(""),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Analizza la foto dell'etichetta ingredienti (Plus Famiglia, max 30/mese)."""
+    if user.role != "customer":
+        raise HTTPException(403, "Solo i clienti possono analizzare etichette prodotto")
+
+    code = canonical_barcode(barcode)
+    cached = get_cached_label(db, code)
+    if cached:
+        return ProductLabelAnalyzeOut(
+            barcode=cached.barcode,
+            product_name=cached.product_name,
+            brand=cached.brand,
+            ingredients=cached.ingredients,
+            allergeni_contenuti=cache_allergeni_contenuti(cached),
+            allergeni_tracce=cache_allergeni_tracce(cached),
+            ai_stub=False,
+            from_cache=True,
+            note="Prodotto già in archivio AllerTgy — nessuna analisi AI necessaria.",
+            remaining_this_month=remaining_product_label_ai_scans(user, db),
+        )
+
+    remaining = ensure_product_label_ai_allowed(user, db)
+
+    mime_type = (file.content_type or "").lower()
+    if mime_type not in PHOTO_ALLOWED_TYPES:
+        raise HTTPException(415, "Formati accettati: JPG, PNG, WebP")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "Il file è vuoto")
+    if len(content) > PHOTO_MAX_BYTES:
+        raise HTTPException(413, "Immagine troppo grande: massimo 5 MB")
+    _validate_magic(content, mime_type)
+
+    result = analyze_product_label(content, mime_type)
+    if result.ai_stub and not (result.ingredients or result.product_name).strip():
+        db.rollback()
+        raise HTTPException(422, result.note or "Impossibile leggere l'etichetta")
+
+    upsert_cached_label(
+        db,
+        barcode=code,
+        product_name=result.product_name,
+        brand=result.brand,
+        ingredients=result.ingredients,
+        allergeni_contenuti=result.allergeni_contenuti,
+        allergeni_tracce=result.allergeni_tracce,
+        created_by_user_id=user.id,
+    )
+    db.commit()
+    return ProductLabelAnalyzeOut(
+        barcode=code,
+        product_name=result.product_name,
+        brand=result.brand,
+        ingredients=result.ingredients,
+        allergeni_contenuti=result.allergeni_contenuti,
+        allergeni_tracce=result.allergeni_tracce,
+        ai_stub=result.ai_stub,
+        from_cache=False,
+        note=result.note,
+        remaining_this_month=remaining_product_label_ai_scans(user, db),
+    )
 
 
 @router.get("/allergens", response_model=list[AllergenOut])
@@ -637,7 +752,7 @@ def list_sub_profiles(
     profiles = db.scalars(
         select(UserProfile)
         .where(UserProfile.user_id == user.id)
-        .order_by(UserProfile.relationship == 'io', UserProfile.created_at)
+        .order_by(UserProfile.kinship == 'io', UserProfile.created_at)
     ).all()
     
     res = []

@@ -34,7 +34,7 @@ allerTgy/
 │   └── src/
 │       ├── api/             # client HTTP
 │       ├── engine/          # semaforo.ts, offAllergens.ts, compatibility
-│       ├── services/        # barcodeScan, push, geofencing, healthExport
+│       ├── services/        # barcodeScan, push, geofencing, appleHealth, favorites
 │       ├── components/      # DishCard, RestaurantCard, …
 │       ├── store/           # Zustand: sessione, notifiche, owner
 │       └── utils/           # openHours, …

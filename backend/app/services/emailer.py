@@ -62,7 +62,13 @@ def _layout(title: str, body_html: str) -> str:
     """
 
 
-def send_password_reset(to: str, reset_url: str) -> None:
+def send_password_reset(to: str, reset_url: str, mobile_reset_url: str | None = None) -> None:
+    mobile_link = ""
+    if mobile_reset_url:
+        mobile_link = f"""
+            <p style="margin-top:16px">Su smartphone con l'app installata puoi anche
+            <a href="{mobile_reset_url}">aprire il reset nell'app AllerTgy</a>.</p>
+            """
     send_email(
         to,
         "Reimposta la tua password AllerTgy",
@@ -72,6 +78,7 @@ def send_password_reset(to: str, reset_url: str) -> None:
             <p>Abbiamo ricevuto una richiesta di reimpostazione password.</p>
             <p><a href="{reset_url}" style="background:#166534;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Scegli una nuova password</a></p>
             <p>Il link scade tra <strong>30 minuti</strong> e può essere usato una sola volta.</p>
+            {mobile_link}
             """,
         ),
     )

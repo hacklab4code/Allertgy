@@ -89,8 +89,8 @@ npm install
 EXPO_PUBLIC_API_URL=http://<IP-Mac>:8000 npx expo start
 ```
 
-**Cliente** — tab: Cerca (QR), Spesa (barcode), Locali, Account.
-**Ristoratore** — tab: Locale, Menù, QR, Account.
+**Cliente** — tab: Home, Ristoranti, Profilo + azione centrale **Scansiona** (QR locale, barcode, codice manuale).
+**Ristoratore** — tab: Attività, Menù, QR, Profilo.
 
 ## Il semaforo
 
@@ -101,6 +101,7 @@ Test: `cd app-mobile && npm test`
 
 ## Prossimi passi
 
-- Integrazione Gemini Vision live (chiave in `.env`)
+- Attivare servizi esterni (Gemini, Stripe, R2) — vedi **SETUP_SERVIZI.md**
+- Build nativa Expo per push notification su device reale
 - Tag NFC (Fase 2)
 - Deploy produzione e submission store

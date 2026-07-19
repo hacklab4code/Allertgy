@@ -4,9 +4,9 @@ import {
   ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { api } from '../../src/api/client';
-import DetailSection from '../../src/components/DetailSection';
+import { CollapseSection, Screen } from '../../src/components/ui';
 import { useOwner } from '../../src/store/owner';
-import { colors, radius, shadow, spacing, typography } from '../../src/theme';
+import { TAB_BAR_CLEARANCE, colors, radius, shadow, spacing, typography } from '../../src/theme';
 import type { BusinessPlan, Plan, Restaurant } from '../../src/types';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -35,6 +35,7 @@ export default function OwnerPiano() {
   const [invoices, setInvoices] = useState<{ id: number; amount_cents: number; status: string; pdf_url: string | null; created_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<BusinessPlan | 'portal' | null>(null);
+  const [invoicesExpanded, setInvoicesExpanded] = useState(false);
 
   const locale = current;
 
@@ -151,13 +152,12 @@ export default function OwnerPiano() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <DetailSection
-        title="PIANO ATTUALE"
-        subtitle="Stato abbonamento, prova gratuita e gestione pagamenti per questo locale."
-        style={{ marginTop: 0 }}
-        card={false}
-      >
+    <Screen edges={false}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingBottom: TAB_BAR_CLEARANCE }]}>
+      <View style={styles.blockHead}>
+        <Text style={styles.blockTitle}>Piano attuale</Text>
+        <Text style={styles.blockSub}>Stato abbonamento e gestione pagamenti</Text>
+      </View>
       <View style={[styles.statusCard, isTrialing && styles.statusTrial, isActive && styles.statusActive]}>
         <Text style={styles.statusFor}>{locale.name}</Text>
         <View style={styles.statusRow}>
@@ -181,14 +181,13 @@ export default function OwnerPiano() {
           </TouchableOpacity>
         )}
       </View>
-      </DetailSection>
 
       {canTrial && (
-        <DetailSection
-          title="PROVA GRATUITA"
-          subtitle="14 giorni di piano Base senza carta — sblocca menù, QR e registro allergeni."
-          card={false}
-        >
+        <>
+        <View style={styles.blockHead}>
+          <Text style={styles.blockTitle}>Prova gratuita</Text>
+          <Text style={styles.blockSub}>14 giorni Base senza carta</Text>
+        </View>
         <View style={styles.trialHero}>
           <Text style={styles.trialHeroEmoji}>🎁</Text>
           <Text style={styles.trialHeroTitle}>14 giorni di Base, gratis</Text>
@@ -206,14 +205,13 @@ export default function OwnerPiano() {
               : <Text style={styles.trialHeroBtnText}>Inizia la prova gratuita</Text>}
           </TouchableOpacity>
         </View>
-        </DetailSection>
+        </>
       )}
 
-      <DetailSection
-        title="CONFRONTO PIANI"
-        subtitle="Puoi cambiare o disdire in qualsiasi momento dal portale abbonamenti."
-        card={false}
-      >
+      <View style={styles.blockHead}>
+        <Text style={styles.blockTitle}>Confronto piani</Text>
+        <Text style={styles.blockSub}>Cambia o disdici dal portale abbonamenti</Text>
+      </View>
       {plans.map((plan) => {
         const isCurrent = plan.code === currentPlan && status !== 'free';
         const isFree = plan.code === 'free';
@@ -262,13 +260,14 @@ export default function OwnerPiano() {
           </View>
         );
       })}
-      </DetailSection>
 
       {invoices.length > 0 && (
-        <DetailSection
-          title="STORICO FATTURE"
-          subtitle="Fatture emesse per questo locale — scarica il PDF quando disponibile."
-          card={false}
+        <CollapseSection
+          icon="receipt"
+          title="Storico fatture"
+          preview={`${invoices.length} fatture`}
+          expanded={invoicesExpanded}
+          onToggle={() => setInvoicesExpanded((v) => !v)}
         >
           {invoices.map((inv) => (
             <View key={inv.id} style={styles.invoiceRow}>
@@ -288,7 +287,7 @@ export default function OwnerPiano() {
               </View>
             </View>
           ))}
-        </DetailSection>
+        </CollapseSection>
       )}
 
       <Text style={styles.footnote}>
@@ -296,6 +295,7 @@ export default function OwnerPiano() {
         con fatturazione elettronica, disdicibili in qualsiasi momento.
       </Text>
     </ScrollView>
+    </Screen>
   );
 }
 
@@ -310,6 +310,9 @@ function Spec({ ok, label }: { ok: boolean; label: string }) {
 
 const styles = StyleSheet.create({
   container: { padding: spacing.lg, paddingBottom: 48, backgroundColor: colors.bg, gap: spacing.lg },
+  blockHead: { gap: 2 },
+  blockTitle: { ...typography.h2, color: colors.ink },
+  blockSub: { color: colors.textSecondary, fontSize: 12 },
 
   statusCard: {
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg,

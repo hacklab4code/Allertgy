@@ -57,6 +57,15 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 PLAN_PRICE_CENTS = {k: v for k, v in PLAN_PRICES.items() if k != "free"}
 PLAN_NAMES = {p["code"]: p["name"] for p in PLAN_DEFINITIONS}
 
+_STRIPE_UNAVAILABLE = (
+    "Pagamenti non ancora attivi: configura STRIPE_SECRET_KEY nel backend."
+)
+
+
+def _stripe_dev_mock_allowed() -> bool:
+    """Mock locale senza Stripe: solo in sviluppo, mai in produzione."""
+    return not settings.is_production and not settings.stripe_configured
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Endpoint pubblico – piani disponibili
@@ -85,6 +94,10 @@ def create_customer_checkout(
         raise HTTPException(400, "Hai già Plus Famiglia attivo")
 
     if not settings.stripe_configured:
+        if settings.is_production:
+            raise HTTPException(503, _STRIPE_UNAVAILABLE)
+        if not _stripe_dev_mock_allowed():
+            raise HTTPException(503, _STRIPE_UNAVAILABLE)
         now = datetime.now(timezone.utc)
         user.customer_plan = "customer_plus"
         user.customer_subscription_status = "active"
@@ -237,7 +250,20 @@ def create_checkout_session(
     db: Session = Depends(get_db),
 ):
     r = _my_restaurant(data.restaurant_id, user, db)
+    status = r.subscription_status or "free"
+    if status == "comped":
+        raise HTTPException(400, "Questo locale ha un piano omaggio attivo.")
+    if status == "active" and r.stripe_subscription_id:
+        raise HTTPException(
+            400,
+            "Questo locale ha già un abbonamento attivo. "
+            "Usa il portale clienti per modificare il piano.",
+        )
     if not settings.stripe_configured:
+        if settings.is_production:
+            raise HTTPException(503, _STRIPE_UNAVAILABLE)
+        if not _stripe_dev_mock_allowed():
+            raise HTTPException(503, _STRIPE_UNAVAILABLE)
         r.business_plan = data.plan
         r.subscription_status = "active"
         r.plan_price_cents = PLAN_PRICES.get(data.plan, 0)
@@ -287,6 +313,10 @@ def create_boost_session(
     """
     r = _my_restaurant(data.restaurant_id, user, db)
     if not settings.stripe_configured:
+        if settings.is_production:
+            raise HTTPException(503, _STRIPE_UNAVAILABLE)
+        if not _stripe_dev_mock_allowed():
+            raise HTTPException(503, _STRIPE_UNAVAILABLE)
         from ..models import VisibilityBoost
         now = datetime.now(timezone.utc)
         db.add(VisibilityBoost(
@@ -296,6 +326,7 @@ def create_boost_session(
             activated_at=now,
             expires_at=now + timedelta(days=30),
         ))
+        r.featured_priority = max(r.featured_priority or 0, 10)
         db.commit()
         return BoostSessionOut(
             activated=True,

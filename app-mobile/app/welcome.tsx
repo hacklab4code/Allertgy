@@ -1,9 +1,13 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, SafeAreaView } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useSession, type Role } from '../src/store/session';
 import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
 import { useTranslation } from '../src/constants/translations';
+import { AppText, GlassCard, GlassScreenScroll, PuffyButton, Screen } from '../src/components/ui';
+import { colors, spacing, radius, font, puffyShadow } from '../src/theme';
 
 export default function Welcome() {
   const [step, setStep] = useState<'select_role' | 'slides'>('select_role');
@@ -11,278 +15,150 @@ export default function Welcome() {
   const [slide, setSlide] = useState(0);
   const { language, setRole } = useSession();
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
 
   const customerSlides = [
-    {
-      photo: (language || 'it').toLowerCase() === 'it' ? 'foto: tavolo al ristorante' : 'photo: restaurant table',
-      title: t('slide_c1_title'),
-      text: t('slide_c1_text'),
-    },
-    {
-      photo: (language || 'it').toLowerCase() === 'it' ? 'profilo: allergie e preferenze' : 'profile: allergies & preferences',
-      title: t('slide_c2_title'),
-      text: t('slide_c2_text'),
-    },
-    {
-      photo: (language || 'it').toLowerCase() === 'it' ? 'menu: semaforo personalizzato' : 'menu: personalized traffic light',
-      title: t('slide_c3_title'),
-      text: t('slide_c3_text'),
-    }
+    { icon: 'restaurant' as const, title: t('slide_c1_title'), text: t('slide_c1_text') },
+    { icon: 'shield-checkmark' as const, title: t('slide_c2_title'), text: t('slide_c2_text') },
+    { icon: 'ellipse' as const, title: t('slide_c3_title'), text: t('slide_c3_text') },
   ];
 
   const ownerSlides = [
-    {
-      photo: (language || 'it').toLowerCase() === 'it' ? 'gestione: menu digitale' : 'management: digital menu',
-      title: t('slide_o1_title'),
-      text: t('slide_o1_text'),
-    },
-    {
-      photo: (language || 'it').toLowerCase() === 'it' ? 'sicurezza: clienti felici' : 'safety: happy customers',
-      title: t('slide_o2_title'),
-      text: t('slide_o2_text'),
-    },
-    {
-      photo: (language || 'it').toLowerCase() === 'it' ? 'statistiche: area ristoratore' : 'statistics: owner area',
-      title: t('slide_o3_title'),
-      text: t('slide_o3_text'),
-    }
+    { icon: 'clipboard' as const, title: t('slide_o1_title'), text: t('slide_o1_text') },
+    { icon: 'happy' as const, title: t('slide_o2_title'), text: t('slide_o2_text') },
+    { icon: 'stats-chart' as const, title: t('slide_o3_title'), text: t('slide_o3_text') },
   ];
 
   const slides = selectedRole === 'owner' ? ownerSlides : customerSlides;
-
-  const next = () => {
-    if (slide < slides.length - 1) {
-      setSlide(slide + 1);
-    } else {
-      router.push('/login');
-    }
-  };
-
-  const skip = () => {
-    router.push('/login');
-  };
+  const current = slides[slide];
 
   const handleSelectRole = (role: Role) => {
     setSelectedRole(role);
     setRole(role);
   };
 
-  const current = slides[slide];
-
   return (
-    <View style={styles.container}>
-      <SafeAreaView style={{ backgroundColor: '#FFFFFF', zIndex: 100 }}>
+    <Screen edges={false} ambient>
+      <View style={[styles.topBar, { paddingTop: insets.top }]}>
         <LanguageFlagsRow />
-      </SafeAreaView>
+      </View>
 
-      {step === 'select_role' ? (
-        <ScrollView contentContainerStyle={styles.scroll} bounces={false}>
-          <Text style={styles.logo}>{t('allertgyTitle')}</Text>
-          <View style={styles.roleContainer}>
-            <View style={styles.headerArea}>
-              <Text style={styles.mainTitle}>{t('welcome')}</Text>
-              <Text style={styles.subtitle}>{t('welcome_subtitle')}</Text>
-            </View>
+      <GlassScreenScroll bounces={false} showsVerticalScrollIndicator={false}>
+        <AppText variant="h2" color={colors.brand}>{t('allertgyTitle')}</AppText>
 
-            <View style={styles.roleCards}>
-              <TouchableOpacity
-                style={[
-                  styles.roleCard,
-                  selectedRole === 'customer' && styles.roleCardActive
-                ]}
-                onPress={() => handleSelectRole('customer')}
-              >
-                <View style={styles.roleHeader}>
-                  <Text style={styles.roleIcon}>🙋</Text>
-                  <Text style={[styles.cardTitle, selectedRole === 'customer' && styles.cardTitleActive]}>
-                    {t('role_customer')}
-                  </Text>
-                </View>
-                <Text style={styles.cardDesc}>
-                  {t('role_customer_desc')}
-                </Text>
-              </TouchableOpacity>
+        {step === 'select_role' ? (
+          <View style={styles.roleArea}>
+            <AppText variant="h1">{t('welcome')}</AppText>
+            <AppText variant="subtitle">{t('welcome_subtitle')}</AppText>
 
-              <TouchableOpacity
-                style={[
-                  styles.roleCard,
-                  selectedRole === 'owner' && styles.roleCardActive
-                ]}
-                onPress={() => handleSelectRole('owner')}
-              >
-                <View style={styles.roleHeader}>
-                  <Text style={styles.roleIcon}>👨‍🍳</Text>
-                  <Text style={[styles.cardTitle, selectedRole === 'owner' && styles.cardTitleActive]}>
-                    {t('role_owner')}
-                  </Text>
-                </View>
-                <Text style={styles.cardDesc}>
-                  {t('role_owner_desc')}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <GlassCard
+              onPress={() => handleSelectRole('customer')}
+              style={[styles.roleCard, selectedRole === 'customer' && styles.roleCardActive]}
+            >
+              <View style={[styles.roleIcon, { backgroundColor: colors.brandTertiary }]}>
+                <Ionicons name="person" size={28} color={colors.brand} />
+              </View>
+              <AppText variant="title">{t('role_customer')}</AppText>
+              <AppText variant="subtitle">{t('role_customer_desc')}</AppText>
+            </GlassCard>
+
+            <GlassCard
+              onPress={() => handleSelectRole('owner')}
+              style={[styles.roleCard, selectedRole === 'owner' && styles.roleCardActive]}
+            >
+              <View style={[styles.roleIcon, { backgroundColor: colors.greenSoft }]}>
+                <Ionicons name="restaurant" size={28} color={colors.green} />
+              </View>
+              <AppText variant="title">{t('role_owner')}</AppText>
+              <AppText variant="subtitle">{t('role_owner_desc')}</AppText>
+            </GlassCard>
           </View>
-        </ScrollView>
-      ) : (
-        <ScrollView contentContainerStyle={styles.scroll} bounces={false}>
-          <Text style={styles.logo}>{t('allertgyTitle')}</Text>
-          <View style={styles.center}>
-            <View style={styles.photo}>
-              <Text style={styles.photoText}>{current.photo}</Text>
+        ) : (
+          <View style={styles.slideArea}>
+            <PuffyButton
+              label={slide > 0 ? t('back') : (language === 'it' ? 'Cambia ruolo' : 'Change role')}
+              onPress={() => {
+                if (slide > 0) setSlide(slide - 1);
+                else { setStep('select_role'); setSlide(0); }
+              }}
+              variant="soft"
+              fullWidth={false}
+              style={{ alignSelf: 'flex-start', marginBottom: spacing.sm }}
+            />
+            <View style={[styles.slideHero, puffyShadow(10)]}>
+              <Ionicons name={current.icon} size={64} color={colors.brand} />
             </View>
-            <View style={styles.copy}>
-              <Text style={styles.title}>{current.title}</Text>
-              <Text style={styles.text}>{current.text}</Text>
-            </View>
+            <AppText variant="h1">{current.title}</AppText>
+            <AppText variant="body">{current.text}</AppText>
             <View style={styles.dots}>
               {slides.map((_, i) => (
-                <View
-                  key={i}
-                  style={[styles.dot, i === slide ? styles.dotActive : null]}
-                />
+                <View key={i} style={[styles.dot, i === slide && styles.dotActive]} />
               ))}
             </View>
           </View>
-        </ScrollView>
-      )}
+        )}
+      </GlassScreenScroll>
 
-      {step === 'select_role' ? (
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={[styles.btnStart, !selectedRole && styles.btnDisabled]}
-            disabled={!selectedRole}
+      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.xxl) }]}>
+        {step === 'select_role' ? (
+          <PuffyButton
+            label={t('continue')}
             onPress={() => setStep('slides')}
-          >
-            <Text style={styles.btnStartText}>{t('continue')}</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.bottomBar}>
-          <TouchableOpacity style={styles.btnStart} onPress={next}>
-            <Text style={styles.btnStartText}>
-              {slide < slides.length - 1 ? t('next') : t('start')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnLogin} onPress={skip}>
-            <Text style={styles.btnLoginText}>{t('already_have_account')}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+            disabled={!selectedRole}
+            icon="arrow-forward"
+          />
+        ) : (
+          <>
+            <PuffyButton
+              label={slide < slides.length - 1 ? t('next') : t('start')}
+              onPress={() => (slide < slides.length - 1 ? setSlide(slide + 1) : router.push('/login'))}
+              icon="arrow-forward"
+            />
+            <PuffyButton
+              label={t('already_have_account')}
+              onPress={() => router.push('/login')}
+              variant="soft"
+            />
+          </>
+        )}
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7FAF8' },
-  scroll: { 
-    flexGrow: 1, 
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 24,
-  },
-  logo: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0B5D4D',
-  },
-  roleContainer: { flex: 1, justifyContent: 'center', gap: 24, marginTop: 24 },
-  headerArea: { gap: 8 },
-  mainTitle: { fontSize: 32, fontWeight: '900', color: '#0B5D4D', lineHeight: 38 },
-  subtitle: { fontSize: 15, color: '#596B63', lineHeight: 22 },
-  roleCards: { gap: 16 },
-  roleCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: '#DDE8E2',
-    shadowColor: '#0B5D4D',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  roleCardActive: {
-    borderColor: '#0F8A6A',
-    backgroundColor: '#F0F9F5',
-  },
-  roleHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
-  roleIcon: { fontSize: 24 },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: '#10201B' },
-  cardTitleActive: { color: '#0B5D4D' },
-  cardDesc: { fontSize: 13, color: '#596B63', lineHeight: 18 },
-  center: { flex: 1, justifyContent: 'center', gap: 20, marginTop: 10 },
-  photo: {
-    height: 240,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#DDE8E2',
-    backgroundColor: '#EEF5F1',
+  topBar: { backgroundColor: colors.surface },
+  scroll: { flexGrow: 1, padding: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.md, gap: spacing.lg },
+  roleArea: { gap: spacing.lg, marginTop: spacing.md },
+  roleCard: { gap: spacing.sm },
+  roleCardActive: { borderColor: colors.brand, backgroundColor: colors.brand50 },
+  roleIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  photoText: {
-    fontSize: 12,
-    color: '#596B63',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#DDE8E2',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
-  },
-  copy: { gap: 10 },
-  title: { 
-    fontSize: 24, 
-    fontWeight: '800', 
-    color: '#10201B', 
-    lineHeight: 30,
-  },
-  text: { 
-    fontSize: 15, 
-    color: '#596B63', 
-    lineHeight: 22,
-  },
-  dots: { flexDirection: 'row', gap: 6 },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#C9D8D0',
-  },
-  dotActive: {
-    width: 20,
-    backgroundColor: '#0F8A6A',
-  },
-  bottomBar: { 
-    paddingHorizontal: 24, 
-    paddingBottom: 32,
-    gap: 10,
-  },
-  btnStart: { 
-    backgroundColor: '#0F8A6A', 
-    height: 52,
-    borderRadius: 14, 
+  slideArea: { gap: spacing.lg, marginTop: spacing.xl, alignItems: 'center' },
+  slideHero: {
+    width: 140,
+    height: 140,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceSecondary,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.border,
   },
-  btnStartText: { 
-    color: '#fff', 
-    fontWeight: '700', 
-    fontSize: 16 
-  },
-  btnDisabled: {
-    backgroundColor: '#A9C2B5',
-  },
-  btnLogin: {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnLoginText: {
-    color: '#0B5D4D',
-    fontWeight: '600',
-    fontSize: 15,
+  dots: { flexDirection: 'row', gap: 6, marginTop: spacing.sm },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
+  dotActive: { width: 24, backgroundColor: colors.brand },
+  bottomBar: {
+    padding: spacing.lg,
+    paddingTop: spacing.sm,
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
   },
 });

@@ -1,12 +1,37 @@
 import { Stack, router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../src/api/client';
 import { useSession } from '../src/store/session';
 import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
 import { useTranslation } from '../src/constants/translations';
+import { AppText, GlassScreenScroll, PuffyButton, Screen, Section } from '../src/components/ui';
+import { colors, spacing, MIN_TOUCH_TARGET } from '../src/theme';
+
+function Check({ checked, onPress, text }: { checked: boolean; onPress: () => void; text: string }) {
+  return (
+    <Pressable style={styles.checkRow} onPress={onPress}>
+      <View style={[styles.checkbox, checked && styles.checkboxOn]}>
+        {checked ? <AppText variant="bodyBold" color="#fff">✓</AppText> : null}
+      </View>
+      <AppText variant="caption" style={styles.checkText}>{text}</AppText>
+    </Pressable>
+  );
+}
+
+function DocLink({ label, tab }: { label: string; tab: string }) {
+  return (
+    <Pressable onPress={() => router.push(`/legal-docs?tab=${tab}` as '/legal-docs')}>
+      <AppText variant="caption" color={colors.brand} style={styles.docLink}>
+        {label} ›
+      </AppText>
+    </Pressable>
+  );
+}
 
 export default function LegalScreen() {
+  const [age, setAge] = useState(false);
   const [terms, setTerms] = useState(false);
   const [privacy, setPrivacy] = useState(false);
   const [health, setHealth] = useState(false);
@@ -14,6 +39,7 @@ export default function LegalScreen() {
   const [error, setError] = useState('');
   const { setLegalStatus, language } = useSession();
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const isIt = (language || 'it').toLowerCase() === 'it';
 
   const accept = async () => {
@@ -29,74 +55,66 @@ export default function LegalScreen() {
     setBusy(false);
   };
 
-  const ready = terms && privacy && health;
+  const ready = age && terms && privacy && health;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-      <Stack.Screen options={{ headerRight: undefined }} />
-      <LanguageFlagsRow />
-      
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.icon}>⚖️</Text>
-        <Text style={styles.title}>{t('legal_title')}</Text>
-        <Text style={styles.text}>{t('legal_intro')}</Text>
+    <Screen edges={false} ambient>
+      <Stack.Screen options={{ headerRight: () => <LanguageFlagsRow inHeader /> }} />
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+      <GlassScreenScroll showsVerticalScrollIndicator={false}>
+        <AppText variant="h1" style={styles.icon}>⚖️</AppText>
+        <AppText variant="h2" style={styles.title}>{t('legal_title')}</AppText>
+        <AppText variant="body" style={styles.text}>{t('legal_intro')}</AppText>
 
-        <View style={styles.box}>
-          <Check 
-            checked={terms} 
-            onPress={() => setTerms(!terms)} 
-            text={isIt ? "Accetto i Termini di servizio dell'app." : "I accept the App Terms of Service."} 
-          />
-          <Check 
-            checked={privacy} 
-            onPress={() => setPrivacy(!privacy)} 
-            text={isIt ? "Ho letto l'Informativa Privacy e so che posso revocare o modificare i dati dal profilo." : "I have read the Privacy Policy and know that I can revoke or modify my data in my profile."} 
-          />
-          <Check 
-            checked={health} 
-            onPress={() => setHealth(!health)} 
-            text={isIt ? "Acconsento esplicitamente al trattamento dei dati su allergie, intolleranze e preferenze alimentari per personalizzare il menu." : "I explicitly consent to the processing of data on allergies, intolerances and dietary preferences to customize the menu."} 
-          />
-        </View>
+        <Section title={t('legal_read_before')} card>
+          <View style={styles.docLinks}>
+            <DocLink label={t('legal_read_terms')} tab="terms" />
+            <DocLink label={t('legal_read_privacy')} tab="privacy" />
+            <DocLink label={t('legal_read_safety')} tab="safety" />
+          </View>
+        </Section>
 
-        <TouchableOpacity style={[styles.button, (!ready || busy) && styles.disabled]} disabled={!ready || busy} onPress={accept}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{t('accept_continue')}</Text>}
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
-  );
-}
+        {error ? <AppText variant="caption" color={colors.red}>{error}</AppText> : null}
 
-function Check({ checked, onPress, text }: { checked: boolean; onPress: () => void; text: string }) {
-  return (
-    <TouchableOpacity style={styles.checkRow} onPress={onPress}>
-      <View style={[styles.checkbox, checked && styles.checkboxOn]}>
-        {checked ? <Text style={styles.checkboxMark}>✓</Text> : null}
+        <Section title={isIt ? 'Consensi richiesti' : 'Required consents'} card>
+          <Check checked={age} onPress={() => setAge(!age)} text={t('legal_age')} />
+          <Check checked={terms} onPress={() => setTerms(!terms)} text={t('legal_accept_terms')} />
+          <Check checked={privacy} onPress={() => setPrivacy(!privacy)} text={t('legal_accept_privacy')} />
+          <Check checked={health} onPress={() => setHealth(!health)} text={t('legal_accept_health')} />
+        </Section>
+      </GlassScreenScroll>
+
+      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+        <PuffyButton
+          label={busy ? (isIt ? 'Salvataggio…' : 'Saving…') : t('accept_continue')}
+          onPress={accept}
+          disabled={!ready || busy}
+          fullWidth
+        />
       </View>
-      <Text style={styles.checkText}>{text}</Text>
-    </TouchableOpacity>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 24, justifyContent: 'center', backgroundColor: '#f8fafc' },
-  icon: { fontSize: 44, textAlign: 'center', marginBottom: 12 },
-  title: { fontSize: 22, fontWeight: '900', textAlign: 'center', color: '#0f172a' },
-  text: { marginTop: 10, marginBottom: 18, color: '#475569', textAlign: 'center', lineHeight: 22, fontSize: 14 },
-  box: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 14, gap: 12 },
-  checkRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  scroll: { padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.lg },
+  icon: { textAlign: 'center' },
+  title: { textAlign: 'center' },
+  text: { textAlign: 'center', color: colors.onSurfaceMuted, lineHeight: 22 },
+  docLinks: { gap: spacing.sm },
+  docLink: { fontWeight: '700', lineHeight: 22 },
+  checkRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', minHeight: MIN_TOUCH_TARGET },
   checkbox: {
-    width: 23, height: 23, borderRadius: 6, borderWidth: 1.5,
-    borderColor: '#cbd5e1', alignItems: 'center', justifyContent: 'center',
-    marginTop: 1,
+    width: 24, height: 24, borderWidth: 1.5,
+    borderColor: colors.border, alignItems: 'center', justifyContent: 'center', marginTop: 1,
   },
-  checkboxOn: { backgroundColor: '#059669', borderColor: '#059669' },
-  checkboxMark: { color: '#fff', fontWeight: '900', fontSize: 14 },
-  checkText: { flex: 1, color: '#475569', fontSize: 13, lineHeight: 19, fontWeight: '600' },
-  button: { marginTop: 18, backgroundColor: '#059669', borderRadius: 14, padding: 16, alignItems: 'center' },
-  disabled: { opacity: 0.4 },
-  buttonText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  error: { color: '#dc2626', textAlign: 'center', marginBottom: 10 },
+  checkboxOn: { backgroundColor: colors.brand, borderColor: colors.brand },
+  checkText: { flex: 1, color: colors.onSurfaceMuted, lineHeight: 19 },
+  bottomBar: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
 });

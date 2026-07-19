@@ -1,16 +1,12 @@
-import React from 'react';
-import MapView, { Marker, Callout } from 'react-native-maps';
+import React, { useEffect, useRef } from 'react';
+import MapView, { Marker, Callout, Region } from 'react-native-maps';
 
 interface MapWrapperProps {
-  style: any;
+  style: object;
   showsUserLocation: boolean;
   showsMyLocationButton: boolean;
-  initialRegion: {
-    latitude: number;
-    longitude: number;
-    latitudeDelta: number;
-    longitudeDelta: number;
-  };
+  initialRegion: Region;
+  region?: Region;
   children: React.ReactNode;
 }
 
@@ -23,14 +19,25 @@ export default function MapWrapper({
   showsUserLocation,
   showsMyLocationButton,
   initialRegion,
-  children
+  region,
+  children,
 }: MapWrapperProps) {
+  const mapRef = useRef<MapView>(null);
+
+  useEffect(() => {
+    if (region && mapRef.current) {
+      mapRef.current.animateToRegion(region, 600);
+    }
+  }, [region?.latitude, region?.longitude]);
+
   return (
     <MapView
+      ref={mapRef}
       style={style}
       showsUserLocation={showsUserLocation}
       showsMyLocationButton={showsMyLocationButton}
       initialRegion={initialRegion}
+      region={region}
     >
       {children}
     </MapView>

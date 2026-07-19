@@ -1,11 +1,13 @@
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { api, API, WEB_URL } from '../../src/api/client';
-import DetailSection from '../../src/components/DetailSection';
+import { OwnerReviewsPanel } from '../../src/components/owner/OwnerReviewsPanel';
+import { CollapseSection, HeaderAddButton, Screen, Section, SettingsDivider, SettingsRow } from '../../src/components/ui';
+import { TAB_BAR_CLEARANCE, spacing } from '../../src/theme';
 import { useOwner } from '../../src/store/owner';
 
 /** Scheda Locale: seleziona o crea il ristorante. */
@@ -19,7 +21,8 @@ export default function Locali() {
   const [busy, setBusy] = useState(false);
 
   // Stati form di personalizzazione vetrina
-  const [isEditingVetrina, setIsEditingVetrina] = useState(false);
+  const [reviewsExpanded, setReviewsExpanded] = useState(false);
+  const [reviewStats, setReviewStats] = useState({ total: 0, pending: 0 });
   const [editName, setEditName] = useState('');
   const [editCity, setEditCity] = useState('');
   const [editAddress, setEditAddress] = useState('');
@@ -35,6 +38,12 @@ export default function Locali() {
   const [editAllergenManager, setEditAllergenManager] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [photos, setPhotos] = useState<{ id: number; url: string; is_cover: boolean }[]>([]);
+  const [identityOpen, setIdentityOpen] = useState(true);
+  const [contactsOpen, setContactsOpen] = useState(false);
+  const [linksOpen, setLinksOpen] = useState(false);
+  const [legalOpen, setLegalOpen] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     if (current) {
@@ -61,6 +70,19 @@ export default function Locali() {
   }, [current]);
 
   useEffect(() => {
+    if (!current) {
+      setReviewStats({ total: 0, pending: 0 });
+      return;
+    }
+    api.listReviews(current.public_code)
+      .then((list) => setReviewStats({
+        total: list.length,
+        pending: list.filter((r) => !r.reply).length,
+      }))
+      .catch(() => setReviewStats({ total: 0, pending: 0 }));
+  }, [current?.id]);
+
+  useEffect(() => {
     api.myRestaurants()
       .then((rs) => {
         setRestaurants(rs);
@@ -78,6 +100,7 @@ export default function Locali() {
       setRestaurants([...restaurants, r]);
       setCurrent(r);
       setName(''); setCity(''); setInviteCode('');
+      setShowAddModal(false);
       if (inviteCode.trim() && r.business_plan === 'pro_notify') {
         Alert.alert(
           'Pro omaggio attivato!',
@@ -113,7 +136,6 @@ export default function Locali() {
       
       setRestaurants(restaurants.map(r => r.id === current.id ? updated : r));
       setCurrent(updated);
-      setIsEditingVetrina(false);
       Alert.alert('Salvato', 'I dettagli della vetrina sono stati aggiornati con successo!');
     } catch (e) {
       setError((e as Error).message);
@@ -221,18 +243,39 @@ export default function Locali() {
     }
   };
 
+  const planLabel = current?.business_plan === 'base' ? 'Base'
+    : current?.business_plan === 'pro_notify' ? 'Pro' : 'Gratis';
+
   if (loading) return <ActivityIndicator style={{ marginTop: 60 }} size="large" color="#059669" />;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <Screen edges={false}>
+    <Stack.Screen
+      options={{
+        headerRight: () => (
+          <HeaderAddButton
+            onPress={() => setShowAddModal(true)}
+            accessibilityLabel="Aggiungi attività"
+          />
+        ),
+      }}
+    />
+    <ScrollView contentContainerStyle={[styles.container, { paddingBottom: TAB_BAR_CLEARANCE }]}>
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {restaurants.length > 0 && (
-        <DetailSection
-          title="SELEZIONE LOCALE"
-          subtitle="Scegli quale attività stai gestendo. Da qui passi a menù, QR e piani."
+        <Section
+          title="Le tue attività"
+          subtitle={restaurants.length === 0
+            ? 'Tocca + in alto a destra per registrare la prima attività.'
+            : restaurants.length === 1
+              ? 'Gestisci locale, vetrina e feedback clienti.'
+              : 'Seleziona quale locale stai gestendo.'}
+          card
           padded={false}
         >
+          {restaurants.length === 0 ? (
+            <Text style={styles.muted}>Nessun locale registrato.</Text>
+          ) : null}
           {restaurants.map((r) => {
             const active = current?.id === r.id;
             return (
@@ -243,37 +286,78 @@ export default function Locali() {
                   <Text style={styles.placeName}>{r.name}</Text>
                   <Text style={styles.placeSub}>
                     {r.city ? `${r.city} · ` : ''}codice {r.public_code}
-                    {r.menu_updated_at ? ' · menù pubblicato ✓' : ' · menù da pubblicare'}
+                    {r.menu_updated_at ? ' · menù ✓' : ' · menù da fare'}
                   </Text>
                 </View>
                 {active && <Text style={styles.check}>✓</Text>}
               </TouchableOpacity>
             );
           })}
-          {current && (
-            <View style={{ gap: 8, marginTop: 8 }}>
-              <TouchableOpacity style={styles.cta} onPress={() => router.push('/(owner)/menu')}>
-                <Text style={styles.ctaText}>Gestisci il menù di {current.name} →</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.secondaryCta, isEditingVetrina && { backgroundColor: '#f1f5f9' }]} 
-                onPress={() => setIsEditingVetrina(!isEditingVetrina)}
-              >
-                <Text style={styles.secondaryCtaText}>
-                  {isEditingVetrina ? 'Chiudi personalizzazione ✕' : 'Personalizza Vetrina ✨'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </DetailSection>
-      )}
+        </Section>
 
-      {isEditingVetrina && current && (
+      {current ? (
         <>
-          <DetailSection
-            title="IDENTITÀ LOCALE"
-            subtitle="Nome, logo e descrizione visibili ai clienti sulla vetrina."
+          <Section title="Panoramica" subtitle={current.name} card padded={false}>
+            <View style={styles.metricsRow}>
+              <View style={styles.metricBox}>
+                <Text style={styles.metricValue}>{current.menu_updated_at ? 'OK' : '—'}</Text>
+                <Text style={styles.metricLabel}>menù</Text>
+              </View>
+              <View style={styles.metricBox}>
+                <Text style={styles.metricValue}>{planLabel}</Text>
+                <Text style={styles.metricLabel}>piano</Text>
+              </View>
+              <View style={styles.metricBox}>
+                <Text style={styles.metricValue}>{reviewStats.pending > 0 ? reviewStats.pending : reviewStats.total}</Text>
+                <Text style={styles.metricLabel}>{reviewStats.pending > 0 ? 'da rispondere' : 'recensioni'}</Text>
+              </View>
+            </View>
+            <SettingsRow
+              icon="restaurant"
+              title="Gestione menù"
+              subtitle={current.menu_updated_at ? 'Menù pubblicato' : 'Da pubblicare'}
+              onPress={() => router.push('/(owner)/menu')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="qr-code"
+              title="QR code tavoli"
+              subtitle="Stampa il QR per i clienti"
+              onPress={() => router.push('/(owner)/qr')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="bar-chart"
+              title="Statistiche"
+              subtitle="Visite menù e allergeni cercati"
+              onPress={() => router.push('/(owner)/statistiche')}
+            />
+          </Section>
+
+          <CollapseSection
+            icon="star"
+            title="Recensioni clienti"
+            preview={
+              reviewStats.total === 0
+                ? 'Nessuna recensione'
+                : reviewStats.pending > 0
+                  ? `${reviewStats.pending} da rispondere`
+                  : `${reviewStats.total} recensioni`
+            }
+            badge={reviewStats.pending > 0 ? reviewStats.pending : undefined}
+            expanded={reviewsExpanded}
+            onToggle={() => setReviewsExpanded((v) => !v)}
+            tint={reviewStats.pending > 0 ? 'yellow' : 'none'}
+          >
+            <OwnerReviewsPanel locale={current} onStats={setReviewStats} />
+          </CollapseSection>
+
+          <CollapseSection
+            icon="storefront"
+            title="Identità e logo"
+            preview={editName || current.name}
+            expanded={identityOpen}
+            onToggle={() => setIdentityOpen((v) => !v)}
           >
             <Text style={styles.fieldLabel}>Logo del Ristorante</Text>
             <View style={styles.logoRow}>
@@ -303,11 +387,14 @@ export default function Locali() {
               multiline 
               placeholder="es. Specialità tradizionali milanesi con cucina gluten-free..." 
             />
-          </DetailSection>
+          </CollapseSection>
 
-          <DetailSection
-            title="CONTATTI E POSIZIONE"
-            subtitle="Indirizzo, telefono e orari mostrati nella scheda pubblica."
+          <CollapseSection
+            icon="location"
+            title="Contatti e posizione"
+            preview={editCity || 'Indirizzo, telefono, orari'}
+            expanded={contactsOpen}
+            onToggle={() => setContactsOpen((v) => !v)}
           >
             <Text style={styles.fieldLabel}>Indirizzo Completo</Text>
             <TextInput style={styles.input} value={editAddress} onChangeText={setEditAddress} placeholder="es. Via Garibaldi 12" />
@@ -325,11 +412,14 @@ export default function Locali() {
               multiline 
               placeholder="es. Lun - Ven: 12:30 - 14:30, 19:30 - 22:30" 
             />
-          </DetailSection>
+          </CollapseSection>
 
-          <DetailSection
-            title="COLLEGAMENTI E RECENSIONI"
-            subtitle="Link utili per menu esterno e recensioni su altre piattaforme."
+          <CollapseSection
+            icon="link"
+            title="Link esterni"
+            preview="Menù PDF, Google, TripAdvisor"
+            expanded={linksOpen}
+            onToggle={() => setLinksOpen((v) => !v)}
           >
             <Text style={styles.fieldLabel}>Link Menù Originale (PDF / Web)</Text>
             <TextInput style={styles.input} value={editMenuUrl} onChangeText={setEditMenuUrl} keyboardType="url" autoCapitalize="none" placeholder="es. https://trattoria.it/menu.pdf" />
@@ -337,25 +427,37 @@ export default function Locali() {
             <TextInput style={styles.input} value={editGoogle} onChangeText={setEditGoogle} placeholder="Google Place ID per recensioni" />
             <Text style={styles.fieldLabel}>TripAdvisor URL</Text>
             <TextInput style={styles.input} value={editTripAdvisor} onChangeText={setEditTripAdvisor} placeholder="URL TripAdvisor per recensioni" />
-          </DetailSection>
+          </CollapseSection>
 
-          <DetailSection
-            title="DATI LEGALI"
-            subtitle="Obbligatori per registro allergeni e validità del menù digitale."
+          <CollapseSection
+            icon="document-text"
+            title="Dati legali"
+            preview={editVat ? 'P.IVA inserita' : 'P.IVA da completare'}
+            expanded={legalOpen}
+            onToggle={() => setLegalOpen((v) => !v)}
+            tint={editVat && editAllergenManager ? undefined : 'yellow'}
           >
             <Text style={styles.fieldLabel}>Partita IVA (P.IVA)</Text>
             <TextInput style={styles.input} value={editVat} onChangeText={setEditVat} keyboardType="numeric" placeholder="es. 12345678901" />
             <Text style={styles.fieldLabel}>Referente Allergeni (Responsabile HACCP)</Text>
             <TextInput style={styles.input} value={editAllergenManager} onChangeText={setEditAllergenManager} placeholder="es. Chef Mario Rossi" />
-          </DetailSection>
+          </CollapseSection>
 
-          <DetailSection
-            title="GALLERIA FOTO"
-            subtitle="Immagini del locale mostrate ai clienti. Una foto può essere impostata come cover."
+          <CollapseSection
+            icon="images"
+            title="Galleria foto"
+            preview={`${photos.length} foto`}
+            expanded={galleryOpen}
+            onToggle={() => setGalleryOpen((v) => !v)}
           >
-            <TouchableOpacity style={styles.addPhotoBtn} onPress={handleAddPhoto}>
-              <Text style={styles.addPhotoBtnText}>+ Aggiungi Foto alla Galleria</Text>
-            </TouchableOpacity>
+            <View style={styles.galleryToolbar}>
+              <Text style={styles.fieldLabel}>Foto caricate</Text>
+              <HeaderAddButton
+                inHeader={false}
+                onPress={handleAddPhoto}
+                accessibilityLabel="Aggiungi foto"
+              />
+            </View>
             {photos.length > 0 ? (
               <View style={styles.photosGrid}>
                 {photos.map((p) => (
@@ -378,56 +480,72 @@ export default function Locali() {
             ) : (
               <Text style={styles.emptyPhotos}>Nessuna foto caricata nella galleria.</Text>
             )}
-          </DetailSection>
+          </CollapseSection>
+
+          {(current as any).slug ? (
+            <View style={styles.slugPreviewCard}>
+              <Text style={styles.slugPreviewTitle}>🌐 Pagina vetrina online</Text>
+              <Text style={styles.slugPreviewUrl}>{WEB_URL}/r/{(current as any).slug}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.formActions}>
-            <TouchableOpacity style={[styles.formBtn, styles.cancelFormBtn]} onPress={() => setIsEditingVetrina(false)}>
-              <Text style={styles.cancelFormBtnText}>Annulla</Text>
-            </TouchableOpacity>
             <TouchableOpacity style={[styles.formBtn, styles.saveFormBtn]} onPress={saveVetrina} disabled={busy}>
-              <Text style={styles.saveFormBtnText}>{busy ? 'Salvataggio...' : 'Salva Vetrina'}</Text>
+              <Text style={styles.saveFormBtnText}>{busy ? 'Salvataggio...' : 'Salva vetrina'}</Text>
             </TouchableOpacity>
           </View>
         </>
-      )}
+      ) : null}
 
-      {!isEditingVetrina && current && (current as any).slug && (
-        <View style={styles.slugPreviewCard}>
-          <Text style={styles.slugPreviewTitle}>🌐 Pagina vetrina online:</Text>
-          <Text style={styles.slugPreviewUrl}>{WEB_URL}/r/{(current as any).slug}</Text>
-        </View>
-      )}
-
-      <DetailSection
-        title={restaurants.length === 0 ? 'REGISTRA ATTIVITÀ' : 'AGGIUNGI ATTIVITÀ'}
-        subtitle="Riceverai un codice a 6 cifre che i clienti useranno per vedere il menù filtrato sulle loro allergie."
-      >
-        <TextInput style={styles.input} placeholder="Nome del locale (es. Trattoria da Mario)"
-          value={name} onChangeText={setName} />
-        <TextInput style={styles.input} placeholder="Città" value={city} onChangeText={setCity} />
-        {restaurants.length === 0 && (
-          <>
-            <TextInput
-              style={styles.input}
-              placeholder="Codice invito cliente (opzionale)"
-              value={inviteCode}
-              onChangeText={setInviteCode}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-            <Text style={styles.mutedSmall}>
-              Se un cliente AllerTgy ti ha invitato, inserisci il suo codice: tu ricevi 1 mese di Pro omaggio e al cliente regaliamo Plus Famiglia.
-            </Text>
-          </>
-        )}
-        <TouchableOpacity
-          style={[styles.button, (!name.trim() || busy) && { opacity: 0.4 }]}
-          disabled={!name.trim() || busy}
-          onPress={create}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Crea locale</Text>}
-        </TouchableOpacity>
-      </DetailSection>
     </ScrollView>
+
+    <Modal visible={showAddModal} animationType="slide" onRequestClose={() => setShowAddModal(false)}>
+      <Screen edges={false}>
+        <View style={styles.modalHead}>
+          <Text style={styles.modalTitle}>
+            {restaurants.length === 0 ? 'Registra attività' : 'Nuova attività'}
+          </Text>
+          <TouchableOpacity onPress={() => setShowAddModal(false)} hitSlop={12}>
+            <Text style={styles.modalClose}>Chiudi</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
+          <Text style={styles.muted}>
+            Riceverai un codice a 6 cifre per il menù filtrato sulle allergie dei clienti.
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Nome del locale (es. Trattoria da Mario)"
+            value={name}
+            onChangeText={setName}
+          />
+          <TextInput style={styles.input} placeholder="Città" value={city} onChangeText={setCity} />
+          {restaurants.length === 0 ? (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="Codice invito cliente (opzionale)"
+                value={inviteCode}
+                onChangeText={setInviteCode}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+              <Text style={styles.mutedSmall}>
+                Se un cliente AllerTgy ti ha invitato, inserisci il suo codice: tu ricevi 1 mese di Pro omaggio.
+              </Text>
+            </>
+          ) : null}
+          <TouchableOpacity
+            style={[styles.button, (!name.trim() || busy) && { opacity: 0.4 }]}
+            disabled={!name.trim() || busy}
+            onPress={create}
+          >
+            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Crea locale</Text>}
+          </TouchableOpacity>
+        </ScrollView>
+      </Screen>
+    </Modal>
+    </Screen>
   );
 }
 
@@ -440,7 +558,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontWeight: '800', fontSize: 15, color: '#1e293b', marginBottom: 8 },
   muted: { color: '#64748b', fontSize: 13, lineHeight: 19, marginBottom: 12 },
-  mutedSmall: { color: '#94a3b8', fontSize: 11, lineHeight: 16, marginBottom: 8, marginTop: -4 },
+  mutedSmall: { color: '#94a3b8', fontSize: 11, lineHeight: 16, marginBottom: 8 },
   place: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12,
@@ -450,29 +568,31 @@ const styles = StyleSheet.create({
   placeName: { fontWeight: '700', color: '#1e293b' },
   placeSub: { color: '#64748b', fontSize: 12, marginTop: 2 },
   check: { color: '#059669', fontWeight: '800', fontSize: 18 },
-  cta: { marginTop: 6, alignItems: 'center', padding: 10 },
-  ctaText: { color: '#047857', fontWeight: '700' },
+  metricsRow: { flexDirection: 'row', gap: 8, marginBottom: 8, paddingHorizontal: 4 },
+  metricBox: {
+    flex: 1, alignItems: 'center', paddingVertical: 10,
+    borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10, backgroundColor: '#f8fafc',
+  },
+  metricValue: { fontWeight: '800', fontSize: 15, color: '#1e293b' },
+  metricLabel: { fontSize: 10, color: '#64748b', marginTop: 2, textTransform: 'uppercase' },
   input: {
     backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0',
     borderRadius: 12, padding: 13, marginBottom: 10, fontSize: 15,
   },
   button: {
-    backgroundColor: '#059669', borderRadius: 12, padding: 14, alignItems: 'center',
+    backgroundColor: '#059669', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 8,
   },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  secondaryCta: {
-    borderWidth: 1.5,
-    borderColor: '#059669',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
+  modalHead: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#e2e8f0',
   },
-  secondaryCtaText: {
-    color: '#059669',
-    fontWeight: '800',
-    fontSize: 14,
+  modalTitle: { fontWeight: '800', fontSize: 18, color: '#1e293b' },
+  modalClose: { color: '#047857', fontWeight: '700', fontSize: 15 },
+  modalBody: { padding: 16, gap: 4, paddingBottom: 40 },
+  galleryToolbar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, marginBottom: 4,
   },
   fieldLabel: {
     fontSize: 11,
@@ -529,22 +649,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
-  },
-  addPhotoBtn: {
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: '#059669',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 10,
-    backgroundColor: '#ecfdf5',
-  },
-  addPhotoBtnText: {
-    color: '#047857',
-    fontWeight: '700',
-    fontSize: 13,
   },
   photosGrid: {
     flexDirection: 'row',
@@ -614,30 +718,19 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   formActions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 15,
+    marginTop: 8,
+    paddingHorizontal: 16,
   },
   formBtn: {
-    flex: 1,
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
   },
-  cancelFormBtn: {
-    backgroundColor: '#fff',
-    borderColor: '#cbd5e1',
-  },
   saveFormBtn: {
     backgroundColor: '#059669',
     borderColor: '#059669',
-  },
-  cancelFormBtnText: {
-    color: '#475569',
-    fontWeight: '700',
-    fontSize: 14,
   },
   saveFormBtnText: {
     color: '#fff',

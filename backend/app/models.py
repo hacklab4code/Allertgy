@@ -47,20 +47,30 @@ class User(Base):
         "Allergen", secondary="user_allergens", lazy="selectin"
     )
     user_allergens = relationship(
-        "UserAllergen", cascade="all, delete-orphan", lazy="selectin"
+        "UserAllergen", cascade="all, delete-orphan", lazy="selectin", overlaps="allergens"
     )
 
     @property
     def legal_consents_ok(self) -> bool:
+        from .legal import LEGAL_TERMS_VERSION, PRIVACY_VERSION
+
         if not self.terms_accepted_at or not self.privacy_accepted_at:
             return False
         if self.role == "customer" and not self.health_data_consent_at:
+            return False
+        if self.legal_terms_version != LEGAL_TERMS_VERSION:
+            return False
+        if self.privacy_version != PRIVACY_VERSION:
             return False
         return True
 
     @property
     def disclaimer_accepted(self) -> bool:
-        return self.disclaimer_accepted_at is not None
+        from .legal import SAFETY_DISCLAIMER_VERSION
+
+        if self.disclaimer_accepted_at is None:
+            return False
+        return self.safety_disclaimer_version == SAFETY_DISCLAIMER_VERSION
 
     @property
     def onboarding_completed(self) -> bool:
@@ -104,7 +114,7 @@ class UserAllergen(Base):
     )
     confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
-    allergen: Mapped["Allergen"] = relationship(lazy="joined")
+    allergen: Mapped["Allergen"] = relationship(lazy="joined", overlaps="allergens")
 
 
 class Restaurant(Base):
@@ -552,6 +562,28 @@ class CustomerUsage(Base):
     )
 
 
+class ProductLabelCache(Base):
+    """Etichette prodotto analizzate con AI, condivise per barcode (no ripetizione AI)."""
+    __tablename__ = "product_label_cache"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    barcode: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    product_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    brand: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    ingredients: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    allergeni_contenuti_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    allergeni_tracce_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+    )
+
+
 class UserProfile(Base):
     __tablename__ = "user_profiles"
 
@@ -569,7 +601,7 @@ class UserProfile(Base):
         "Allergen", secondary="profile_allergens", lazy="selectin"
     )
     profile_allergens = relationship(
-        "ProfileAllergen", cascade="all, delete-orphan", lazy="selectin"
+        "ProfileAllergen", cascade="all, delete-orphan", lazy="selectin", overlaps="allergens"
     )
 
     @property
@@ -597,7 +629,7 @@ class ProfileAllergen(Base):
         String(30), default="moderata"
     )
 
-    allergen: Mapped["Allergen"] = relationship(lazy="joined")
+    allergen: Mapped["Allergen"] = relationship(lazy="joined", overlaps="allergens")
 
 
 class MerchantReferral(Base):

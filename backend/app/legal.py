@@ -7,12 +7,12 @@ richiederanno una nuova accettazione agli utenti con versione diversa.
 (in particolare TERMS §8 — limitazione di responsabilità — e B2B).
 """
 
-LEGAL_TERMS_VERSION = "2026-07-06"
-PRIVACY_VERSION = "2026-07-06"
-SAFETY_DISCLAIMER_VERSION = "2026-07-06"
-MENU_CONFIRMATION_VERSION = "2026-07-06"
-COOKIE_VERSION = "2026-07-06"
-B2B_TERMS_VERSION = "2026-07-06"
+LEGAL_TERMS_VERSION = "2026-07-11"
+PRIVACY_VERSION = "2026-07-11"
+SAFETY_DISCLAIMER_VERSION = "2026-07-11"
+MENU_CONFIRMATION_VERSION = "2026-07-11"
+COOKIE_VERSION = "2026-07-11"
+B2B_TERMS_VERSION = "2026-07-11"
 
 TERMS_MARKDOWN = """
 # Termini di Servizio
@@ -24,9 +24,9 @@ TERMS_MARKDOWN = """
 - *Ristoratore*: utente professionale titolare di uno o più *Locali*, responsabile dell'inserimento dei dati sul menù.
 - *Contenuti del Locale*: menù, piatti, allergeni dichiarati, foto, orari, inseriti dal Ristoratore.
 
-**3. Natura del servizio e limiti** — AllerTgy è uno **strumento di supporto informativo**. Non è un dispositivo medico, non fornisce diagnosi né consulenza medica, e **non sostituisce la comunicazione diretta con il personale del Locale prima di ordinare**. I dati sugli allergeni sono dichiarati dal Ristoratore sotto la propria responsabilità e possono non riflettere variazioni last-minute in cucina o rischi di contaminazione crociata.
+**3. Natura del servizio e limiti** — AllerTgy è uno **strumento di supporto informativo**. Non è un dispositivo medico, non fornisce diagnosi né consulenza medica, e **non sostituisce la comunicazione diretta con il personale del Locale prima di ordinare**. Il semaforo (🟢/🟡/🔴) indica solo la compatibilità tra il profilo allergenico che hai inserito e gli allergeni **dichiarati dal Ristoratore** nel menù: non garantisce l'assenza di rischi in cucina. I dati sugli allergeni possono non riflettere variazioni last-minute in cucina o rischi di contaminazione crociata non dichiarati.
 
-**4. Registrazione e obblighi dell'utente** — L'utente si impegna a fornire dati veritieri (identità, email, allergie dichiarate) e a mantenere aggiornato il proprio profilo allergenico. La sicurezza delle credenziali è responsabilità dell'utente.
+**4. Registrazione e obblighi dell'utente** — L'utente si impegna a fornire dati veritieri (identità, email, allergie dichiarate) e a mantenere aggiornato il proprio profilo allergenico. **Prima di ogni ordine, anche in presenza di semaforo verde, l'utente deve comunicare le proprie allergie e intolleranze al personale del Locale** e verificare ingredienti, preparazione e rischio di contaminazione crociata. La sicurezza delle credenziali è responsabilità dell'utente.
 
 **5. Obblighi del Ristoratore** — Il Ristoratore garantisce l'accuratezza e l'aggiornamento dei dati su allergeni inseriti per ciascun piatto, si impegna ad aggiornare il menù ad ogni variazione di ricetta o fornitore, e riconosce che l'inserimento errato di un allergene può causare un danno grave alla salute di un Cliente.
 
@@ -89,7 +89,14 @@ SAFETY_MARKDOWN = """
 
 Gli allergeni indicati per ogni piatto sono **dichiarati dal Ristoratore** sotto la propria responsabilità. AllerTgy non entra fisicamente nelle cucine dei locali e non può garantire l'assenza di contaminazioni crociate o di variazioni dell'ultimo minuto negli ingredienti.
 
+**Il semaforo automatico**
+- 🟢 *Verde*: nessun allergene del tuo profilo risulta **dichiarato** nel piatto. **Non significa che il piatto sia sicuro al 100%**: comunica comunque le tue allergie al personale.
+- 🟡 *Giallo*: possibili tracce di un allergene del tuo profilo. Chiedi sempre conferma al personale prima di ordinare.
+- 🔴 *Rosso*: allergene del tuo profilo dichiarato come contenuto. Evita il piatto e verifica con il personale eventuali alternative.
+
 **Comunica SEMPRE le tue allergie al personale di sala prima di ordinare**, anche se il semaforo mostra 🟢. In presenza di allergie gravi (rischio di shock anafilattico), consulta sempre il tuo medico sulle precauzioni da adottare mangiando fuori casa.
+
+Le segnalazioni di altri clienti (warning) sono opinioni non verificate da AllerTgy: usale solo come spunto per parlare con il personale, non come prova di sicurezza.
 
 Se un documento medico viene analizzato con intelligenza artificiale, i risultati sono **suggerimenti da confermare manualmente**: l'AI può commettere errori di lettura, e nessun dato viene aggiunto al tuo profilo senza la tua conferma esplicita.
 
