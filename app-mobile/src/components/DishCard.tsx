@@ -14,10 +14,10 @@ const ACCENT = {
   rosso: colors.red,
 } as const;
 
-const LABELS = {
-  verde: 'safe',
-  giallo: 'warning',
-  rosso: 'danger',
+const SHORT_LABEL = {
+  verde: 'Idoneo',
+  giallo: 'Attenzione',
+  rosso: 'Non idoneo',
 } as const;
 
 const STOCK_PHOTOS = [
@@ -54,7 +54,7 @@ function getDishImageUrl(url: string | null | undefined, name: string, category?
 export default function DishCard({ piatto, esito }: { piatto: Piatto; esito: EsitoSemaforo }) {
   const language = useSession((s) => s.language);
   const allergyIntensities = useSession((s) => s.allergyIntensities || {});
-  const label = t(LABELS[esito.stato], language);
+  const label = SHORT_LABEL[esito.stato];
   const rosso = esito.stato === 'rosso';
   const imgUri = getDishImageUrl(piatto.image_url, piatto.nome_piatto, piatto.categoria);
   const tint = esito.stato === 'verde' ? 'green' : esito.stato === 'giallo' ? 'yellow' : 'red';
