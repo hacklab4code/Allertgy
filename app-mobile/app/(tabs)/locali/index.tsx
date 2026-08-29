@@ -1,6 +1,15 @@
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState, useCallback } from 'react';
-import { ActivityIndicator, Dimensions, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapWrapper, { MarkerComponent as Marker, CalloutComponent as Callout } from '../../../src/components/MapWrapper';
 import * as Location from 'expo-location';
@@ -11,9 +20,30 @@ import RestaurantCard from '../../../src/components/RestaurantCard';
 import { useSession } from '../../../src/store/session';
 import { useTranslation } from '../../../src/constants/translations';
 import { useHeaderFloatInset } from '../../../src/hooks/useHeaderFloatInset';
-import { AppText, AllergyProfileBanner, EmptyStateCard, ErrorStateCard, GlassCard, GlassCarousel, GlassScreenScroll, Screen } from '../../../src/components/ui';
-import { colors, font, radius, spacing, typography, CHIP_MIN_HEIGHT } from '../../../src/theme';
+import { useSectionTitle } from '../../../src/hooks/useSectionTitle';
+import {
+  AppText,
+  AllergyProfileBanner,
+  DEFAULT_LOCALI_FILTERS,
+  EmptyStateCard,
+  ErrorStateCard,
+  GlassIconButton,
+  GlassScreenScroll,
+  LocaliFilterSheet,
+  Screen,
+  ScrollEntry,
+  ScrollFocusEndPad,
+  SemaforoGeminiBorder,
+  countActiveFilters,
+  type LocaliFilters,
+} from '../../../src/components/ui';
+import { useFloatingHeader } from '../../../src/store/floatingHeader';
+import { SEARCH_BAR_HEIGHT } from '../../../src/layoutConstants';
+import { colors, font, radius, softShadow, spacing, typography } from '../../../src/theme';
 import type { RestaurantSummary } from '../../../src/types';
+import { CUISINE_OPTIONS, cuisineLabel, resolveCuisine, type CuisineCode } from '../../../src/utils/cuisine';
+import { distanceKm, formatDistanceLabel } from '../../../src/utils/venueDistance';
+import * as Haptics from 'expo-haptics';
 
 interface LocaleData {
   code: string;
@@ -23,50 +53,63 @@ interface LocaleData {
   longitude?: number | null;
   imageUrl?: string | null;
   compatibility: CompatibilitaResult | null;
+  menuAvailable?: boolean;
+  isVerified?: boolean;
+  cuisine: CuisineCode;
+  boostActive?: boolean;
   ratingAvg?: number | null;
   ratingCount?: number;
-  boostActive?: boolean;
+  distanceKm?: number | null;
+  distanceLabel?: string | null;
 }
 
 export default function Locali() {
   const {
-    isFavorite, allergie: primaryAllergies, token,
-    ingredientiEsclusi, language, subProfiles, setSubProfiles, activeProfileId, setActiveProfileId,
+    isFavorite, allergie: primaryAllergies, allergyCriteria: primaryCriteria, token,
+    ingredientiEsclusi, language, subProfiles, setSubProfiles, activeProfileId,
   } = useSession();
 
-  // Find active profile
   const activeProfile = useMemo(() => {
     if (!activeProfileId) return null;
-    return subProfiles.find(p => p.id === activeProfileId) || null;
+    return subProfiles.find((p) => p.id === activeProfileId) || null;
   }, [activeProfileId, subProfiles]);
 
   const allergie = useMemo(() => {
-    if (activeProfile) {
-      return activeProfile.allergens.map(a => a.code);
-    }
+    if (activeProfile) return activeProfile.allergens.map((a) => a.code);
     return primaryAllergies;
   }, [activeProfile, primaryAllergies]);
+
+  const allergyCriteria = useMemo(() => {
+    if (activeProfile) {
+      const map: Record<string, 'assoluto' | 'crudo' | 'cotto'> = {};
+      for (const a of activeProfile.allergens) {
+        map[a.code] = a.criterio || 'assoluto';
+      }
+      return map;
+    }
+    return primaryCriteria || {};
+  }, [activeProfile, primaryCriteria]);
 
   const { t } = useTranslation();
   const isIt = (language || 'it').toLowerCase() === 'it';
   const hasAllergie = allergie.length > 0;
   const headerTop = useHeaderFloatInset(spacing.sm);
+  useSectionTitle(isIt ? 'Ristoranti' : 'Restaurants');
   const [restaurants, setRestaurants] = useState<RestaurantSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const showFloatingChrome = useFloatingHeader((s) => s.show);
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
-
   const [searchQuery, setSearchQuery] = useState('');
-  const [compatFilter, setCompatFilter] = useState<'all' | 'safe' | '80'>('all');
-  const [cuisineFilter, setCuisineFilter] = useState<'all' | 'italiano' | 'sushi' | 'burger' | 'altro'>('all');
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [filters, setFilters] = useState<LocaliFilters>(DEFAULT_LOCALI_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
-  useEffect(() => {
-    if (compatFilter !== 'all' || cuisineFilter !== 'all') {
-      setFiltersExpanded(true);
-    }
-  }, [compatFilter, cuisineFilter]);
+  const toggleViewMode = () => {
+    setViewMode((prev) => (prev === 'list' ? 'map' : 'list'));
+    showFloatingChrome();
+  };
 
   const loadRestaurants = useCallback(() => {
     setLoading(true);
@@ -79,47 +122,63 @@ export default function Locali() {
 
   useEffect(() => {
     loadRestaurants();
-
-    if (token) {
-      api.getSubProfiles().then(setSubProfiles).catch(() => {});
-    }
-  }, [token, loadRestaurants]);
+    if (token) api.getSubProfiles().then(setSubProfiles).catch(() => {});
+  }, [token, loadRestaurants, setSubProfiles]);
 
   useEffect(() => {
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
       try {
-        let loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         setUserLocation(loc);
       } catch (e) {
-        console.log("Errore posizione:", e);
+        console.log('Errore posizione:', e);
       }
     })();
   }, []);
 
-  // Calcola compatibilità per ogni ristorante
   const locali = useMemo<LocaleData[]>(() => {
+    const userLat = userLocation?.coords.latitude;
+    const userLon = userLocation?.coords.longitude;
     return restaurants.map((r) => {
-      const compat = r.piatti.length > 0
-        ? calcolaCompatibilita(allergie, r.piatti, ingredientiEsclusi)
+      const published = r.menu_available ?? r.piatti.length > 0;
+      const compat = hasAllergie && published && r.piatti.length > 0
+        ? calcolaCompatibilita(allergie, r.piatti, ingredientiEsclusi, allergyCriteria)
         : null;
+      let distKm: number | null = null;
+      let distanceLabel: string | null = null;
+      if (
+        userLat != null
+        && userLon != null
+        && r.latitude != null
+        && r.longitude != null
+      ) {
+        distKm = distanceKm(userLat, userLon, r.latitude, r.longitude);
+        distanceLabel = formatDistanceLabel(distKm);
+      }
       return {
         code: r.public_code,
         name: r.nome_ristorante,
         city: r.citta,
         latitude: r.latitude,
         longitude: r.longitude,
-        imageUrl: null,
+        imageUrl: r.image_url ?? null,
         compatibility: compat,
+        menuAvailable: published,
+        isVerified: !!r.is_verified,
+        cuisine: resolveCuisine(r.cuisine, r.nome_ristorante),
         boostActive: !!r.boost_active,
+        ratingAvg: r.google_rating ?? null,
+        ratingCount: r.google_reviews_count ?? 0,
+        distanceKm: distKm,
+        distanceLabel,
       };
     });
-  }, [restaurants, allergie, ingredientiEsclusi]);
+  }, [restaurants, allergie, ingredientiEsclusi, allergyCriteria, hasAllergie, userLocation]);
 
   const filteredLocali = useMemo(() => {
     return locali.filter((l) => {
-      // 1. Filtro Ricerca Testo
       const query = searchQuery.toLowerCase().trim();
       if (query) {
         const matchesName = l.name.toLowerCase().includes(query);
@@ -127,35 +186,26 @@ export default function Locali() {
         const matchesCode = l.code.toLowerCase().includes(query);
         if (!matchesName && !matchesCity && !matchesCode) return false;
       }
-
-      // 2. Filtro Compatibilità
-      if (compatFilter === 'safe') {
-        if (!l.compatibility || l.compatibility.percentuale !== 100) return false;
-      } else if (compatFilter === '80') {
-        if (!l.compatibility || l.compatibility.percentuale < 80) return false;
+      if (filters.onlyMenu && !l.menuAvailable) return false;
+      if (filters.onlyFavorites && !isFavorite(l.code)) return false;
+      if (filters.verified === 'yes' && !l.isVerified) return false;
+      if (filters.verified === 'no' && l.isVerified) return false;
+      if (filters.cuisines.length > 0 && !filters.cuisines.includes(l.cuisine)) return false;
+      if (filters.maxDistanceKm > 0) {
+        if (l.distanceKm == null || l.distanceKm > filters.maxDistanceKm) return false;
       }
-
-      // 3. Filtro Cucina
-      if (cuisineFilter !== 'all') {
-        const rest = restaurants.find(r => r.public_code === l.code);
-        const searchPool = `${l.name} ${rest?.nome_ristorante || ''} ${rest?.piatti.map(p => p.nome_piatto).join(' ') || ''}`.toLowerCase();
-        if (cuisineFilter === 'italiano') {
-          if (!searchPool.includes('pizza') && !searchPool.includes('pasta') && !searchPool.includes('trattoria') && !searchPool.includes('oster') && !searchPool.includes('italiana')) return false;
-        } else if (cuisineFilter === 'sushi') {
-          if (!searchPool.includes('sushi') && !searchPool.includes('giappo') && !searchPool.includes('cinese') && !searchPool.includes('asian') && !searchPool.includes('ramen')) return false;
-        } else if (cuisineFilter === 'burger') {
-          if (!searchPool.includes('burger') && !searchPool.includes('pub') && !searchPool.includes('panin') && !searchPool.includes('fast food')) return false;
-        } else if (cuisineFilter === 'altro') {
-          const isIt = searchPool.includes('pizza') || searchPool.includes('pasta') || searchPool.includes('trattoria') || searchPool.includes('oster') || searchPool.includes('italiana');
-          const isSushi = searchPool.includes('sushi') || searchPool.includes('giappo') || searchPool.includes('cinese') || searchPool.includes('asian') || searchPool.includes('ramen');
-          const isBurger = searchPool.includes('burger') || searchPool.includes('pub') || searchPool.includes('panin') || searchPool.includes('fast food');
-          if (isIt || isSushi || isBurger) return false;
-        }
+      if (hasAllergie && filters.minCompat > 0) {
+        if (!l.compatibility || l.compatibility.percentuale < filters.minCompat) return false;
       }
-
       return true;
-    }).sort((a, b) => Number(!!b.boostActive) - Number(!!a.boostActive));
-  }, [locali, searchQuery, compatFilter, cuisineFilter, restaurants]);
+    });
+  }, [locali, searchQuery, filters, hasAllergie, isFavorite]);
+
+  const availableCuisines = useMemo(() => {
+    const set = new Set<CuisineCode>();
+    for (const l of locali) set.add(l.cuisine);
+    return [...set];
+  }, [locali]);
 
   const onToggle = (code: string, name: string) => {
     void toggleRestaurantFavorite(code, name);
@@ -168,215 +218,342 @@ export default function Locali() {
     return colors.amber;
   };
 
-  const mapRegion = useMemo(() => ({
-    latitude: userLocation?.coords.latitude ?? 41.902782,
-    longitude: userLocation?.coords.longitude ?? 12.496366,
-    latitudeDelta: 0.0922,
-    longitudeDelta: 0.0421,
-  }), [userLocation]);
+  const mapRegion = useMemo(() => {
+    if (userLocation) {
+      const { latitude: lat, longitude: lon } = userLocation.coords;
+      if (lat >= 35 && lat <= 47 && lon >= 6 && lon <= 19) {
+        return {
+          latitude: lat,
+          longitude: lon,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        };
+      }
+    }
+    return {
+      latitude: 42.5,
+      longitude: 12.5,
+      latitudeDelta: 6.5,
+      longitudeDelta: 6.5,
+    };
+  }, [userLocation]);
 
   const sortedLocali = useMemo(() => {
     return [...filteredLocali].sort((a, b) => {
       const boost = Number(!!b.boostActive) - Number(!!a.boostActive);
       if (boost !== 0) return boost;
-      return (b.compatibility?.percentuale ?? -1) - (a.compatibility?.percentuale ?? -1);
+
+      switch (filters.sortBy) {
+        case 'distance': {
+          const da = a.distanceKm ?? Number.POSITIVE_INFINITY;
+          const db = b.distanceKm ?? Number.POSITIVE_INFINITY;
+          return da - db;
+        }
+        case 'name':
+          return a.name.localeCompare(b.name, isIt ? 'it' : 'en');
+        case 'rating': {
+          const ra = a.ratingAvg ?? -1;
+          const rb = b.ratingAvg ?? -1;
+          return rb - ra;
+        }
+        case 'compat':
+        default:
+          return (b.compatibility?.percentuale ?? -1) - (a.compatibility?.percentuale ?? -1);
+      }
     });
-  }, [filteredLocali]);
+  }, [filteredLocali, filters.sortBy, isIt]);
 
   const mapLocales = sortedLocali.filter((l) => l.latitude && l.longitude);
-  const activeFilterCount = Number(compatFilter !== 'all') + Number(cuisineFilter !== 'all');
-  const profileName = activeProfile?.name ?? (isIt ? 'il tuo profilo' : 'your profile');
-  const compatibilityOptions = [
-    { value: 'all', label: isIt ? 'Qualsiasi' : 'Any' },
-    { value: 'safe', label: isIt ? 'Sicuri 100%' : '100% safe' },
-    { value: '80', label: isIt ? 'Almeno 80%' : 'At least 80%' },
-  ] as const;
-  const cuisineOptions = [
-    { value: 'all', label: isIt ? 'Tutte' : 'All' },
-    { value: 'italiano', label: isIt ? 'Italiana' : 'Italian' },
-    { value: 'sushi', label: 'Sushi' },
-    { value: 'burger', label: 'Burger' },
-    { value: 'altro', label: isIt ? 'Altro' : 'Other' },
-  ] as const;
+
+  const activeFilterCount = useMemo(
+    () => countActiveFilters(filters, hasAllergie),
+    [filters, hasAllergie],
+  );
+
+  const filterSummary = useMemo(() => {
+    if (activeFilterCount === 0) {
+      return isIt ? 'Cucina, verifica, sicurezza' : 'Cuisine, trust, safety';
+    }
+    const bits: string[] = [];
+    if (filters.cuisines.length === 1) {
+      bits.push(cuisineLabel(filters.cuisines[0], isIt));
+    } else if (filters.cuisines.length > 1) {
+      bits.push(isIt ? `${filters.cuisines.length} cucine` : `${filters.cuisines.length} cuisines`);
+    }
+    if (filters.verified === 'yes') bits.push(isIt ? 'Verificati' : 'Verified');
+    if (filters.verified === 'no') bits.push(isIt ? 'Non verificati' : 'Unverified');
+    if (filters.onlyMenu) bits.push(isIt ? 'Menù allergeni' : 'Allergen menus');
+    if (filters.onlyFavorites) bits.push(isIt ? 'Preferiti' : 'Favorites');
+    if (hasAllergie && filters.minCompat > 0) bits.push(`${filters.minCompat}%+`);
+    if (filters.maxDistanceKm > 0) bits.push(`≤${filters.maxDistanceKm} km`);
+    if (filters.sortBy === 'distance') bits.push(isIt ? 'Per distanza' : 'By distance');
+    if (filters.sortBy === 'name') bits.push(isIt ? 'Per nome' : 'By name');
+    if (filters.sortBy === 'rating') bits.push(isIt ? 'Per voto' : 'By rating');
+    return bits.join(' · ');
+  }, [activeFilterCount, filters, hasAllergie, isIt]);
+
+  const openFilters = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setFiltersOpen(true);
+  }, []);
+
+  const toggleCuisineChip = useCallback((code: CuisineCode) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setFilters((prev) => {
+      const exists = prev.cuisines.includes(code);
+      return {
+        ...prev,
+        cuisines: exists
+          ? prev.cuisines.filter((c) => c !== code)
+          : [...prev.cuisines, code],
+      };
+    });
+  }, []);
+
+  const toggleVerifiedChip = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setFilters((prev) => ({
+      ...prev,
+      verified: prev.verified === 'yes' ? 'all' : 'yes',
+    }));
+  }, []);
+
+  const controls = (onMap: boolean) => (
+    <View style={[styles.controls, onMap && styles.controlsOnMap]}>
+      {/* Barra di ricerca con Icona Mappa PNG 3D ALL'INTERNO A DESTRA */}
+      <View style={styles.searchRow}>
+        <SemaforoGeminiBorder
+          kind="semaforo"
+          active={searchFocused || searchQuery.length > 0}
+          borderRadius={radius.md}
+          borderWidth={2.5}
+          pauseMs={4000}
+          passMs={1200}
+          fill={onMap ? 'rgba(255,255,255,0.96)' : colors.surfaceSecondary}
+          style={[styles.searchBorder, onMap && styles.searchBorderOnMap]}
+          contentStyle={styles.searchBorderContent}
+        >
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={18} color={colors.onSurfaceMuted} />
+            <TextInput
+              placeholder={isIt ? 'Nome o città' : 'Name or city'}
+              placeholderTextColor={colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              style={styles.searchField}
+              returnKeyType="search"
+            />
+            {searchQuery ? (
+              <Pressable onPress={() => setSearchQuery('')} hitSlop={10} style={{ marginRight: 4 }}>
+                <Ionicons name="close-circle" size={18} color={colors.onSurfaceMuted} />
+              </Pressable>
+            ) : null}
+
+            {/* Icona Mappa PNG 3D all'interno a destra della barra */}
+            <Pressable
+              onPress={toggleViewMode}
+              style={({ pressed }) => [styles.mapInsideBar, pressed && { opacity: 0.8 }]}
+              accessibilityLabel={
+                onMap
+                  ? (isIt ? 'Mostra lista' : 'Show list')
+                  : (isIt ? 'Mostra mappa' : 'Show map')
+              }
+            >
+              <Image
+                source={require('../../../assets/icon_mappa.png')}
+                style={styles.mapIconImg}
+                resizeMode="contain"
+              />
+            </Pressable>
+          </View>
+        </SemaforoGeminiBorder>
+      </View>
+
+      {/* SOTTO LA BARRA DI RICERCA: Filtri a Pillola Orizzontali (Airbnb / Uber Eats Style) */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterChipScroll}
+        style={styles.filterChipContainer}
+      >
+        {/* Main Filter Modal Button */}
+        <Pressable
+          onPress={openFilters}
+          style={({ pressed }) => [
+            styles.filterChip,
+            activeFilterCount > 0 && styles.filterChipActive,
+            pressed && styles.filterChipPressed,
+          ]}
+          accessibilityLabel={isIt ? 'Apri tutti i filtri' : 'Open all filters'}
+        >
+          <Ionicons
+            name="options-outline"
+            size={14}
+            color={activeFilterCount > 0 ? '#FFFFFF' : colors.brandInk}
+          />
+          <Text
+            style={[
+              styles.filterChipText,
+              activeFilterCount > 0 && styles.filterChipTextActive,
+            ]}
+          >
+            {isIt ? 'Filtri' : 'Filters'}
+          </Text>
+          {activeFilterCount > 0 ? (
+            <View style={styles.filterBadgeCount}>
+              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+
+        {/* Toggle Verificati Chip */}
+        <Pressable
+          onPress={toggleVerifiedChip}
+          style={({ pressed }) => [
+            styles.filterChip,
+            filters.verified === 'yes' && styles.filterChipActive,
+            pressed && styles.filterChipPressed,
+          ]}
+        >
+          <Text
+            style={[
+              styles.filterChipText,
+              filters.verified === 'yes' && styles.filterChipTextActive,
+            ]}
+          >
+            🛡️ {isIt ? 'Verificati' : 'Verified'}
+          </Text>
+        </Pressable>
+
+        {/* Quick Cuisine Chips */}
+        {CUISINE_OPTIONS.slice(0, 6).map((opt) => {
+          const isSelected = filters.cuisines.includes(opt.code);
+          return (
+            <Pressable
+              key={opt.code}
+              onPress={() => toggleCuisineChip(opt.code)}
+              style={({ pressed }) => [
+                styles.filterChip,
+                isSelected && styles.filterChipActive,
+                pressed && styles.filterChipPressed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  isSelected && styles.filterChipTextActive,
+                ]}
+              >
+                {opt.emoji} {isIt ? opt.it : opt.en}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {!hasAllergie && !onMap ? <AllergyProfileBanner hasAllergie={false} isIt={isIt} /> : null}
+
+      {activeFilterCount > 0 ? (
+        <Pressable
+          onPress={openFilters}
+          style={({ pressed }) => [
+            styles.filterSummaryChip,
+            onMap && styles.filterSummaryChipOnMap,
+            pressed && styles.filterSummaryChipPressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={isIt ? 'Modifica filtri' : 'Edit filters'}
+        >
+          <AppText style={styles.filterSummary} numberOfLines={1}>
+            {filterSummary}
+          </AppText>
+          <AppText style={styles.filterCount}>{filteredLocali.length}</AppText>
+        </Pressable>
+      ) : null}
+    </View>
+  );
 
   return (
     <Screen edges={false}>
       <View style={styles.mainContainer}>
-        <View style={[styles.headerArea, { paddingTop: headerTop }]}>
-          <View style={styles.intro}>
-            <View style={styles.introCopy}>
-              <AppText variant="eyebrow" color={colors.onSurfaceMuted}>
-                {isIt ? 'Esplora' : 'Explore'}
-              </AppText>
-              <AppText variant="h1">
-                {isIt ? 'Ristoranti' : 'Restaurants'}
-              </AppText>
-              <View style={styles.contextRow}>
-                <Ionicons
-                  name={hasAllergie ? 'shield-checkmark' : 'restaurant-outline'}
-                  size={14}
-                  color={hasAllergie ? colors.brand : colors.onSurfaceMuted}
-                />
-                <AppText variant="caption" color={colors.onSurfaceMuted} numberOfLines={1}>
-                  {hasAllergie
-                    ? (isIt ? `Compatibilità per ${profileName}` : `Compatibility for ${profileName}`)
-                    : (isIt ? 'Esplora i menù dei ristoranti' : 'Explore restaurant menus')}
-                </AppText>
-              </View>
-            </View>
-            <View style={styles.countPill}>
-              <AppText variant="bodyBold">{sortedLocali.length}</AppText>
-              <AppText variant="caption" color={colors.onSurfaceMuted}>{isIt ? 'locali' : 'venues'}</AppText>
-            </View>
-          </View>
-
-          <View style={styles.searchAndView}>
-            <View style={styles.searchBox}>
-              <Ionicons name="search" size={19} color={colors.onSurfaceMuted} />
-              <TextInput
-                placeholder={isIt ? 'Nome o città' : 'Name or city'}
-                placeholderTextColor={colors.textMuted}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                style={styles.searchField}
-                returnKeyType="search"
-                accessibilityLabel={isIt ? 'Cerca un ristorante' : 'Search for a restaurant'}
-              />
-              {searchQuery ? (
-                <Pressable onPress={() => setSearchQuery('')} hitSlop={10}>
-                  <Ionicons name="close-circle" size={18} color={colors.onSurfaceMuted} />
-                </Pressable>
-              ) : null}
-            </View>
-            <View style={styles.viewSwitch}>
-              <Pressable
-                onPress={() => setViewMode('list')}
-                style={[styles.viewButton, viewMode === 'list' && styles.viewButtonActive]}
-                accessibilityLabel={t('list_view')}
-              >
-                <Ionicons name="list" size={19} color={viewMode === 'list' ? colors.white : colors.onSurfaceMuted} />
-              </Pressable>
-              <Pressable
-                onPress={() => setViewMode('map')}
-                style={[styles.viewButton, viewMode === 'map' && styles.viewButtonActive]}
-                accessibilityLabel={t('map_view')}
-              >
-                <Ionicons name="map-outline" size={18} color={viewMode === 'map' ? colors.white : colors.onSurfaceMuted} />
-              </Pressable>
-            </View>
-          </View>
-
-          {!hasAllergie && (
-            <AllergyProfileBanner hasAllergie={false} isIt={isIt} />
-          )}
-
-          <View style={styles.filterSummary}>
-            <Pressable
-              style={[styles.filterTrigger, activeFilterCount > 0 && styles.filterTriggerActive]}
-              onPress={() => setFiltersExpanded((value) => !value)}
+        {viewMode === 'map' ? (
+          <View style={styles.mapStage}>
+            <MapWrapper
+              style={StyleSheet.absoluteFill}
+              showsUserLocation
+              showsMyLocationButton={false}
+              initialRegion={mapRegion}
+              region={userLocation ? mapRegion : undefined}
             >
-              <Ionicons name="options-outline" size={16} color={activeFilterCount > 0 ? colors.white : colors.onSurface} />
-              <AppText
-                variant="caption"
-                color={activeFilterCount > 0 ? colors.white : colors.onSurface}
-                style={styles.filterTriggerText}
-              >
-                {isIt ? 'Filtri' : 'Filters'}{activeFilterCount ? ` · ${activeFilterCount}` : ''}
-              </AppText>
-              <Ionicons
-                name={filtersExpanded ? 'chevron-up' : 'chevron-down'}
-                size={14}
-                color={activeFilterCount > 0 ? colors.white : colors.onSurfaceMuted}
-              />
-            </Pressable>
-            <AppText variant="caption" color={colors.onSurfaceMuted} numberOfLines={1} style={styles.orderHint}>
-              {hasAllergie
-                ? (isIt ? 'Più compatibili per primi' : 'Best matches first')
-                : (isIt ? 'In evidenza per primi' : 'Featured first')}
-            </AppText>
+              {mapLocales.map((locale) => {
+                const pct = locale.compatibility?.percentuale ?? null;
+                const markerBg = pct === null ? '#F1F5F9' : pct >= 70 ? '#ECFDF5' : pct >= 40 ? '#FFFBEB' : '#FEF2F2';
+                const markerBorder = pct === null ? '#CBD5E1' : pct >= 70 ? '#10B981' : pct >= 40 ? '#F59E0B' : '#EF4444';
+                const markerDotColor = pct === null ? '#94A3B8' : pct >= 70 ? '#10B981' : pct >= 40 ? '#F59E0B' : '#EF4444';
+                const markerTextColor = pct === null ? '#64748B' : pct >= 70 ? '#065F46' : pct >= 40 ? '#92400E' : '#991B1B';
+
+                return (
+                  <Marker
+                    key={locale.code}
+                    coordinate={{ latitude: locale.latitude!, longitude: locale.longitude! }}
+                    pinColor={getMarkerColor(locale.compatibility)}
+                    onCalloutPress={() => router.push(`/menu/${locale.code}`)}
+                  >
+                    <View style={[styles.customMarkerPill, { backgroundColor: markerBg, borderColor: markerBorder }]}>
+                      <View style={[styles.markerDot, { backgroundColor: markerDotColor }]} />
+                      <Text style={[styles.markerPercentText, { color: markerTextColor }]}>
+                        {pct !== null ? `${pct}%` : '—'}
+                      </Text>
+                    </View>
+                    <Callout>
+                      <View style={styles.callout}>
+                        <Text style={styles.calloutTitle}>{locale.name}</Text>
+                        {locale.city ? <Text style={styles.calloutSub}>{locale.city}</Text> : null}
+                        <Text style={styles.calloutSub}>
+                          {locale.compatibility
+                            ? `${locale.compatibility.percentuale}% ${isIt ? 'idoneo per te' : 'suitable'}`
+                            : (isIt ? 'Dati allergeni non pubblicati' : 'Allergen data not published')}
+                        </Text>
+                        <Text style={styles.calloutLink}>
+                          {locale.compatibility
+                            ? (isIt ? 'Apri menù ›' : 'Open menu ›')
+                            : (isIt ? 'Apri scheda ›' : 'Open venue ›')}
+                        </Text>
+                      </View>
+                    </Callout>
+                  </Marker>
+                );
+              })}
+            </MapWrapper>
+
+            <View pointerEvents="box-none" style={[styles.mapOverlay, { paddingTop: headerTop }]}>
+              {controls(true)}
+            </View>
+
+            {mapLocales.length === 0 && !loading ? (
+              <View style={styles.mapEmptyOverlay} pointerEvents="none">
+                <View style={styles.mapEmptyCard}>
+                  <AppText variant="bodyBold" style={{ textAlign: 'center' }}>
+                    {isIt ? 'Nessun locale sulla mappa' : 'No venues on the map'}
+                  </AppText>
+                  <AppText variant="caption" color={colors.onSurfaceMuted} style={{ textAlign: 'center' }}>
+                    {isIt ? 'Prova a cambiare i filtri' : 'Try changing the filters'}
+                  </AppText>
+                </View>
+              </View>
+            ) : null}
           </View>
-
-          {filtersExpanded ? (
-            <View style={styles.filtersPanel}>
-              <View style={styles.filterGroup}>
-                <AppText variant="eyebrow">{isIt ? 'Compatibilità' : 'Compatibility'}</AppText>
-                <GlassCarousel contentContainerStyle={styles.filterScroll}>
-                  {compatibilityOptions.map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      style={[styles.filterChip, compatFilter === option.value && styles.filterChipActive]}
-                      onPress={() => setCompatFilter(option.value)}
-                    >
-                      <Text style={[styles.filterChipText, compatFilter === option.value && styles.filterChipTextActive]}>
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </GlassCarousel>
-              </View>
-              <View style={styles.filterGroup}>
-                <AppText variant="eyebrow">{isIt ? 'Cucina' : 'Cuisine'}</AppText>
-                <GlassCarousel contentContainerStyle={styles.filterScroll}>
-                  {cuisineOptions.map((option) => (
-                    <TouchableOpacity
-                      key={option.value}
-                      style={[styles.filterChip, cuisineFilter === option.value && styles.filterChipActive]}
-                      onPress={() => setCuisineFilter(option.value)}
-                    >
-                      <Text style={[styles.filterChipText, cuisineFilter === option.value && styles.filterChipTextActive]}>
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </GlassCarousel>
-              </View>
-            </View>
-          ) : null}
-        </View>
-
-      {viewMode === 'map' ? (
-        <View style={{ flex: 1 }}>
-          <MapWrapper
-            style={styles.map}
-            showsUserLocation={true}
-            showsMyLocationButton={true}
-            initialRegion={mapRegion}
-            region={userLocation ? mapRegion : undefined}
+        ) : (
+          <GlassScreenScroll
+            headerFloat
+            trackFloatingChrome
+            contentContainerStyle={styles.container}
           >
-            {mapLocales.map((locale) => (
-              <Marker
-                key={locale.code}
-                coordinate={{ latitude: locale.latitude!, longitude: locale.longitude! }}
-                pinColor={getMarkerColor(locale.compatibility)}
-              >
-                <Callout onPress={() => router.push(`/menu/${locale.code}`)}>
-                  <View style={styles.callout}>
-                    <Text style={styles.calloutTitle}>{locale.name}</Text>
-                    {locale.city ? <Text style={styles.calloutSub}>{locale.city}</Text> : null}
-                    <Text style={styles.calloutSub}>
-                      {locale.compatibility
-                        ? `${locale.compatibility.percentuale}% ${isIt ? 'compatibile' : 'compatible'}`
-                        : (isIt ? 'Menù non disponibile' : 'Menu unavailable')}
-                    </Text>
-                    <Text style={styles.calloutLink}>{isIt ? 'Apri menù ›' : 'Open menu ›'}</Text>
-                  </View>
-                </Callout>
-              </Marker>
-            ))}
-          </MapWrapper>
-          {mapLocales.length === 0 && !loading && (
-            <View style={styles.mapEmptyOverlay} pointerEvents="none">
-              <GlassCard style={styles.emptyBox}>
-                <AppText variant="subtitle" style={{ textAlign: 'center' }}>
-                  {isIt ? 'Nessun locale con coordinate per i filtri attuali.' : 'No venues with coordinates for current filters.'}
-                </AppText>
-              </GlassCard>
-            </View>
-          )}
-        </View>
-      ) : (
-        <GlassScreenScroll contentContainerStyle={styles.container}>
-          {loadError ? (
+            {controls(false)}
+
+            {loadError ? (
               <ErrorStateCard
                 message={t('restaurants_load_error')}
                 retryLabel={t('retry_btn')}
@@ -391,39 +568,58 @@ export default function Locali() {
                 description={isIt ? 'Nessun ristorante corrisponde ai filtri impostati.' : 'No restaurants match the selected filters.'}
               />
             ) : (
-              <>
-                <View style={styles.resultsHeader}>
-                  <AppText variant="title">
-                    {activeFilterCount > 0
-                      ? (isIt ? 'Risultati filtrati' : 'Filtered results')
-                      : (isIt ? 'Ristoranti consigliati' : 'Recommended restaurants')}
-                  </AppText>
-                  <AppText variant="caption" color={colors.onSurfaceMuted}>
-                    {sortedLocali.length}
-                  </AppText>
-                </View>
-                <View style={styles.cardList}>
-                  {sortedLocali.map((item) => (
+              <View style={styles.cardList}>
+                {sortedLocali.map((item, index) => (
+                  <ScrollEntry
+                    key={item.code}
+                    animation="send-and-receive"
+                    edge={
+                      sortedLocali.length === 1
+                        ? 'both'
+                        : index === 0
+                          ? 'first'
+                          : index === sortedLocali.length - 1
+                            ? 'last'
+                            : undefined
+                    }
+                  >
                     <RestaurantCard
-                      key={item.code}
                       code={item.code}
                       name={item.name}
                       city={item.city}
+                      imageUrl={item.imageUrl}
                       compatibility={item.compatibility}
+                      menuAvailable={item.menuAvailable}
                       isFavorite={isFavorite(item.code)}
                       onToggleFavorite={() => onToggle(item.code, item.name)}
                       latitude={item.latitude}
                       longitude={item.longitude}
                       boostActive={item.boostActive}
-                      compact
+                      ratingAvg={item.ratingAvg}
+                      ratingCount={item.ratingCount}
+                      distanceLabel={item.distanceLabel}
+                      outline={index % 2 === 1 ? 'glass' : 'white'}
                     />
-                  ))}
-                </View>
-              </>
+                  </ScrollEntry>
+                ))}
+                <ScrollFocusEndPad />
+              </View>
             )}
-        </GlassScreenScroll>
-      )}
+          </GlassScreenScroll>
+        )}
       </View>
+
+      <LocaliFilterSheet
+        visible={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        value={filters}
+        onChange={setFilters}
+        isIt={isIt}
+        hasAllergie={hasAllergie}
+        hasLocation={!!userLocation}
+        resultCount={filteredLocali.length}
+        availableCuisines={availableCuisines}
+      />
     </Screen>
   );
 }
@@ -433,54 +629,123 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
   },
-  headerArea: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
-    backgroundColor: 'transparent',
-    zIndex: 10,
-    gap: spacing.sm,
-  },
-  intro: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  introCopy: {
+  mapStage: {
     flex: 1,
-    gap: 4,
   },
-  contextRow: {
+  mapOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: spacing.lg,
+    zIndex: 20,
+  },
+  controls: {
+    gap: 10,
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  controlsOnMap: {
+    gap: 10,
+  },
+  searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 10,
+    width: '100%',
+    height: SEARCH_BAR_HEIGHT,
+    overflow: 'visible',
   },
-  countPill: {
+  filterChipContainer: {
+    marginHorizontal: -spacing.lg,
+  },
+  filterChipScroll: {
+    paddingHorizontal: spacing.lg,
+    gap: 8,
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  filterChip: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceTertiary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+    ...softShadow(3),
   },
-  searchAndView: {
-    flexDirection: 'row',
+  filterChipActive: {
+    backgroundColor: colors.brandInk,
+    borderColor: colors.brandInk,
+  },
+  filterChipPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.98 }],
+  },
+  filterChipText: {
+    fontFamily: font.semibold,
+    fontSize: 13,
+    lineHeight: 16,
+    color: colors.brandInk,
+    fontWeight: '600',
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  filterBadgeCount: {
+    backgroundColor: colors.brand,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    marginLeft: 2,
+  },
+  filterBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
   },
   searchBox: {
     flex: 1,
-    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: colors.border,
+    paddingLeft: spacing.md,
+    paddingRight: 6,
+    borderRadius: radius.md - 2,
+    backgroundColor: 'transparent',
+  },
+  mapInsideBar: {
+    paddingLeft: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapIconImg: {
+    width: 36,
+    height: 36,
+  },
+  searchBorder: {
+    flex: 1,
+    height: SEARCH_BAR_HEIGHT,
+    overflow: 'hidden',
+  },
+  searchBorderContent: {
+    flex: 1,
+  },
+  searchBorderOnMap: {
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   searchField: {
     flex: 1,
@@ -490,63 +755,48 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.onSurface,
   },
-  viewSwitch: {
+  filterSummaryChip: {
     flexDirection: 'row',
-    padding: 3,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceTertiary,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  viewButton: {
-    width: 39,
-    height: 38,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm,
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: colors.brand50,
+    borderWidth: 1,
+    borderColor: colors.brand200,
   },
-  viewButtonActive: {
-    backgroundColor: colors.onSurface,
+  filterSummaryChipOnMap: {
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    shadowColor: colors.brand,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  filterSummaryChipPressed: {
+    opacity: 0.88,
   },
   filterSummary: {
-    minHeight: 34,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  filterTrigger: {
-    minHeight: 34,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 11,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  filterTriggerActive: {
-    backgroundColor: colors.brand,
-    borderColor: colors.brand,
-  },
-  filterTriggerText: {
-    fontFamily: font.bold,
-  },
-  orderHint: {
     flex: 1,
-    textAlign: 'right',
+    fontFamily: font.regular,
+    fontSize: 12,
+    color: colors.onSurfaceMuted,
+    minWidth: 0,
   },
-  filtersPanel: {
-    gap: spacing.sm,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.xs,
-  },
-  filterGroup: {
-    gap: 4,
+  filterCount: {
+    fontFamily: font.displaySemibold,
+    fontSize: 14,
+    color: colors.brandInk,
+    letterSpacing: -0.2,
   },
   container: {
-    paddingTop: spacing.md,
     gap: spacing.md,
+  },
+  cardList: {
+    gap: spacing.lg,
+    overflow: 'visible',
   },
   mapEmptyOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -554,11 +804,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.xl,
   },
-
-  // Map
-  map: {
-    flex: 1,
-    width: Dimensions.get('window').width,
+  mapEmptyCard: {
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxWidth: 280,
   },
   callout: {
     padding: spacing.sm,
@@ -574,67 +828,35 @@ const styles = StyleSheet.create({
   calloutSub: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   calloutLink: {
     ...typography.caption,
     color: colors.brandDark,
     fontWeight: '600',
   },
-
-  resultsHeader: {
+  customMarkerPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  cardList: {
-    gap: spacing.sm,
-  },
-
-  // Empty state
-  emptyBox: {
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  emptyEmoji: {
-    fontSize: 32,
-  },
-  emptyTitle: {
-    ...typography.h3,
-    color: colors.ink,
-  },
-  emptyText: {
-    ...typography.bodySm,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 19,
-  },
-  filterScroll: {
-    gap: spacing.sm,
-    paddingRight: spacing.md,
-    paddingVertical: 2,
-    alignItems: 'center',
-  },
-  filterChip: {
-    paddingHorizontal: 14,
-    minHeight: CHIP_MIN_HEIGHT,
-    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1.5,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  filterChipActive: {
-    backgroundColor: colors.brand50,
-    borderColor: colors.brand,
+  markerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.onSurfaceMuted,
-  },
-  filterChipTextActive: {
-    color: colors.brand,
-    fontWeight: '800',
+  markerPercentText: {
+    fontSize: 11,
+    fontFamily: font.bold,
   },
 });

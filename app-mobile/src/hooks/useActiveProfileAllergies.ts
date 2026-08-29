@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { avatarForIndex } from '../components/ui/AvatarBubble';
 import { useSession } from '../store/session';
-import type { SubProfile } from '../types';
+import type { AllergyCriterio, AllergyIntensity, SubProfile } from '../types';
 
 type Options = {
   /** Nome del profilo principale (display_name utente) */
@@ -12,6 +12,8 @@ type Options = {
 export function useActiveProfileAllergies(options: Options = {}) {
   const {
     allergie: primaryAllergies,
+    allergyIntensities: primaryIntensities,
+    allergyCriteria: primaryCriteria,
     subProfiles,
     activeProfileId,
     language,
@@ -28,6 +30,26 @@ export function useActiveProfileAllergies(options: Options = {}) {
     if (activeProfile?.allergens?.length) return activeProfile.allergens.map((a) => a.code);
     return primaryAllergies;
   }, [activeProfile, primaryAllergies]);
+
+  const allergyIntensities = useMemo<Record<string, AllergyIntensity>>(() => {
+    if (activeProfile?.allergens?.length) {
+      const map: Record<string, AllergyIntensity> = {};
+      for (const a of activeProfile.allergens) map[a.code] = a.intensity;
+      return map;
+    }
+    return primaryIntensities || {};
+  }, [activeProfile, primaryIntensities]);
+
+  const allergyCriteria = useMemo<Record<string, AllergyCriterio>>(() => {
+    if (activeProfile?.allergens?.length) {
+      const map: Record<string, AllergyCriterio> = {};
+      for (const a of activeProfile.allergens) {
+        map[a.code] = a.criterio || 'assoluto';
+      }
+      return map;
+    }
+    return primaryCriteria || {};
+  }, [activeProfile, primaryCriteria]);
 
   const familyProfiles = useMemo(
     () => subProfiles.filter((p) => p.relationship !== 'io'),
@@ -48,6 +70,8 @@ export function useActiveProfileAllergies(options: Options = {}) {
     activeProfile,
     activeProfileId,
     allergie,
+    allergyIntensities,
+    allergyCriteria,
     profileLabel: activeProfile?.name ?? null,
     activeLabel,
     activeAvatar,

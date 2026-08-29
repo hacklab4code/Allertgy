@@ -109,5 +109,13 @@ assert.deepEqual(calcolaSemaforo([], piattoConAglio, ['aglio']).match_esclusi, [
 // Escludi aglio + cipolla
 assert.equal(calcolaSemaforo([], carbonara, ['aglio']).stato, 'verde');
 
+// Criterio crudo/cotto: presenza → giallo (non rosso), perché la forma non è nota dal menù
+const frittata = { nome_piatto: 'Frittata', allergeni_contenuti: ['uova'], allergeni_tracce: [] as string[] };
+assert.equal(calcolaSemaforo(['uova'], frittata).stato, 'rosso', 'Assoluto (default) → rosso');
+assert.equal(calcolaSemaforo(['uova'], frittata, [], { uova: 'assoluto' }).stato, 'rosso');
+assert.equal(calcolaSemaforo(['uova'], frittata, [], { uova: 'crudo' }).stato, 'giallo', 'Criterio crudo → giallo');
+assert.deepEqual(calcolaSemaforo(['uova'], frittata, [], { uova: 'crudo' }).match_criterio, ['uova']);
+assert.deepEqual(calcolaSemaforo(['uova'], frittata, [], { uova: 'crudo' }).match_contenuti, []);
+assert.equal(calcolaSemaforo(['uova'], frittata, [], { uova: 'cotto' }).stato, 'giallo', 'Criterio cotto → giallo');
 
 console.log('✅ semaforo.test.ts: tutti i test superati');

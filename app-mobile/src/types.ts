@@ -2,11 +2,17 @@ export interface Allergen {
   id: number;
   code: string;
   name_it: string;
+  name_en?: string | null;
   emoji: string | null;
   is_diet: number;
   category: string;
   intensity?: 'lieve' | 'moderata' | 'grave' | null;
+  /** Forma a cui reagisce: assoluto / crudo / cotto */
+  criterio?: 'assoluto' | 'crudo' | 'cotto' | null;
 }
+
+export type AllergyIntensity = 'lieve' | 'moderata' | 'grave';
+export type AllergyCriterio = 'assoluto' | 'crudo' | 'cotto';
 
 export interface MenuOutItem {
   id: number;
@@ -40,7 +46,16 @@ export interface RestaurantSummary {
   citta: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  image_url?: string | null;
   boost_active?: boolean;
+  /** False = piano free / menù allergeni non pubblicato — non confondere con “0 piatti idonei”. */
+  menu_available?: boolean;
+  /** Badge AllerTgy verificato. */
+  is_verified?: boolean;
+  /** Tipo cucina (es. italiana, pizza, sushi). */
+  cuisine?: string | null;
+  google_rating?: number | null;
+  google_reviews_count?: number | null;
   piatti: Piatto[];
 }
 
@@ -60,6 +75,7 @@ export interface Menu {
   orari_apertura?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  image_url?: string | null;
   aggiornato_il: string | null;
   menu_version?: number;
   menu_legal_confirmed_at?: string | null;
@@ -69,9 +85,27 @@ export interface Menu {
   tripadvisor_rating?: number | null;
   tripadvisor_reviews_count?: number | null;
   boost_active?: boolean;
+  /** False = dati allergeni non pubblicati (piano free o menù non attivo). */
+  menu_available?: boolean;
   safety_notice?: string;
   menus?: MenuOutItem[];
+  photos?: RestaurantPhoto[];
   piatti: Piatto[];
+}
+
+export interface RestaurantPhoto {
+  id: number;
+  url: string;
+  is_cover: boolean;
+  sort_order?: number;
+}
+
+export interface PublicRestaurant {
+  public_code: string;
+  name: string;
+  city?: string | null;
+  image_url?: string | null;
+  photos: RestaurantPhoto[];
 }
 
 export interface PiattoValutazione {
@@ -89,14 +123,25 @@ export interface MenuValutato extends Menu {
 
 /** Piatto in scrittura (lato ristoratore) */
 export interface PiattoIn {
+  id?: number;
   nome_piatto: string;
   descrizione?: string | null;
   categoria?: string | null;
   prezzo_cents?: number | null;
   image_url?: string | null;
   menu_group?: string | null;
+  kitchen_protocol_confirmed?: number;
+  cross_contamination_checked_at?: string | null;
   allergeni_contenuti: string[];
   allergeni_tracce: string[];
+}
+
+export interface DishSaveOut {
+  dish: PiattoIn & { id: number };
+  menu_version: number;
+  menu_updated_at: string | null;
+  published: boolean;
+  registry_ready: boolean;
 }
 
 export type BusinessPlan = 'free' | 'base' | 'pro_notify';
@@ -189,6 +234,7 @@ export interface SubProfileAllergen {
   name_it: string;
   emoji: string | null;
   intensity: 'lieve' | 'moderata' | 'grave';
+  criterio?: 'assoluto' | 'crudo' | 'cotto';
 }
 
 export interface SubProfile {
@@ -202,7 +248,11 @@ export interface SubProfile {
 export interface SubProfileIn {
   name: string;
   relationship: string;
-  allergens: { code: string; intensity: 'lieve' | 'moderata' | 'grave' }[];
+  allergens: {
+    code: string;
+    intensity: 'lieve' | 'moderata' | 'grave';
+    criterio?: 'assoluto' | 'crudo' | 'cotto';
+  }[];
 }
 
 export interface ProfileShare {

@@ -24,19 +24,11 @@ export function ProductFavoriteCard({
   onToggleFavorite,
   compact = false,
 }: Props) {
-  const cardTint = product.status === 'verde' ? 'green'
-    : product.status === 'giallo' ? 'yellow'
-    : 'red';
-  const accent = product.status === 'verde' ? colors.green
-    : product.status === 'giallo' ? colors.amber
-    : colors.red;
-
   return (
     <GlassCard
       padded={false}
-      tint={cardTint}
-      accentColor={accent}
-      cardRadius={radius.lg}
+      tint="none"
+      cardRadius={radius.md}
       style={compact ? styles.cardCompact : styles.card}
     >
       <View style={styles.row}>
@@ -86,8 +78,16 @@ export function ProductFavoriteCard({
 }
 
 const styles = StyleSheet.create({
-  card: { marginBottom: spacing.sm },
-  cardCompact: { marginBottom: spacing.xs },
+  card: {
+    alignSelf: 'stretch',
+    width: '100%',
+    marginBottom: spacing.sm,
+  },
+  cardCompact: {
+    alignSelf: 'stretch',
+    width: '100%',
+    marginBottom: spacing.xs,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -106,10 +106,11 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: radius.sm,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
     backgroundColor: colors.surfaceTertiary,
+    flexShrink: 0,
   },
   image: { width: '100%', height: '100%' },
   imagePlaceholder: {
@@ -117,11 +118,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  body: { flex: 1, gap: 3, minWidth: 0 },
-  metaRow: { marginTop: 2 },
+  body: { flex: 1, gap: 3, minWidth: 0, justifyContent: 'center' },
+  metaRow: { marginTop: 2, flexDirection: 'row', alignItems: 'center' },
   actions: {
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
+    flexShrink: 0,
   },
   favBtn: {
     width: 34,

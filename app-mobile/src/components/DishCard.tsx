@@ -1,200 +1,410 @@
-import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { API } from '../api/client';
+import React from 'react';
+import { Alert, Image, StyleSheet, Text, Pressable, View } from 'react-native';
+import { router } from 'expo-router';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import type { EsitoSemaforo } from '../engine/semaforo';
 import type { Piatto } from '../types';
 import { useSession } from '../store/session';
 import { t, getAllergenName } from '../engine/translations';
-import { colors, radius } from '../theme';
-import { GlassCard } from './ui/GlassCard';
-import { StatoVerdictPill } from './ui/Traffic';
+import { resolveDishImageUrl } from '../utils/dishImage';
 
-const ACCENT = {
-  verde: colors.green,
-  giallo: colors.amber,
-  rosso: colors.red,
-} as const;
+export type VerdictType = 'SAFE' | 'WARN' | 'RISK';
 
-const SHORT_LABEL = {
-  verde: 'Idoneo',
-  giallo: 'Attenzione',
-  rosso: 'Non idoneo',
-} as const;
+const VERDICT_CONFIG = {
+  SAFE: {
+    label: 'Idoneo',
+    icon: 'check-circle' as const,
+    color: '#10B981',
+    softBg: '#ECFDF5',
+    border: '#6EE7B7',
+    textColor: '#065F46',
+  },
+  WARN: {
+    label: 'Attenzione',
+    icon: 'alert-triangle' as const,
+    color: '#F59E0B',
+    softBg: '#FFFBEB',
+    border: '#FCD34D',
+    textColor: '#92400E',
+  },
+  RISK: {
+    label: 'Non idoneo',
+    icon: 'x-octagon' as const,
+    color: '#EF4444',
+    softBg: '#FEF2F2',
+    border: '#FCA5A5',
+    textColor: '#991B1B',
+  },
+};
 
-const STOCK_PHOTOS = [
-  'https://images.unsplash.com/photo-1572656631137-7935297eff55?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1595908129746-57ca1a63dd4d?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=300&q=80',
-];
-
-function getDishImageUrl(url: string | null | undefined, name: string, category?: string | null): string {
-  if (url) {
-    if (url.startsWith('http')) return url;
-    return `${API}${url}`;
-  }
-  const n = (name || '').toLowerCase();
-  const c = (category || '').toLowerCase();
-  if (n.includes('pizza')) return STOCK_PHOTOS[8];
-  if (n.includes('pasta') || n.includes('carbonara') || n.includes('tagliatelle') || c.includes('primi')) return STOCK_PHOTOS[2];
-  if (n.includes('risotto')) return STOCK_PHOTOS[3];
-  if (n.includes('bruschetta') || c.includes('antipast')) return STOCK_PHOTOS[0];
-  if (n.includes('frittur') || n.includes('calamari') || n.includes('pesce') || n.includes('mare')) return STOCK_PHOTOS[4];
-  if (n.includes('carne') || n.includes('tagliata') || n.includes('manzo') || c.includes('secondi')) return STOCK_PHOTOS[5];
-  if (n.includes('verdur') || n.includes('insalat') || c.includes('contorn')) return STOCK_PHOTOS[6];
-  if (n.includes('tiramis') || n.includes('dolce') || c.includes('dolc')) return STOCK_PHOTOS[7];
-  return STOCK_PHOTOS[9];
+export interface DishCardProps {
+  piatto: Piatto;
+  esito: EsitoSemaforo;
+  restaurantCode: string;
+  onPress?: () => void;
+  tavolataInfo?: {
+    idonei: string[];
+    nonIdonei: string[];
+  };
 }
 
-export default function DishCard({ piatto, esito }: { piatto: Piatto; esito: EsitoSemaforo }) {
+export default function DishCard({
+  piatto,
+  esito,
+  restaurantCode,
+  onPress,
+  tavolataInfo,
+}: DishCardProps) {
   const language = useSession((s) => s.language);
   const allergyIntensities = useSession((s) => s.allergyIntensities || {});
-  const label = SHORT_LABEL[esito.stato];
-  const rosso = esito.stato === 'rosso';
-  const imgUri = getDishImageUrl(piatto.image_url, piatto.nome_piatto, piatto.categoria);
-  const tint = esito.stato === 'verde' ? 'green' : esito.stato === 'giallo' ? 'yellow' : 'red';
 
-  const onLongPress = () => {
+  const verdict: VerdictType =
+    esito.stato === 'verde' ? 'SAFE' : esito.stato === 'giallo' ? 'WARN' : 'RISK';
+  const config = VERDICT_CONFIG[verdict];
+
+  const imgUri = resolveDishImageUrl(piatto.image_url, piatto.nome_piatto, piatto.categoria);
+  const isVegan = piatto.categoria?.toLowerCase().includes('vegan') || piatto.nome_piatto?.toLowerCase().includes('vegan');
+  const priceFormatted = piatto.prezzo_cents != null ? `${(piatto.prezzo_cents / 100).toFixed(2)} €` : null;
+
+  // Costruzione Why Chips
+  const containsList = esito.match_contenuti || [];
+  const tracesList = esito.match_tracce || [];
+  const excludedList = esito.match_esclusi || [];
+
+  const handlePress = () => {
+    void Haptics.selectionAsync();
+    if (onPress) {
+      onPress();
+    } else if (restaurantCode && piatto.id) {
+      router.push(`/menu/${restaurantCode}/dish/${piatto.id}`);
+    }
+  };
+
+  const handleLongPress = () => {
     if (esito.stato === 'verde') return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    let msg = '';
     const mapIntensity = (code: string) => {
       const i = allergyIntensities[code];
-      if (i === 'lieve') return ' (Intensità: Lieve)';
-      if (i === 'grave') return ' (Intensità: Grave/Anafilassi)';
-      return ' (Intensità: Moderata)';
+      if (i === 'lieve') return ' (Lieve)';
+      if (i === 'grave') return ' (Grave/Anafilassi)';
+      return ' (Moderata)';
     };
 
-    if (esito.match_contenuti.length > 0) {
-      msg += 'Contiene:\n';
-      esito.match_contenuti.forEach((c) => {
-        msg += `- ${getAllergenName(c, language)}${c !== 'vegano' && c !== 'vegetariano' ? mapIntensity(c) : ''}\n`;
+    let msg = '';
+    if (containsList.length > 0) {
+      msg += '🔴 Contiene:\n';
+      containsList.forEach((c) => {
+        msg += `• ${getAllergenName(c, language)}${c !== 'vegano' && c !== 'vegetariano' ? mapIntensity(c) : ''}\n`;
       });
     }
-    if (esito.match_tracce.length > 0) {
+    if (tracesList.length > 0) {
       if (msg) msg += '\n';
-      msg += 'Tracce:\n';
-      esito.match_tracce.forEach((c) => {
-        msg += `- ${getAllergenName(c, language)}${mapIntensity(c)}\n`;
+      msg += '🟡 Tracce dichiarate:\n';
+      tracesList.forEach((c) => {
+        msg += `• ${getAllergenName(c, language)}${mapIntensity(c)}\n`;
+      });
+    }
+    if (excludedList.length > 0) {
+      if (msg) msg += '\n';
+      msg += '🚫 Ingredienti esclusi:\n';
+      excludedList.forEach((c) => {
+        msg += `• ${c}\n`;
       });
     }
 
-    Alert.alert(`Allergie: ${piatto.nome_piatto}`, msg);
+    Alert.alert(`Dettaglio Sicurezza: ${piatto.nome_piatto}`, msg || 'Nessun dettaglio aggiuntivo.');
   };
 
   return (
-    <TouchableOpacity activeOpacity={0.9} onLongPress={onLongPress} delayLongPress={400}>
-      <GlassCard
-        padded={false}
-        tint={tint}
-        accentColor={ACCENT[esito.stato]}
-        style={styles.card}
-      >
-        <View style={styles.row}>
-          <View style={styles.imageFrame}>
-            <Image source={{ uri: imgUri }} style={styles.image as any} />
+    <Pressable
+      onPress={handlePress}
+      onLongPress={handleLongPress}
+      delayLongPress={350}
+      style={({ pressed }) => [
+        styles.cardContainer,
+        pressed && styles.cardPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`${piatto.nome_piatto}, verdetto ${config.label}, prezzo ${priceFormatted || 'non specificato'}`}
+    >
+      <View style={styles.contentRow}>
+        {/* Foto piatto opzionale */}
+        {imgUri ? (
+          <View style={styles.imageWrapper}>
+            <Image source={{ uri: imgUri }} style={styles.image} resizeMode="cover" />
           </View>
+        ) : null}
 
-          <View style={styles.body}>
-            <Text style={[styles.name, rosso && styles.strike]} numberOfLines={2}>
-              {piatto.nome_piatto}
-            </Text>
-
-            {piatto.descrizione ? <Text style={styles.desc} numberOfLines={2}>{piatto.descrizione}</Text> : null}
-
-            <View style={styles.badges}>
-              <StatoVerdictPill stato={esito.stato} label={label} size="sm" />
-              {piatto.kitchen_protocol_confirmed === 1 ? (
-                <View style={styles.kitchenBadge}>
-                  <Text style={styles.kitchenBadgeText}>🛡️ CUCINA SICURA</Text>
+        {/* Informazioni Piatto */}
+        <View style={styles.mainInfo}>
+          {/* Header Row: Nome Piatto + Prezzo */}
+          <View style={styles.headerRow}>
+            <View style={styles.titleContainer}>
+              <Text
+                style={[
+                  styles.dishName,
+                  verdict === 'RISK' && styles.dishNameRisk,
+                ]}
+                numberOfLines={2}
+              >
+                {piatto.nome_piatto}
+              </Text>
+              {isVegan && (
+                <View style={styles.veganBadge}>
+                  <MaterialCommunityIcons name="leaf" size={11} color="#065F46" />
+                  <Text style={styles.veganText}>Vegan</Text>
                 </View>
-              ) : null}
+              )}
             </View>
 
-            {piatto.kitchen_protocol_confirmed === 1 ? (
-              <Text style={styles.kitchenHint}>{t('kitchen_safe_hint', language)}</Text>
-            ) : null}
-
-            {esito.match_contenuti.length > 0 && (
-              <Text style={styles.why}>
-                {esito.match_contenuti.some((c) => c === 'vegano' || c === 'vegetariano')
-                  ? t('diet_incompatible', language)
-                  : t('contains', language)}
-                {esito.match_contenuti.map((a) => getAllergenName(a, language)).join(', ')}
-              </Text>
-            )}
-            {esito.match_esclusi && esito.match_esclusi.length > 0 && (
-              <Text style={styles.why}>
-                {t('excluded_ingredient', language)}
-                {esito.match_esclusi.join(', ')}
-              </Text>
-            )}
-            {esito.stato === 'giallo' && (
-              <Text style={styles.why}>
-                {t('traces', language)}
-                {esito.match_tracce.map((a) => getAllergenName(a, language)).join(', ')}
-              </Text>
+            {priceFormatted && (
+              <Text style={styles.dishPrice}>{priceFormatted}</Text>
             )}
           </View>
 
-          {piatto.prezzo_cents != null && (
-            <Text style={styles.price}>{(piatto.prezzo_cents / 100).toFixed(2)} €</Text>
-          )}
+          {/* Descrizione Ingredienti */}
+          {piatto.descrizione ? (
+            <Text style={styles.description} numberOfLines={2}>
+              {piatto.descrizione}
+            </Text>
+          ) : null}
+
+          {/* Badge Cucina Sicura se presente */}
+          {piatto.kitchen_protocol_confirmed === 1 ? (
+            <View style={styles.kitchenBadge}>
+              <Text style={styles.kitchenBadgeText}>🛡️ Cucina Sicura Garantita</Text>
+            </View>
+          ) : null}
+
+          {/* Badge Tavolata Famiglia se attivo */}
+          {tavolataInfo && (tavolataInfo.idonei.length > 0 || tavolataInfo.nonIdonei.length > 0) ? (
+            <View style={[styles.tavolataBadge, tavolataInfo.nonIdonei.length > 0 ? styles.tavolataBadgeWarn : styles.tavolataBadgeOk]}>
+              <Feather name={tavolataInfo.nonIdonei.length > 0 ? "alert-circle" : "users"} size={11} color={tavolataInfo.nonIdonei.length > 0 ? "#B91C1C" : "#047857"} />
+              <Text style={[styles.tavolataBadgeText, { color: tavolataInfo.nonIdonei.length > 0 ? "#B91C1C" : "#047857" }]} numberOfLines={1}>
+                {tavolataInfo.nonIdonei.length > 0
+                  ? `⚠️ Vietato per: ${tavolataInfo.nonIdonei.join(', ')}`
+                  : `🟢 Idoneo per tutta la tavolata (${tavolataInfo.idonei.join(', ')})`}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Footer: Quad-Indicator Pill + Why Chips */}
+          <View style={styles.footerRow}>
+            {/* Pillola Verdetto Quad-Indicator */}
+            <View
+              style={[
+                styles.verdictPill,
+                { backgroundColor: config.softBg, borderColor: config.border },
+              ]}
+            >
+              <Feather name={config.icon} size={12} color={config.color} />
+              <Text style={[styles.verdictLabel, { color: config.textColor }]}>
+                {config.label}
+              </Text>
+            </View>
+
+            {/* Why Chip: Contiene */}
+            {containsList.length > 0 && (
+              <View style={[styles.whyChip, styles.whyChipContains]}>
+                <Text style={[styles.whyChipText, styles.whyChipTextContains]} numberOfLines={1}>
+                  Contiene: {containsList.map((a) => getAllergenName(a, language)).join(', ')}
+                </Text>
+              </View>
+            )}
+
+            {/* Why Chip: Tracce */}
+            {tracesList.length > 0 && (
+              <View style={[styles.whyChip, styles.whyChipTraces]}>
+                <Text style={[styles.whyChipText, styles.whyChipTextTraces]} numberOfLines={1}>
+                  Tracce: {tracesList.map((a) => getAllergenName(a, language)).join(', ')}
+                </Text>
+              </View>
+            )}
+
+            {/* Why Chip: Ingredienti Esclusi */}
+            {excludedList.length > 0 && (
+              <View style={[styles.whyChip, styles.whyChipContains]}>
+                <Text style={[styles.whyChipText, styles.whyChipTextContains]} numberOfLines={1}>
+                  Escluso: {excludedList.join(', ')}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-      </GlassCard>
-    </TouchableOpacity>
+      </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    marginBottom: 12,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 14,
-    alignItems: 'flex-start',
+  cardContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 14,
+    marginVertical: 6,
+    marginHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#E6DFF5',
+    shadowColor: '#36255C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  imageFrame: {
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceTertiary,
+  cardPressed: {
+    transform: [{ scale: 0.985 }],
+    opacity: 0.92,
   },
-  image: { width: 72, height: 72 },
-  body: { flex: 1, gap: 4 },
-  name: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.onSurface,
-    letterSpacing: -0.2,
-  },
-  strike: { textDecorationLine: 'line-through', color: colors.textMuted },
-  desc: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
-  badges: {
+  contentRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  imageWrapper: {
+    width: 72,
+    height: 72,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#EDE6FA',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  mainInfo: {
+    flex: 1,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
+  titleContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
+  dishName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C0D30',
+    letterSpacing: -0.2,
+    lineHeight: 21,
+  },
+  dishNameRisk: {
+    color: '#4B3F58',
+  },
+  dishPrice: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#36255C',
+  },
+  veganBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+    alignSelf: 'flex-start',
     marginTop: 4,
+    gap: 3,
+  },
+  veganText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  description: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: '#675B7D',
+    lineHeight: 18,
+    marginVertical: 4,
   },
   kitchenBadge: {
-    backgroundColor: colors.brand50,
-    borderRadius: radius.pill,
+    alignSelf: 'flex-start',
+    backgroundColor: '#EEF2FF',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginVertical: 4,
+  },
+  kitchenBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#3730A3',
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  verdictPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    gap: 4,
+  },
+  verdictLabel: {
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  whyChip: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: colors.brand200,
+    borderRadius: 8,
+    maxWidth: '85%',
   },
-  kitchenBadgeText: { fontSize: 9, fontWeight: '800', color: colors.brandDark, letterSpacing: 0.5 },
-  kitchenHint: { fontSize: 10, color: colors.onSurfaceMuted, fontWeight: '600', lineHeight: 14 },
-  why: { fontSize: 11, color: colors.redText, marginTop: 2, fontWeight: '700' },
-  price: { fontSize: 14, fontWeight: '800', color: colors.inkSoft, letterSpacing: -0.2 },
+  whyChipContains: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  whyChipTraces: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  whyChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  whyChipTextContains: {
+    color: '#991B1B',
+  },
+  whyChipTextTraces: {
+    color: '#92400E',
+  },
+  tavolataBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  tavolataBadgeOk: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  tavolataBadgeWarn: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  tavolataBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
 });

@@ -1,12 +1,33 @@
 #!/bin/bash
-# Metro per Development Build (AllerTgy installata su iPhone). Usato da PM2.
+# Metro per Development Build (AllerTgy). Usato da PM2.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-IP=$(bash "$ROOT/scripts/sync-packager-ip.sh")
+
+# Preferisci Wi‑Fi locale (più affidabile). Tailscale solo se ALLERTGY_REMOTE=1
+if [ "${ALLERTGY_REMOTE:-0}" = "1" ]; then
+  IP=$(tailscale ip -4 2>/dev/null || true)
+fi
+if [ -z "${IP:-}" ]; then
+  IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "127.0.0.1")
+fi
+
+# Scrivi env per Xcode / app
+NODE_BIN=$(command -v node)
+cat > "$ROOT/app-mobile/ios/.xcode.env.local" <<XEOF
+export NODE_BINARY=$NODE_BIN
+export REACT_NATIVE_PACKAGER_HOSTNAME=$IP
+export RCT_METRO_PORT=8081
+XEOF
+printf 'EXPO_PUBLIC_API_URL=http://%s:8000\n' "$IP" > "$ROOT/app-mobile/.env"
+
 cd "$ROOT/app-mobile"
 export EXPO_PUBLIC_API_URL="http://${IP}:8000"
 export REACT_NATIVE_PACKAGER_HOSTNAME="$IP"
 export RCT_METRO_PORT=8081
 export CI=false
+export EXPO_NO_TELEMETRY=1
 export npm_config_cache="$ROOT/app-mobile/.npm_cache"
-exec npx expo start --dev-client --lan --port 8081 --max-workers 2
+# Worker: lascia che metro.config.js scelga (4–6). Evita --max-workers 2
+# che rende il first bundle lentissimo sul Mac.
+echo "[run-expo] Metro su http://${IP}:8081  API=http://${IP}:8000"
+exec npx expo start --dev-client --lan --port 8081

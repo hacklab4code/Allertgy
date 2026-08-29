@@ -5,12 +5,12 @@ interface FooterProps {
 }
 
 export const Footer = ({ scrollTo }: FooterProps) => (
-  <footer className="bg-[#1C221F] text-white/70 relative overflow-hidden">
+  <footer className="bg-[#36255C] text-white/70 relative overflow-hidden">
     <div className="max-w-7xl mx-auto px-6 md:px-12 py-16 md:py-20">
       <div className="grid md:grid-cols-2 gap-10 items-start">
         <div>
           <div className="flex items-center gap-2 text-white">
-            <span className="grid place-items-center w-9 h-9 rounded-xl bg-[#16A34A]">
+            <span className="grid place-items-center w-9 h-9 rounded-xl bg-[#D2C3F6] text-[#36255C]">
               <Salad className="w-5 h-5" strokeWidth={2} />
             </span>
             <span className="text-xl font-extrabold tracking-tight">

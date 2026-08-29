@@ -2,43 +2,54 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Alert, Image, Linking, Platform, Pressable, Share, StyleSheet, Switch, View, ActivityIndicator,
+  Alert, Clipboard, Image, Linking, Pressable, Share, StatusBar, StyleSheet, View, ActivityIndicator, Modal, ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { api, API } from '../../../src/api/client';
-import { logoutAndCleanup } from '../../../src/services/authSession';
+import { Ionicons } from '@expo/vector-icons';
+import { api } from '../../../src/api/client';
+import { logoutAndCleanup, syncUserAllergensFromServer } from '../../../src/services/authSession';
 import { useSession } from '../../../src/store/session';
-import { useAppearance } from '../../../src/store/appearance';
-import type { Allergen, CustomerPlan, ReferralStats } from '../../../src/types';
+import type { Allergen, ReferralStats } from '../../../src/types';
 import { getFlagEmoji, getLanguageLabel } from '../../../src/constants/languages';
 import { t } from '../../../src/engine/translations';
 import ShareProfileModal from '../../../src/components/ShareProfileModal';
 import { useTranslation } from '../../../src/constants/translations';
-import { colors, spacing, radius, puffyShadow } from '../../../src/theme';
-import { puffRaised } from '../../../src/components/ui/puffSurface';
+import { colors, spacing, radius } from '../../../src/theme';
 import {
   AppText,
-  CollapseSection,
-  DebossedInput,
   ErrorStateCard,
-  GlassCard,
   GlassScreenScroll,
-  PuffyButton,
   Screen,
   Section,
   SettingsRow,
   SettingsDivider,
 } from '../../../src/components/ui';
-import { useNativeLiquidGlass, canUseNativeLiquidGlass } from '../../../src/components/ui/useNativeLiquidGlass';
 import { useProfileSheet } from '../../../src/store/profileSheet';
-import { connectAppleHealth, disconnectAppleHealth, isAppleHealthAvailable } from '../../../src/services/appleHealth';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SCREEN_PADDING_H } from '../../../src/layoutConstants';
+import { useSectionTitle } from '../../../src/hooks/useSectionTitle';
+import Constants from 'expo-constants';
+import { loadTrustProfile, type TrustProfile } from '../../../src/services/communityTrust';
+
+const ORANGE = colors.amber;
+const ORANGE_SOFT = colors.amberBg;
+const ICON_WHITE = '#FFFFFF';
+
+function SectionCountBadge({ count }: { count: number }) {
+  return (
+    <View style={styles.sectionCountBadge}>
+      <AppText style={styles.sectionCountBadgeText}>{count}</AppText>
+    </View>
+  );
+}
 
 export default function Account() {
+  const insets = useSafeAreaInsets();
   const {
-    email, allergie, allergyIntensities, logout, setEmergencyMedicines, language,
-    ingredientiEsclusi, setIngredientiEsclusi, emergencyContactName, emergencyContactPhone,
+    email, allergie, setEmergencyMedicines, language,
+    emergencyContactName,
     setEmergencyContact, subProfiles, setSubProfiles,
+    setProfilePhotoUrl,
   } = useSession();
   const { t: tLocal } = useTranslation();
   const [all, setAll] = useState<Allergen[]>([]);
@@ -47,35 +58,19 @@ export default function Account() {
   const [loading, setLoading] = useState(false);
   const [profileError, setProfileError] = useState(false);
   const [emergencyDraft, setEmergencyDraft] = useState('');
-  const [contactNameDraft, setContactNameDraft] = useState('');
-  const [contactPhoneDraft, setContactPhoneDraft] = useState('');
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [shareTarget, setShareTarget] = useState<{ profileId: number | null; label: string } | null>(null);
-  const [customerPlans, setCustomerPlans] = useState<CustomerPlan[]>([]);
   const [referral, setReferral] = useState<ReferralStats | null>(null);
-  const [planExpanded, setPlanExpanded] = useState(false);
-  const [sosExpanded, setSosExpanded] = useState(false);
-  const [supportExpanded, setSupportExpanded] = useState(false);
+  const [infoModalVisible, setInfoModalVisible] = useState(false);
+  const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [trustProfile, setTrustProfile] = useState<TrustProfile | null>(null);
+
   const openProfileSheet = useProfileSheet((s) => s.open);
-  const liquidGlassEnabled = useAppearance((s) => s.liquidGlassEnabled);
-  const setLiquidGlassEnabled = useAppearance((s) => s.setLiquidGlassEnabled);
-  const { reduceTransparency } = useNativeLiquidGlass();
-  const appleNativeGlass = canUseNativeLiquidGlass(false, true);
 
   const mie = all.filter((a) => allergie.includes(a.code));
   const isIt = language === 'it';
-  const liquidGlassSubtitle = (() => {
-    if (!liquidGlassEnabled || reduceTransparency) {
-      return isIt ? 'Superfici opache, senza vetro' : 'Opaque surfaces, no glass';
-    }
-    if (appleNativeGlass) {
-      return isIt ? 'Vetro nativo Apple (Liquid Glass)' : 'Native Apple Liquid Glass';
-    }
-    if (Platform.OS === 'ios') {
-      return isIt ? 'Effetto vetro (fallback iOS)' : 'Glass effect (iOS fallback)';
-    }
-    return isIt ? 'Effetto vetro per tutti i dispositivi' : 'Glass effect on all devices';
-  })();
+  useSectionTitle(isIt ? 'Profilo' : 'Profile');
+  const appVersion = Constants.expoConfig?.version ?? '0.1.0';
 
   const loadProfileData = async () => {
     setProfileError(false);
@@ -85,12 +80,12 @@ export default function Account() {
       setEmergencyMedicines(p.emergency_medicines);
       setEmergencyDraft(p.emergency_medicines ?? '');
       setEmergencyContact(p.emergency_contact_name ?? null, p.emergency_contact_phone ?? null);
-      setContactNameDraft(p.emergency_contact_name ?? '');
-      setContactPhoneDraft(p.emergency_contact_phone ?? '');
       const docs = await api.getDocuments();
       setDocuments(docs);
       const photo = await api.getProfilePhoto().catch(() => null);
-      setPhotoUrl(photo?.photo_url ?? null);
+      const url = photo?.photo_url ?? null;
+      setPhotoUrl(url);
+      setProfilePhotoUrl(url);
     } catch (e) {
       console.log('Errore caricamento profilo mobile:', e);
       setProfileError(true);
@@ -111,6 +106,7 @@ export default function Account() {
     try {
       const res = await api.uploadProfilePhoto(result.assets[0].uri, result.assets[0].mimeType ?? 'image/jpeg');
       setPhotoUrl(res.photo_url);
+      setProfilePhotoUrl(res.photo_url);
     } catch (e) {
       Alert.alert(isIt ? 'Errore' : 'Error', (e as Error).message);
     }
@@ -119,40 +115,26 @@ export default function Account() {
 
   useEffect(() => {
     api.allergens().then(setAll).catch(() => { });
-    api.getCustomerPlans().then(setCustomerPlans).catch(() => { });
     api.getReferralStats().then(setReferral).catch(() => { });
     loadProfileData();
+    syncUserAllergensFromServer().catch(() => { });
     api.getSubProfiles().then(setSubProfiles).catch(() => { });
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      api.getProfilePhoto().then((photo) => setPhotoUrl(photo?.photo_url ?? null)).catch(() => { });
+      void loadProfileData();
+      void loadTrustProfile(isIt).then(setTrustProfile);
+      syncUserAllergensFromServer().catch(() => { });
+      api.getDocuments().then(setDocuments).catch(() => { });
+      api.getProfilePhoto().then((photo) => {
+        const url = photo?.photo_url ?? null;
+        setPhotoUrl(url);
+        setProfilePhotoUrl(url);
+      }).catch(() => { });
       api.getSubProfiles().then(setSubProfiles).catch(() => { });
-    }, [setSubProfiles]),
+    }, [setSubProfiles, setProfilePhotoUrl]),
   );
-
-  const purchasePlus = async () => {
-    setLoading(true);
-    try {
-      const res = await api.customerCheckout();
-      if (res.checkout_url) await Linking.openURL(res.checkout_url);
-    } catch (e) {
-      Alert.alert(isIt ? 'Errore' : 'Error', (e as Error).message);
-    }
-    setLoading(false);
-  };
-
-  const managePlus = async () => {
-    setLoading(true);
-    try {
-      const res = await api.customerPortal();
-      if (res.portal_url) await Linking.openURL(res.portal_url);
-    } catch (e) {
-      Alert.alert(isIt ? 'Errore' : 'Error', (e as Error).message);
-    }
-    setLoading(false);
-  };
 
   const confirmLogout = () =>
     Alert.alert(
@@ -166,40 +148,6 @@ export default function Account() {
         },
       ],
     );
-
-  const saveEmergencyMedicines = async () => {
-    setLoading(true);
-    try {
-      const value = emergencyDraft.trim() || null;
-      await api.updateAppleHealth(profile?.apple_health_connected ?? 0, value, emergencyContactName, emergencyContactPhone);
-      setEmergencyMedicines(value);
-      await loadProfileData();
-      Alert.alert(t('saved', language), t('emergency_saved', language));
-    } catch (e) {
-      Alert.alert(t('error', language), (e as Error).message);
-    }
-    setLoading(false);
-  };
-
-  const saveEmergencyContact = async () => {
-    setLoading(true);
-    try {
-      const name = contactNameDraft.trim() || null;
-      const phone = contactPhoneDraft.trim() || null;
-      await api.updateAppleHealth(
-        profile?.apple_health_connected ?? 0,
-        emergencyDraft.trim() || null,
-        name,
-        phone,
-      );
-      setEmergencyContact(name, phone);
-      await loadProfileData();
-      Alert.alert(t('saved', language), t('contact_saved', language));
-    } catch (e) {
-      Alert.alert(t('error', language), (e as Error).message);
-    }
-    setLoading(false);
-  };
 
   const confirmDeleteAccount = () =>
     Alert.alert(
@@ -228,417 +176,447 @@ export default function Account() {
       ],
     );
 
-  const plusPlan = customerPlans.find((p) => p.code === 'customer_plus');
-  const hasPlus = profile?.has_customer_plus || referral?.has_plus;
-  const activePlan = hasPlus
-    ? (plusPlan ?? customerPlans.find((p) => p.code === 'customer_plus'))
-    : (customerPlans.find((p) => p.code === 'customer_free') ?? customerPlans[0]);
+  const shareInviteCode = async () => {
+    if (!referral?.invite_code) return;
+    const msg = isIt
+      ? `Registra il tuo locale su AllerTgy con il mio codice invito ${referral.invite_code}: tu ricevi 1 mese di Pro omaggio e io sblocco Plus Famiglia.`
+      : `Register your venue on AllerTgy with my invite code ${referral.invite_code}: you get 1 free month of Pro and I unlock Family Plus.`;
+    Share.share({ message: msg });
+  };
+
+  const copyInviteCode = async () => {
+    if (!referral?.invite_code) return;
+    Clipboard.setString(referral.invite_code);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    Alert.alert(
+      isIt ? 'Codice copiato!' : 'Code copied!',
+      isIt
+        ? `Il codice ${referral.invite_code} è stato copiato negli appunti.`
+        : `Code ${referral.invite_code} copied to clipboard.`,
+    );
+  };
+
+  const exportAllergySummary = async () => {
+    const labels = mie.map((a) => (isIt ? a.name_it : (a.name_en || a.name_it)));
+    const lines = [
+      'AllerTgy — Profilo allergie',
+      '',
+      labels.length
+        ? `${isIt ? 'Allergie' : 'Allergies'}: ${labels.join(', ')}`
+        : (isIt ? 'Allergie: nessuna registrata' : 'Allergies: none registered'),
+      emergencyDraft.trim()
+        ? `${isIt ? 'Farmaci emergenza' : 'Emergency medicines'}: ${emergencyDraft.trim()}`
+        : '',
+      '',
+      isIt
+        ? 'Generato da AllerTgy. Puoi incollarlo in Note mediche.'
+        : 'Generated by AllerTgy. You can paste it into Medical Notes.',
+    ].filter(Boolean);
+    Share.share({ message: lines.join('\n') });
+  };
 
   const displayName = profile?.display_name || email || (isIt ? 'Utente' : 'User');
-  const excludedCount = ingredientiEsclusi.filter((s) => s.length > 0).length;
-
-  const allergiesMenuSubtitle = mie.length === 0 && excludedCount === 0
-    ? (isIt ? 'Nessuna allergia o ingrediente escluso' : 'No allergies or excluded ingredients')
-    : [
-      mie.length > 0 ? `${allergie.length} ${isIt ? 'allergie' : 'allergies'}` : null,
-      excludedCount > 0 ? `${excludedCount} ${isIt ? 'ingredienti esclusi' : 'excluded'}` : null,
-    ].filter(Boolean).join(' · ');
   const familyMenuSubtitle = subProfiles.length > 0
-    ? `${subProfiles.length} ${isIt ? 'sottoprofili attivi' : 'sub-profiles'}`
+    ? `${subProfiles.length} ${isIt ? 'profili attivi' : 'active profiles'}`
     : (isIt ? 'Solo profilo personale' : 'Personal profile only');
   const docsMenuSubtitle = documents.length > 0
     ? `${documents.length} ${isIt ? 'documenti caricati' : 'documents uploaded'}`
     : (isIt ? 'Nessun documento' : 'No documents');
-  const sosMenuSubtitle = emergencyContactName || emergencyDraft.trim()
+  const sosConfigured = !!(emergencyContactName || emergencyDraft.trim());
+  const sosMenuSubtitle = sosConfigured
     ? (isIt ? 'SOS configurato' : 'SOS configured')
-    : (isIt ? 'Da configurare' : 'Not set up');
-  const planLabel = hasPlus
-    ? (plusPlan?.name ?? (isIt ? 'Plus Famiglia' : 'Family Plus'))
-    : (activePlan?.name ?? (isIt ? 'Cliente Gratis' : 'Free Customer'));
+    : (isIt ? 'Da impostare' : 'Not set up');
+  const langCode = (language || 'it').toUpperCase().slice(0, 2);
 
   return (
-    <Screen edges={false}>
+    <Screen edges={false} ambient>
+      <StatusBar barStyle="dark-content" />
       <GlassScreenScroll
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        headerFloat
+        contentContainerStyle={[styles.scroll, { paddingTop: 0, paddingHorizontal: 0, gap: 0 }]}
       >
-        {/* Hero profilo — foto solo qui, non in Home */}
-        <GlassCard padded={false}>
-          <Pressable onPress={openProfileSheet} style={styles.hero}>
-            <Pressable onPress={changePhoto} style={styles.avatarWrap}>
+        <View style={[styles.identityBand, { paddingTop: insets.top + 54 }]}>
+          <View style={styles.identityInner}>
+            <Pressable
+              onPress={changePhoto}
+              style={({ pressed }) => [styles.avatarWrap, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel={isIt ? 'Cambia foto profilo' : 'Change profile photo'}
+            >
               {photoUrl ? (
                 <Image source={{ uri: photoUrl }} style={styles.avatarImage} />
               ) : (
                 <View style={styles.avatar}>
-                  <AppText variant="title" color={colors.onBrand}>{(email ?? 'A')[0].toUpperCase()}</AppText>
+                  <AppText style={styles.avatarLetter}>
+                    {(email ?? 'A')[0].toUpperCase()}
+                  </AppText>
                 </View>
               )}
               <View style={styles.avatarBadge}>
-                <Ionicons name="camera" size={11} color={colors.brand} />
+                <Ionicons name="camera" size={12} color={colors.brand} />
               </View>
             </Pressable>
-            <View style={styles.heroCopy}>
-              <AppText variant="eyebrow" color={colors.onSurfaceMuted}>
-                {isIt ? 'Profilo' : 'Profile'}
-              </AppText>
-              <AppText variant="h2" style={styles.heroName} numberOfLines={1}>{displayName}</AppText>
-              {email ? (
-                <AppText variant="caption" color={colors.onSurfaceMuted} numberOfLines={1}>
-                  {email}
-                </AppText>
-              ) : null}
-              <View style={styles.heroSwitch}>
-                <AppText variant="caption" color={colors.brand}>
-                  {isIt ? 'Cambia profilo attivo' : 'Switch active profile'}
-                </AppText>
-                <Ionicons name="chevron-forward" size={14} color={colors.brand} />
+
+            <Pressable
+              onPress={openProfileSheet}
+              style={({ pressed }) => [styles.nameHit, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel={isIt ? 'Cambia profilo attivo' : 'Switch active profile'}
+            >
+              <View style={styles.nameRow}>
+                <AppText style={styles.identityName} numberOfLines={1}>{displayName}</AppText>
+                <Ionicons name="chevron-down" size={18} color={colors.onSurfaceMuted} />
               </View>
-            </View>
-          </Pressable>
-        </GlassCard>
+            </Pressable>
 
-        <Section title={isIt ? 'Il tuo profilo' : 'Your profile'} card padded={false}>
-          <SettingsRow
-            icon="shield-checkmark"
-            iconBg={colors.greenSoft}
-            iconColor={colors.onGreen}
-            title={isIt ? 'Allergie e ingredienti' : 'Allergies & ingredients'}
-            subtitle={allergiesMenuSubtitle}
-            onPress={() => router.push('/allergie')}
-          />
-          <SettingsDivider />
-          <SettingsRow
-            icon="people"
-            iconBg={colors.brand50}
-            title={isIt ? 'Sottoprofili famiglia' : 'Family sub-profiles'}
-            subtitle={familyMenuSubtitle}
-            onPress={() => router.push('/sub-profiles')}
-          />
-          <SettingsDivider />
-          <SettingsRow
-            icon="heart"
-            iconBg={colors.redSoft}
-            iconColor={colors.onRed}
-            title={isIt ? 'Preferiti' : 'Favorites'}
-            subtitle={isIt ? 'Locali e prodotti salvati' : 'Saved venues and products'}
-            onPress={() => router.push('/preferiti')}
-          />
-        </Section>
+            {trustProfile && (
+              <View style={[styles.trustBadgePill, { backgroundColor: `${trustProfile.badgeColor}15`, borderColor: `${trustProfile.badgeColor}40` }]}>
+                <AppText style={{ fontSize: 11 }}>{trustProfile.badgeEmoji}</AppText>
+                <AppText style={[styles.trustBadgeText, { color: trustProfile.badgeColor }]}>
+                  {trustProfile.title} ({trustProfile.points} pt)
+                </AppText>
+              </View>
+            )}
 
-        <CollapseSection
-          icon="medkit"
-          iconBg={colors.redSoft}
-          iconColor={colors.onRed}
-          title={isIt ? 'Emergenza SOS' : 'SOS emergency'}
-          preview={sosMenuSubtitle}
-          expanded={sosExpanded}
-          onToggle={() => setSosExpanded((v) => !v)}
-          tint="red"
-        >
-          <View style={styles.formBlock}>
-            <AppText variant="bodyBold">{isIt ? 'Farmaci e note di emergenza' : 'Emergency medicines and notes'}</AppText>
-            <DebossedInput
-              value={emergencyDraft}
-              onChangeText={setEmergencyDraft}
-              placeholder={isIt ? 'es. EpiPen nello zaino' : 'e.g. EpiPen in backpack'}
-              multiline
-              style={styles.multilineInput}
-            />
-            <PuffyButton
-              label={isIt ? 'Salva note SOS' : 'Save SOS notes'}
-              onPress={saveEmergencyMedicines}
-              disabled={loading}
-              fullWidth={false}
-              style={styles.saveBtn}
-            />
+            {referral?.invite_code ? (
+              <View style={styles.headerInvite}>
+                <View style={styles.inviteActionRow}>
+                  <Pressable
+                    onPress={copyInviteCode}
+                    style={({ pressed }) => [styles.inviteCodeBadge, pressed && styles.pressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel={isIt ? 'Copia codice' : 'Copy code'}
+                  >
+                    <AppText style={styles.inviteCodeText}>
+                      {referral.invite_code.split('').join(' ')}
+                    </AppText>
+                  </Pressable>
+                  <Pressable
+                    onPress={shareInviteCode}
+                    style={({ pressed }) => [styles.inviteIconBtn, pressed && styles.pressed]}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={isIt ? 'Condividi codice' : 'Share code'}
+                  >
+                    <Ionicons name="share-outline" size={18} color={colors.brand} />
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
           </View>
-          <View style={styles.formBlock}>
-            <AppText variant="bodyBold">{isIt ? 'Contatto di emergenza' : 'Emergency contact'}</AppText>
-            <View style={styles.contactRow}>
-              <DebossedInput
-                value={contactNameDraft}
-                onChangeText={setContactNameDraft}
-                placeholder={isIt ? 'Nome' : 'Name'}
-                style={[styles.compactInput, { flex: 1 }]}
-              />
-              <DebossedInput
-                value={contactPhoneDraft}
-                onChangeText={setContactPhoneDraft}
-                placeholder={isIt ? 'Telefono' : 'Phone'}
-                keyboardType="phone-pad"
-                style={[styles.compactInput, { flex: 1 }]}
-              />
-            </View>
-            <PuffyButton
-              label={isIt ? 'Salva contatto' : 'Save contact'}
-              onPress={saveEmergencyContact}
-              disabled={loading}
-              fullWidth={false}
-              style={styles.saveBtn}
+        </View>
+
+        <View style={styles.body}>
+          {profileError && (
+            <ErrorStateCard
+              message={isIt ? 'Impossibile caricare il profilo. Controlla la connessione.' : 'Could not load profile. Check your connection.'}
+              retryLabel={isIt ? 'Riprova' : 'Retry'}
+              onRetry={loadProfileData}
             />
-          </View>
-          <View style={[styles.formBlock, { paddingTop: 0 }]}>
+          )}
+
+          {loading && <ActivityIndicator color={colors.brand} style={{ marginVertical: 8 }} />}
+
+          <Section title={isIt ? 'Profilo e Salute' : 'Profile & Health'}>
             <SettingsRow
-              icon="medkit"
+              icon="shield-checkmark"
+              iconBg={colors.green}
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Allergie e ingredienti' : 'Allergies & ingredients'}
+              subtitle={mie.length > 0 ? `${mie.length} ${isIt ? 'allergie attive' : 'active allergies'}` : (isIt ? 'Nessuna allergia' : 'No allergies')}
+              onPress={() => router.push('/allergie')}
+              right={mie.length > 0 ? <SectionCountBadge count={mie.length} /> : undefined}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="card"
+              iconBg="#4A5568"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Pass allergeni' : 'Allergen pass'}
+              subtitle={isIt ? 'Mostra le allergie al personale' : 'Show your allergies to staff'}
+              onPress={() => router.push('/allergy-card')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="people"
+              iconBg={colors.brand}
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Sottoprofili Famiglia' : 'Family Sub-Profiles'}
+              subtitle={familyMenuSubtitle}
+              onPress={() => router.push('/sub-profiles')}
+              right={<SectionCountBadge count={subProfiles.length} />}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="warning"
+              iconBg={colors.red}
+              iconColor={ICON_WHITE}
+              title={isIt ? 'SOS e contatti' : 'SOS & contacts'}
+              subtitle={sosMenuSubtitle}
+              onPress={() => router.push('/emergency')}
+              right={
+                !sosConfigured ? (
+                  <View style={styles.warnBadge}>
+                    <AppText style={styles.warnBadgeText}>!</AppText>
+                  </View>
+                ) : undefined
+              }
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="document-text"
+              iconBg={ORANGE}
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Documenti sanitari' : 'Medical documents'}
+              subtitle={docsMenuSubtitle}
+              onPress={() => router.push('/documenti')}
+            />
+          </Section>
+
+          <Section title={isIt ? 'Strumenti Clinici & Casa' : 'Clinical & Home Tools'}>
+            <SettingsRow
+              icon="print"
+              iconBg="#2563EB"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Fascicolo Medico & Modulo Scuola' : 'Medical & School Report'}
+              subtitle={isIt ? 'Esporta PDF per mensa o allergologo' : 'Export PDF for school or doctor'}
+              onPress={() => router.push('/medical-dossier')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="book"
+              iconBg="#6366F1"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Diario delle Reazioni' : 'Reaction Tracker'}
+              subtitle={isIt ? 'Traccia sintomi e farmaci assunti' : 'Log symptoms and emergency meds'}
+              onPress={() => router.push('/diario-reazioni')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="cube"
+              iconBg="#0EA5E9"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Dispensa & Scadenze Farmaci' : 'Safe Pantry & Meds'}
+              subtitle={isIt ? 'Cibi approvati e promemoria EpiPen' : 'Approved foods & EpiPen expiry'}
+              onPress={() => router.push('/dispensa')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="cart"
+              iconBg="#10B981"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Lista della Spesa Sicura' : 'Safe Grocery List'}
+              subtitle={isIt ? 'Con verifica preventiva allergeni' : 'With real-time allergen check'}
+              onPress={() => router.push('/lista-spesa')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="shield-checkmark"
+              iconBg="#EF4444"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Richiami Ministero Salute' : 'Food Recalls Feed'}
+              subtitle={isIt ? 'Avvisi lotti contaminati' : 'Contaminated lots alerts'}
+              onPress={() => router.push('/recalls')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="phone-portrait"
+              iconBg="#DC2626"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Sfondo Blocco Schermo ICE' : 'Lock Screen ICE Wallpaper'}
+              subtitle={isIt ? 'Visibile ai soccorritori a telefono bloccato' : 'Visible on lockscreen for medics'}
+              onPress={() => router.push('/lockscreen-ice')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="flower"
+              iconBg="#059669"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Allergie Crociate & Pollini' : 'Pollen-Food Cross Allergies'}
+              subtitle={isIt ? 'Sindrome Orale Allergica (OAS) & LTP' : 'OAS and crossed foods'}
+              onPress={() => router.push('/allergie-crociate')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="airplane"
+              iconBg="#8B5CF6"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Frasario Viaggi Offline' : 'Traveler Safe Hub'}
+              subtitle={isIt ? '10 lingue per ristoranti ed emergenze' : '10 languages for travel'}
+              onPress={() => router.push('/travel-hub')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="restaurant"
+              iconBg="#1E1B4B"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Area Ristoratori & Cucina B2B' : 'Restaurateur & Kitchen Hub'}
+              subtitle={isIt ? 'AI Auto-Tagger e Libro Allergeni ASL' : 'AI Tagger & ASL Allergen Book'}
+              onPress={() => router.push('/kitchen-safety-sheet')}
+            />
+          </Section>
+
+          <Section title={isIt ? 'Impostazioni & Supporto' : 'Settings & Support'}>
+            <SettingsRow
+              icon="language"
+              iconBg="#3B82F6"
+              iconColor={ICON_WHITE}
+              title={tLocal('app_language_label')}
+              subtitle={`${getFlagEmoji(language)} ${getLanguageLabel(language)}`}
+              onPress={() => router.push('/language')}
+              right={<AppText style={styles.trailingCode}>{langCode}</AppText>}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="notifications"
+              iconBg="#4A5568"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Notifiche' : 'Notifications'}
+              subtitle={isIt ? 'Avvisi, richieste e aggiornamenti' : 'Alerts, requests and updates'}
+              onPress={() => router.push('/notifiche')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="document-text"
+              iconBg="#EC4899"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Esporta riepilogo allergie' : 'Export allergy summary'}
+              subtitle={isIt ? 'Condividi con medico o contatto fidato' : 'Share with a doctor or trusted contact'}
+              onPress={exportAllergySummary}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="share-social"
+              iconBg="#64748B"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Condividi profilo allergie' : 'Share allergy profile'}
+              subtitle={isIt ? 'Invia il profilo a contatti o utenti' : 'Send profile to contacts or users'}
+              onPress={() => setShareTarget({ profileId: null, label: displayName })}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="information-circle"
+              iconBg={colors.brand}
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Info e supporto' : 'Info & support'}
+              subtitle={isIt ? 'Termini, privacy, sicurezza e assistenza' : 'Terms, privacy, safety & support'}
+              onPress={() => setInfoModalVisible(true)}
+            />
+          </Section>
+
+          <Section title={isIt ? 'Account' : 'Account'}>
+            <SettingsRow
+              icon="person"
+              iconBg="#4A5568"
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Dati account' : 'Account details'}
+              subtitle={isIt ? 'Nome, email e cambio password' : 'Name, email and change password'}
+              onPress={() => router.push('/account-settings')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="card"
+              iconBg={colors.brand}
+              iconColor={ICON_WHITE}
+              title={isIt ? 'Piano e abbonamento' : 'Plan & subscription'}
+              subtitle={
+                profile?.has_customer_plus
+                  ? (isIt ? 'Plus Famiglia attivo' : 'Family Plus active')
+                  : (isIt ? 'Piano gratuito · passa a Plus Famiglia' : 'Free plan · upgrade to Family Plus')
+              }
+              onPress={() => router.push('/subscription')}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="log-out-outline"
+              iconBg={ORANGE_SOFT}
+              iconColor={ORANGE}
+              title={isIt ? "Esci dall'account" : 'Log out'}
+              subtitle={isIt ? 'Disconnetti questo dispositivo' : 'Sign out on this device'}
+              titleColor={ORANGE}
+              onPress={confirmLogout}
+            />
+            <SettingsDivider />
+            <SettingsRow
+              icon="trash"
               iconBg={colors.redSoft}
               iconColor={colors.onRed}
-              title={isIt ? 'Apri schermata SOS' : 'Open SOS screen'}
-              onPress={() => router.push('/emergency')}
+              title={isIt ? 'Elimina account e dati' : 'Delete account and data'}
+              subtitle={isIt ? 'Rimuovi permanentemente il tuo profilo' : 'Permanently remove your profile'}
+              danger
+              onPress={confirmDeleteAccount}
             />
+          </Section>
+
+          <AppText style={styles.footerBrand}>
+            ★ AllerTgy · v{appVersion} ★
+          </AppText>
+        </View>
+      </GlassScreenScroll>
+
+      <Modal visible={infoModalVisible} animationType="slide" onRequestClose={() => setInfoModalVisible(false)}>
+        <Screen edges={false} ambient>
+          <View style={styles.modalHeader}>
+            <AppText style={styles.modalTitle}>
+              {isIt ? 'Info e supporto' : 'Info & support'}
+            </AppText>
+            <Pressable
+              onPress={() => setInfoModalVisible(false)}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={isIt ? 'Chiudi' : 'Close'}
+            >
+              <Ionicons name="close" size={24} color={colors.brandInk} />
+            </Pressable>
           </View>
-        </CollapseSection>
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <Section title={isIt ? 'Note legali e sicurezza' : 'Legal & safety'} card>
+              <SettingsRow
+                icon="document"
+                title={isIt ? 'Termini e condizioni' : 'Terms and conditions'}
+                onPress={() => { setInfoModalVisible(false); router.push('/legal-docs?tab=terms'); }}
+              />
+              <SettingsDivider />
+              <SettingsRow
+                icon="shield"
+                title={isIt ? 'Privacy e dati sulla salute' : 'Privacy and health data'}
+                onPress={() => { setInfoModalVisible(false); router.push('/legal-docs?tab=privacy'); }}
+              />
+              <SettingsDivider />
+              <SettingsRow
+                icon="warning"
+                title={isIt ? 'Sicurezza e responsabilità' : 'Safety and disclaimer'}
+                onPress={() => { setInfoModalVisible(false); router.push('/legal-docs?tab=safety'); }}
+              />
+            </Section>
 
-        {profileError && (
-          <ErrorStateCard
-            message={isIt ? 'Impossibile caricare il profilo. Controlla la connessione.' : 'Could not load profile. Check your connection.'}
-            retryLabel={isIt ? 'Riprova' : 'Retry'}
-            onRetry={loadProfileData}
-          />
-        )}
+            <Section title={isIt ? 'Assistenza clienti' : 'Customer support'} card>
+              <SettingsRow
+                icon="mail"
+                title={isIt ? "Contatta l'assistenza" : 'Contact support'}
+                subtitle="supporto@allertgy.it"
+                onPress={() => Linking.openURL('mailto:supporto@allertgy.it?subject=Assistenza%20AllerTgy')}
+              />
+              <SettingsDivider />
+              <SettingsRow
+                icon="information-circle"
+                title={isIt ? 'Informazioni app' : 'App info'}
+                subtitle={`AllerTgy · v${appVersion}`}
+              />
+            </Section>
 
-        {loading && <ActivityIndicator color={colors.brand} />}
-
-        {/* SALUTE E ALLERGIE */}
-        <Section title={isIt ? 'Salute e documenti' : 'Health & documents'} card padded={false}>
-          <SettingsRow
-            icon="document-text"
-            iconBg={colors.yellowSoft}
-            iconColor={colors.onYellow}
-            title={isIt ? 'Documenti medici' : 'Medical documents'}
-            subtitle={docsMenuSubtitle}
-            onPress={() => router.push('/documenti')}
-          />
-          <SettingsDivider />
-          <SettingsRow
-            icon="card"
-            title={isIt ? 'Pass allergeni' : 'Allergen pass'}
-            subtitle={isIt ? 'Tesserino per il personale di sala' : 'Card for restaurant staff'}
-            onPress={() => router.push('/allergy-card')}
-          />
-        </Section>
-
-        {/* ABBONAMENTO */}
-        <CollapseSection
-          icon="diamond"
-          iconBg={colors.brand50}
-          title={isIt ? 'Abbonamento' : 'Subscription'}
-          preview={planLabel}
-          expanded={planExpanded}
-          onToggle={() => setPlanExpanded((v) => !v)}
-        >
-          <View style={styles.planBlock}>
-            {referral?.invite_code ? (
-              <GlassCard style={[styles.referralCard, { borderLeftWidth: 3, borderLeftColor: colors.greenBorder }]}>
-                <AppText variant="bodyBold" color={colors.onGreen}>
-                  {isIt ? 'Invita un ristoratore' : 'Invite a restaurant'}
-                </AppText>
-                <AppText variant="caption" color={colors.onGreen}>
-                  {isIt
-                    ? 'Condividi il codice: sblocchi Plus Famiglia e regali 1 mese di Pro.'
-                    : 'Share your code: unlock Family Plus and gift 1 month of Pro.'}
-                </AppText>
-                <View style={styles.inviteBox}>
-                  <AppText variant="caption">{isIt ? 'Il tuo codice' : 'Your code'}</AppText>
-                  <AppText variant="h2" color={colors.onGreen} style={styles.inviteCode}>
-                    {referral.invite_code}
-                  </AppText>
-                </View>
-                <PuffyButton
-                  label={isIt ? 'Condividi codice invito' : 'Share invite code'}
-                  onPress={() => {
-                    const msg = isIt
-                      ? `Registra il tuo locale su AllerTgy con il mio codice invito ${referral.invite_code}: tu ricevi 1 mese di Pro omaggio e io sblocco Plus Famiglia.`
-                      : `Register your venue on AllerTgy with my invite code ${referral.invite_code}: you get 1 free month of Pro and I unlock Family Plus.`;
-                    Share.share({ message: msg });
-                  }}
-                />
-              </GlassCard>
-            ) : null}
-
-            <View style={styles.planHead}>
-              <View style={{ flex: 1 }}>
-                <AppText variant="title">
-                  {hasPlus
-                    ? (plusPlan?.name ?? (isIt ? 'Plus Famiglia' : 'Family Plus'))
-                    : (activePlan?.name ?? (isIt ? 'Cliente Gratis' : 'Free Customer'))}
-                </AppText>
-                <AppText variant="caption" style={styles.rowSub}>
-                  {hasPlus
-                    ? (isIt ? 'Attivo in omaggio grazie ai tuoi inviti.' : 'Active for free thanks to your referrals.')
-                    : (activePlan?.tagline ?? (isIt ? 'Semaforo, QR e profilo personale sempre gratuiti.' : 'Traffic light, QR and personal profile remain free.'))}
-                </AppText>
-              </View>
-              <AppText variant="bodyBold" color={colors.brand}>
-                {hasPlus && profile?.customer_subscription_status === 'comped'
-                  ? (isIt ? 'Omaggio' : 'Free gift')
-                  : activePlan?.price_cents
-                    ? `€${(activePlan.price_cents / 100).toFixed(2).replace('.', ',')}`
-                    : (isIt ? 'Gratis' : 'Free')}
+            <View style={styles.disclaimer}>
+              <AppText variant="caption" color={colors.onSurfaceMuted} style={styles.disclaimerText}>
+                {isIt
+                  ? 'AllerTgy confronta il tuo profilo con i dati dichiarati dal locale. Non sostituisce il parere medico: comunica sempre le tue allergie al personale.'
+                  : 'AllerTgy compares your profile with venue data. It does not replace medical advice: always tell staff about your allergies.'}
               </AppText>
             </View>
-            <View style={styles.planFeatures}>
-              {((hasPlus ? plusPlan?.features : activePlan?.features) ?? [
-                'Scansione QR ristorante e semaforo personalizzato',
-                '1 profilo allergie personale',
-                'Recensioni allergy-focused',
-              ]).map((feature) => (
-                <View key={feature} style={styles.planFeatureRow}>
-                  <Ionicons name="checkmark-circle" size={16} color={colors.green} />
-                  <AppText variant="caption" style={{ flex: 1 }}>{feature}</AppText>
-                </View>
-              ))}
-            </View>
-            {!hasPlus && plusPlan ? (
-              <View style={styles.planActions}>
-                <Pressable style={styles.upgradeBox} onPress={purchasePlus}>
-                  <AppText variant="bodyBold">
-                    {isIt
-                      ? `Attiva ${plusPlan.name} — €${(plusPlan.price_cents / 100).toFixed(2)}/mese`
-                      : `Get ${plusPlan.name} — €${(plusPlan.price_cents / 100).toFixed(2)}/mo`}
-                  </AppText>
-                  <AppText variant="caption">{plusPlan.tagline}</AppText>
-                </Pressable>
-              </View>
-            ) : null}
-            {hasPlus && profile?.customer_subscription_status === 'active' ? (
-              <PuffyButton
-                label={isIt ? 'Gestisci abbonamento Plus' : 'Manage Plus subscription'}
-                onPress={managePlus}
-                variant="secondary"
-                style={{ marginTop: spacing.sm }}
-              />
-            ) : null}
-          </View>
-        </CollapseSection>
-
-        {/* IMPOSTAZIONI */}
-        <Section title={isIt ? 'Impostazioni' : 'Settings'} card padded={false}>
-          <SettingsRow
-            icon="language"
-            title={tLocal('app_language_label')}
-            subtitle={`${getFlagEmoji(language)} ${getLanguageLabel(language)}`}
-            onPress={() => router.push('/language')}
-          />
-          <SettingsDivider />
-          <SettingsRow
-            icon="notifications"
-            title={isIt ? 'Notifiche' : 'Notifications'}
-            subtitle={isIt ? 'Avvisi locali e aggiornamenti menù' : 'Venue alerts and menu updates'}
-            onPress={() => router.push('/notifiche')}
-          />
-          {isAppleHealthAvailable() && (
-            <>
-              <SettingsDivider />
-              <View style={styles.healthRow}>
-                <View style={[styles.rowIcon, { backgroundColor: colors.redSoft }]}>
-                  <Ionicons name="heart" size={20} color={colors.onRed} />
-                </View>
-                <View style={styles.rowBody}>
-                  <AppText variant="bodyBold">{tLocal('apple_health_title')}</AppText>
-                  <AppText variant="caption">{tLocal('apple_health_sub')}</AppText>
-                </View>
-                <Switch
-                  value={!!profile?.apple_health_connected}
-                  onValueChange={async (on) => {
-                    const labels = mie.map((a) => a.name_it);
-                    const update = async (connected: number) => {
-                      await api.updateAppleHealth(
-                        connected,
-                        emergencyDraft.trim() || null,
-                        contactNameDraft.trim() || null,
-                        contactPhoneDraft.trim() || null,
-                      );
-                      await loadProfileData();
-                    };
-                    if (on) await connectAppleHealth(update, labels, emergencyDraft);
-                    else await disconnectAppleHealth(update);
-                  }}
-                  trackColor={{ false: colors.border, true: colors.brand200 }}
-                  thumbColor={profile?.apple_health_connected ? colors.brand : colors.surface}
-                />
-              </View>
-            </>
-          )}
-          <SettingsDivider />
-          <SettingsRow
-            icon="share-social"
-            title={isIt ? 'Condividi profilo allergie' : 'Share allergy profile'}
-            subtitle={isIt ? 'Invia il profilo a contatti o utenti AllerTgy' : 'Send profile to contacts or users'}
-            onPress={() => setShareTarget({ profileId: null, label: displayName })}
-          />
-        </Section>
-
-        {/* STILE */}
-        <Section title={isIt ? 'Stile' : 'Style'} card padded={false}>
-          <View style={styles.healthRow}>
-            <View style={[styles.rowIcon, { backgroundColor: colors.brand50 }]}>
-              <Ionicons name="water" size={20} color={colors.brand} />
-            </View>
-            <View style={styles.rowBody}>
-              <AppText variant="bodyBold">Liquid Glass</AppText>
-              <AppText variant="caption" color={colors.onSurfaceMuted}>{liquidGlassSubtitle}</AppText>
-            </View>
-            <Switch
-              value={liquidGlassEnabled}
-              onValueChange={(on) => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setLiquidGlassEnabled(on);
-              }}
-              trackColor={{ false: colors.border, true: colors.brand200 }}
-              thumbColor={liquidGlassEnabled ? colors.brand : colors.surface}
-            />
-          </View>
-        </Section>
-
-        <CollapseSection
-          icon="help-circle"
-          title={isIt ? 'Info e supporto' : 'Info & support'}
-          preview={isIt ? 'Legale, assistenza, informazioni app' : 'Legal, support, app info'}
-          expanded={supportExpanded}
-          onToggle={() => setSupportExpanded((v) => !v)}
-        >
-          <SettingsRow icon="document" title={isIt ? 'Termini e condizioni' : 'Terms and conditions'} onPress={() => router.push('/legal-docs?tab=terms')} />
-          <SettingsDivider />
-          <SettingsRow icon="shield" title={isIt ? 'Privacy e dati sulla salute' : 'Privacy and health data'} onPress={() => router.push('/legal-docs?tab=privacy')} />
-          <SettingsDivider />
-          <SettingsRow
-            icon="trash"
-            iconBg={colors.redSoft}
-            iconColor={colors.onRed}
-            title={isIt ? 'Elimina account e dati' : 'Delete account and data'}
-            onPress={confirmDeleteAccount}
-          />
-          <SettingsDivider />
-          <SettingsRow icon="warning" title={isIt ? 'Sicurezza e responsabilità' : 'Safety and disclaimer'} onPress={() => router.push('/legal-docs?tab=safety')} />
-          <SettingsDivider />
-          <SettingsRow
-            icon="mail"
-            title={isIt ? 'Contatta l\'assistenza' : 'Contact support'}
-            subtitle="supporto@allertgy.it"
-            onPress={() => Linking.openURL('mailto:supporto@allertgy.it?subject=Assistenza%20AllerTgy')}
-          />
-          <SettingsDivider />
-          <SettingsRow
-            icon="information-circle"
-            title={isIt ? 'Informazioni app' : 'App info'}
-            subtitle={`AllerTgy v0.5 · ${API}`}
-          />
-        </CollapseSection>
-
-        <GlassCard style={{ borderLeftWidth: 3, borderLeftColor: colors.greenBorder }}>
-          <AppText variant="caption" color={colors.onGreen} style={styles.disclaimer}>
-            {isIt
-              ? 'AllerTgy confronta il tuo profilo con i dati dichiarati dal locale. Non sostituisce il parere medico: comunica sempre le tue allergie al personale.'
-              : 'AllerTgy compares your profile with venue data. It does not replace medical advice: always tell staff about your allergies.'}
-          </AppText>
-        </GlassCard>
-
-        <PuffyButton
-          label={isIt ? 'Esci dall\'account' : 'Log out'}
-          onPress={confirmLogout}
-          variant="danger"
-        />
-      </GlassScreenScroll>
+          </ScrollView>
+        </Screen>
+      </Modal>
 
       {shareTarget ? (
         <ShareProfileModal
@@ -654,132 +632,216 @@ export default function Account() {
 }
 
 const styles = StyleSheet.create({
-  planBlock: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    paddingTop: spacing.xs,
-    gap: spacing.md,
+  scroll: {
+    alignItems: 'stretch',
   },
-  healthRow: {
-    flexDirection: 'row',
+  identityBand: {
+    width: '100%',
+    paddingBottom: 8,
+    backgroundColor: 'transparent',
+  },
+  identityInner: {
     alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: SCREEN_PADDING_H,
+    gap: 6,
   },
-  hero: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+  pressed: { opacity: 0.86 },
+  avatarWrap: {
+    position: 'relative',
+    marginBottom: 4,
   },
-  avatarWrap: { position: 'relative' },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.brand,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
-    ...puffyShadow(4),
   },
-  avatarImage: { width: 64, height: 64, borderRadius: 32 },
+  avatarImage: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.55)',
+  },
+  avatarLetter: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
   avatarBadge: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceSecondary,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    bottom: 2,
+    right: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
+  nameHit: {
+    alignSelf: 'center',
+    maxWidth: '100%',
+    paddingHorizontal: 8,
   },
-  heroName: {
-    letterSpacing: -0.35,
-  },
-  heroSwitch: {
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    marginTop: 4,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  rowExpanded: { alignItems: 'flex-start' },
-  rowPressed: { opacity: 0.85 },
-  rowIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...puffRaised({ elevation: 3, r: radius.sm }),
-  },
-  rowBody: { flex: 1, gap: 2 },
-  rowSub: { marginTop: 2 },
-  divider: {
-    height: 1,
-    backgroundColor: colors.surfaceTertiary,
-    marginLeft: spacing.lg + 40 + spacing.md,
-  },
-  formBlock: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-  },
-  compactInput: {
-    fontSize: 14,
-    paddingVertical: 12,
-    paddingHorizontal: spacing.md,
-  },
-  multilineInput: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-    fontSize: 14,
-    paddingVertical: 12,
-    paddingHorizontal: spacing.md,
-  },
-  contactRow: { flexDirection: 'row', gap: spacing.sm },
-  saveBtn: { alignSelf: 'flex-start' },
-  referralCard: { gap: spacing.sm, marginBottom: spacing.sm },
-  inviteBox: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    borderRadius: radius.sm,
-    padding: spacing.md,
     gap: 4,
+    maxWidth: '100%',
   },
-  inviteCode: { letterSpacing: 3 },
-  planHead: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    marginBottom: spacing.md,
+  identityName: {
+    color: colors.onSurface,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+    flexShrink: 1,
   },
-  planFeatures: { gap: spacing.sm },
-  planFeatureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  planActions: { gap: spacing.sm, marginTop: spacing.md },
-  upgradeBox: {
-    backgroundColor: colors.surfaceTertiary,
-    borderRadius: radius.sm,
-    borderWidth: 1.5,
+  headerInvite: {
+    marginTop: 12,
+    width: '100%',
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.md,
-    gap: 2,
+    borderRadius: radius.md,
+    padding: 12,
   },
-  disclaimer: { lineHeight: 18 },
+  body: {
+    paddingHorizontal: SCREEN_PADDING_H,
+    paddingTop: 12,
+    paddingBottom: 130,
+    gap: 18,
+  },
+  inviteActionRow: {
+    position: 'relative',
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inviteCodeBadge: {
+    width: '100%',
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    paddingVertical: 11,
+    paddingHorizontal: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  inviteCodeText: {
+    color: colors.onSurface,
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+  },
+  inviteIconBtn: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 36,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trailingCode: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  warnBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#F6B100',
+    borderWidth: 1,
+    borderColor: '#F7CF63',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  warnBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  sectionCountBadge: {
+    minWidth: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(66, 61, 102, 0.20)',
+    paddingHorizontal: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  sectionCountBadgeText: {
+    color: colors.brandInk,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.15,
+  },
+  footerBrand: {
+    textAlign: 'center',
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+    letterSpacing: 0.2,
+  },
+  disclaimer: {
+    paddingHorizontal: 4,
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  disclaimerText: {
+    lineHeight: 17,
+    textAlign: 'center',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    color: colors.brandInk,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  modalContent: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
+  },
+  trustBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  trustBadgeText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
 });

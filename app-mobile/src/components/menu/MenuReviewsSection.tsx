@@ -6,13 +6,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { type Review } from '../../api/client';
 import DetailSection from '../DetailSection';
 import { GlassCard } from '../ui/GlassCard';
 import { t } from '../../engine/translations';
 import { getLocaleForLang } from '../../constants/languages';
 import type { Menu } from '../../types';
-import { colors } from '../../theme';
+import { colors, radius } from '../../theme';
 
 type ReviewState = {
   reviews: Review[];
@@ -57,6 +58,23 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
   } = state;
 
   const isIt = language === 'it';
+  const sourceTabs: Array<{
+    id: 'allertgy' | 'google' | 'tripadvisor';
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    visible: boolean;
+    color: string;
+  }> = [
+    { id: 'allertgy', label: `AllerTgy (${reviews.length})`, icon: 'leaf-outline', visible: true, color: colors.brand },
+    { id: 'google', label: 'Google', icon: 'logo-google', visible: !!menu.google_rating, color: '#2563eb' },
+    { id: 'tripadvisor', label: 'TripAdvisor', icon: 'earth-outline', visible: !!menu.tripadvisor_rating, color: '#059669' },
+  ];
+
+  const criteria = [
+    { label: 'Attenzione dello staff', icon: 'people-outline' as const, value: myRatingStaff, setValue: setMyRatingStaff },
+    { label: 'Chiarezza del menù', icon: 'reader-outline' as const, value: myRatingMenu, setValue: setMyRatingMenu },
+    { label: 'Sicurezza del pasto', icon: 'shield-checkmark-outline' as const, value: myRatingSafety, setValue: setMyRatingSafety },
+  ];
 
   return (
     <>
@@ -68,13 +86,19 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
             : 'AllerTgy, Google, and TripAdvisor ratings for this venue.'
         }
         card={false}
+        style={styles.sectionIntro}
       />
       <View style={styles.box}>
         <View style={styles.header}>
-          <Text style={styles.title}>⭐ {t('reviews', language)}</Text>
+          <View style={styles.headingGroup}>
+            <View style={styles.headingIcon}>
+              <Ionicons name="star" size={15} color="#A66B00" />
+            </View>
+            <Text style={styles.title}>{t('reviews', language)}</Text>
+          </View>
           {reviews.length > 0 && (
             <View style={styles.avg}>
-              <Text style={styles.avgStar}>★</Text>
+              <Ionicons name="star" size={13} color="#A66B00" />
               <Text style={styles.avgText}>
                 {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
               </Text>
@@ -83,53 +107,39 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
         </View>
 
         {(menu.google_rating || menu.tripadvisor_rating) ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          <View style={styles.sourceScores}>
             {menu.google_rating ? (
-              <View style={styles.externalBadge}>
-                <Text style={styles.externalBadgeLabel}>🌐 Google</Text>
-                <Text style={styles.externalBadgeRating}>{menu.google_rating}★</Text>
-                <Text style={styles.externalBadgeCount}>({menu.google_reviews_count})</Text>
+              <View style={[styles.sourceScore, styles.googleScore]}>
+                <Ionicons name="logo-google" size={15} color="#2563eb" />
+                <Text style={styles.sourceName}>Google</Text>
+                <Text style={[styles.sourceRating, { color: '#2563eb' }]}>{menu.google_rating}</Text>
+                <Ionicons name="star" size={12} color="#2563eb" />
+                <Text style={styles.sourceCount}>{menu.google_reviews_count}</Text>
               </View>
             ) : null}
             {menu.tripadvisor_rating ? (
-              <View style={[styles.externalBadge, { borderColor: '#10b981' }]}>
-                <Text style={[styles.externalBadgeLabel, { color: '#059669' }]}>🦉 TripAdvisor</Text>
-                <Text style={[styles.externalBadgeRating, { color: '#059669' }]}>{menu.tripadvisor_rating}★</Text>
-                <Text style={styles.externalBadgeCount}>({menu.tripadvisor_reviews_count})</Text>
+              <View style={[styles.sourceScore, styles.tripadvisorScore]}>
+                <Ionicons name="earth-outline" size={15} color="#059669" />
+                <Text style={styles.sourceName}>TripAdvisor</Text>
+                <Text style={[styles.sourceRating, { color: '#059669' }]}>{menu.tripadvisor_rating}</Text>
+                <Ionicons name="star" size={12} color="#059669" />
+                <Text style={styles.sourceCount}>{menu.tripadvisor_reviews_count}</Text>
               </View>
             ) : null}
           </View>
         ) : null}
 
         <View style={styles.tabsRow}>
-          <TouchableOpacity
-            style={[styles.tabBtn, reviewTab === 'allertgy' && styles.tabBtnActive]}
-            onPress={() => setReviewTab('allertgy')}
-          >
-            <Text style={[styles.tabText, reviewTab === 'allertgy' && styles.tabTextActive]}>
-              🥗 AllerTgy ({reviews.length})
-            </Text>
-          </TouchableOpacity>
-          {menu.google_rating ? (
+          {sourceTabs.filter((tab) => tab.visible).map((tab) => (
             <TouchableOpacity
-              style={[styles.tabBtn, reviewTab === 'google' && { ...styles.tabBtnActive, borderBottomColor: '#3b82f6' }]}
-              onPress={() => setReviewTab('google')}
+              key={tab.id}
+              style={[styles.tabBtn, reviewTab === tab.id && { ...styles.tabBtnActive, borderBottomColor: tab.color }]}
+              onPress={() => setReviewTab(tab.id)}
             >
-              <Text style={[styles.tabText, reviewTab === 'google' && { ...styles.tabTextActive, color: '#2563eb' }]}>
-                🌐 Google
-              </Text>
+              <Ionicons name={tab.icon} size={15} color={reviewTab === tab.id ? tab.color : colors.textMuted} />
+              <Text style={[styles.tabText, reviewTab === tab.id && { color: tab.color }]}>{tab.label}</Text>
             </TouchableOpacity>
-          ) : null}
-          {menu.tripadvisor_rating ? (
-            <TouchableOpacity
-              style={[styles.tabBtn, reviewTab === 'tripadvisor' && { ...styles.tabBtnActive, borderBottomColor: '#10b981' }]}
-              onPress={() => setReviewTab('tripadvisor')}
-            >
-              <Text style={[styles.tabText, reviewTab === 'tripadvisor' && { ...styles.tabTextActive, color: '#059669' }]}>
-                🦉 TripAdvisor
-              </Text>
-            </TouchableOpacity>
-          ) : null}
+          ))}
         </View>
 
         {reviewTab === 'allertgy' && (
@@ -180,7 +190,9 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
             ))}
             {reviews.length === 0 && (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyEmoji}>💬</Text>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.brand} />
+                </View>
                 <Text style={styles.empty}>{t('no_reviews', language)}</Text>
                 <Text style={styles.emptySub}>{t('be_first_review', language)}</Text>
               </View>
@@ -189,42 +201,41 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
             {canSubmit && (
               <GlassCard style={styles.form}>
                 <View style={styles.formHeader}>
-                  <Text style={styles.formEmoji}>✍️</Text>
-                  <Text style={styles.formLabel}>La tua esperienza allergie</Text>
+                  <View style={styles.formIcon}>
+                    <Ionicons name="heart-outline" size={18} color={colors.brand} />
+                  </View>
+                  <View style={styles.formCopy}>
+                    <Text style={styles.formLabel}>La tua esperienza allergie</Text>
+                    <Text style={styles.formSub}>Aiuta chi ha allergie a scegliere con più serenità.</Text>
+                  </View>
                 </View>
-                <Text style={styles.formSub}>Valuta i 3 aspetti chiave per la sicurezza alimentare</Text>
 
                 <View style={styles.allergyQBox}>
-                  <View style={styles.allergyQRow}>
-                    <Text style={styles.allergyQLabel}>👤 Attenzione Staff</Text>
-                    <View style={styles.starsRow}>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <TouchableOpacity key={n} onPress={() => setMyRatingStaff(n)}>
-                          <Text style={[styles.starBtn, n > myRatingStaff && styles.starOff]}>⭐</Text>
-                        </TouchableOpacity>
-                      ))}
+                  {criteria.map((criterion, index) => (
+                    <View key={criterion.label} style={[styles.allergyQRow, index > 0 && styles.criterionDivider]}>
+                      <View style={styles.criterionLabel}>
+                        <Ionicons name={criterion.icon} size={16} color={colors.brand} />
+                        <Text style={styles.allergyQLabel}>{criterion.label}</Text>
+                      </View>
+                      <View style={styles.starsRow}>
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <TouchableOpacity
+                            key={n}
+                            onPress={() => criterion.setValue(n)}
+                            style={styles.starTap}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${criterion.label}: ${n} stelle`}
+                          >
+                            <Ionicons
+                              name={n <= criterion.value ? 'star' : 'star-outline'}
+                              size={25}
+                              color={n <= criterion.value ? '#E7A600' : '#D8D2DF'}
+                            />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
                     </View>
-                  </View>
-                  <View style={styles.allergyQRow}>
-                    <Text style={styles.allergyQLabel}>📋 Chiarezza Menù</Text>
-                    <View style={styles.starsRow}>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <TouchableOpacity key={n} onPress={() => setMyRatingMenu(n)}>
-                          <Text style={[styles.starBtn, n > myRatingMenu && styles.starOff]}>⭐</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                  <View style={styles.allergyQRow}>
-                    <Text style={styles.allergyQLabel}>🛡️ Sicurezza Pasto</Text>
-                    <View style={styles.starsRow}>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <TouchableOpacity key={n} onPress={() => setMyRatingSafety(n)}>
-                          <Text style={[styles.starBtn, n > myRatingSafety && styles.starOff]}>⭐</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
+                  ))}
                 </View>
 
                 <TextInput
@@ -255,7 +266,9 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
           <>
             {externalReviews.filter((r) => r.source === reviewTab).length === 0 ? (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyEmoji}>🌐</Text>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="globe-outline" size={22} color={colors.brand} />
+                </View>
                 <Text style={styles.empty}>Nessuna recensione esterna disponibile</Text>
               </View>
             ) : (
@@ -304,11 +317,13 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
 }
 
 const styles = StyleSheet.create({
-  box: { marginTop: 24, gap: 10 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { fontSize: 18, fontWeight: '900', color: colors.onSurface, letterSpacing: -0.3 },
-  avg: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 'auto' },
-  avgStar: { fontSize: 14, color: '#f59e0b' },
+  sectionIntro: { marginTop: 8 },
+  box: { marginTop: 14, gap: 14 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headingGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headingIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#FFF3CF', alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 19, fontWeight: '900', color: colors.onSurface, letterSpacing: -0.5 },
+  avg: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF9E8', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 99 },
   avgText: { fontSize: 14, fontWeight: '800', color: colors.inkSoft },
   card: {
     borderWidth: 1,
@@ -347,15 +362,15 @@ const styles = StyleSheet.create({
   replyLabel: { fontSize: 10, fontWeight: '800', color: colors.brandDark, textTransform: 'uppercase' },
   emptyBox: {
     alignItems: 'center',
-    padding: 24,
-    gap: 6,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    gap: 7,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    borderStyle: 'dashed',
   },
-  emptyEmoji: { fontSize: 28 },
+  emptyIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.brand50, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   empty: { color: colors.onSurfaceMuted, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   emptySub: { color: colors.textMuted, fontSize: 12, fontWeight: '500', textAlign: 'center' },
   form: {
@@ -364,12 +379,13 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 6,
   },
-  formHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  formEmoji: { fontSize: 18 },
-  formLabel: { fontWeight: '800', fontSize: 15, color: colors.onSurface },
-  formSub: { fontSize: 12, color: colors.textMuted, fontWeight: '500', marginTop: -4 },
-  starsRow: { flexDirection: 'row', gap: 6 },
-  starBtn: { fontSize: 28 },
+  formHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  formIcon: { width: 35, height: 35, borderRadius: 18, backgroundColor: colors.brand50, alignItems: 'center', justifyContent: 'center' },
+  formCopy: { flex: 1, gap: 2 },
+  formLabel: { fontWeight: '800', fontSize: 16, color: colors.onSurface },
+  formSub: { fontSize: 12, lineHeight: 17, color: colors.textMuted, fontWeight: '500' },
+  starsRow: { flexDirection: 'row', marginLeft: 24 },
+  starTap: { paddingHorizontal: 2, paddingVertical: 2 },
   input: {
     minHeight: 80,
     backgroundColor: colors.surface,
@@ -395,29 +411,33 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   submitText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  externalBadge: {
+  sourceScores: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  sourceScore: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     borderWidth: 1,
-    borderColor: '#3b82f6',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: '#eff6ff',
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
   },
-  externalBadgeLabel: { fontSize: 11, fontWeight: '800', color: '#1d4ed8' },
-  externalBadgeRating: { fontSize: 13, fontWeight: '900', color: '#1d4ed8' },
-  externalBadgeCount: { fontSize: 10, color: colors.textSecondary, fontWeight: '600' },
+  googleScore: { backgroundColor: '#F4F8FF', borderColor: '#BBD1FF' },
+  tripadvisorScore: { backgroundColor: '#EFFBF7', borderColor: '#9FE2CD' },
+  sourceName: { fontSize: 12, fontWeight: '700', color: colors.inkSoft },
+  sourceRating: { fontSize: 14, fontWeight: '900', marginLeft: 3 },
+  sourceCount: { fontSize: 11, color: colors.textMuted, fontWeight: '600', marginLeft: 2 },
   tabsRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    marginBottom: 8,
+    marginTop: 2,
   },
   tabBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
     marginBottom: -1,
@@ -430,11 +450,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 14,
-    padding: 12,
-    gap: 12,
+    paddingHorizontal: 12,
   },
-  allergyQRow: { gap: 4 },
-  allergyQLabel: { fontSize: 12, fontWeight: '800', color: colors.inkSoft },
+  allergyQRow: { paddingVertical: 12, gap: 7 },
+  criterionDivider: { borderTopWidth: 1, borderTopColor: colors.border },
+  criterionLabel: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  allergyQLabel: { fontSize: 13, fontWeight: '800', color: colors.inkSoft },
   breakdown: {
     flexDirection: 'row',
     flexWrap: 'wrap',

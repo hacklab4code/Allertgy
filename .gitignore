@@ -28,5 +28,31 @@ backend/static/uploads/
 !app-mobile/assets/**
 !dashboard-web/public/**
 
+# Database & Logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Cursor / IDE
+.cursor/
+
+# Build & upload distribution archives
+DA_CARICARE_SUL_SERVER/
+DIST_PER_DOMINIO/
+*.zip
+
+# iOS / Android native build outputs & npm cache
+.npm_cache/
+ios/Pods/
+ios/build/
+ios/.xcode.env.local
+android/.gradle/
+android/app/build/
+android/build/
+
+# Sub-repositories
+vetrina-frontend/
+
 # macOS
 .DS_Store

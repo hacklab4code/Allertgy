@@ -14,7 +14,12 @@ import { api } from '../src/api/client';
 import { useSession } from '../src/store/session';
 import { getSectionTitle, groupAllergensBySection, getLang, TRANSLATED_ALLERGENS } from '../src/engine/translations';
 import { toggleAllergieSelectionWithIntensities, expandAllergieCodes } from '../src/engine/allergyLinks';
-import type { Allergen } from '../src/types';
+import {
+  criterioShortLabel,
+  intensityShortLabel,
+  promptAllergyConfig,
+} from '../src/engine/allergyConfig';
+import type { Allergen, AllergyCriterio, AllergyIntensity } from '../src/types';
 import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
 import { useTranslation } from '../src/constants/translations';
 import {
@@ -22,11 +27,14 @@ import {
   DebossedInput,
   GlassCard,
   GlassScreenScroll,
-  PuffyButton,
+  SurfaceButton,
   Screen,
   Section,
+  AllergyChip,
+  AllergyConfigModal,
 } from '../src/components/ui';
 import { colors, spacing, CHIP_MIN_HEIGHT, radius } from '../src/theme';
+import { useAdaptiveMeshInk } from '../src/hooks/useMeshInk';
 
 export default function RegisterAllergiesScreen() {
   const { token, language, setAllergie, setProfileCompleted, setRegisterAllergieStep } = useSession();
@@ -35,14 +43,18 @@ export default function RegisterAllergiesScreen() {
   const isIt = (language || 'it').toLowerCase() === 'it';
   const lang = getLang(language);
 
+  const { ref: introRef, ink: introInk, onLayout: onIntroLayout } = useAdaptiveMeshInk(true);
+
   const [all, setAll] = useState<Allergen[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [intensities, setIntensities] = useState<Record<string, 'lieve' | 'moderata' | 'grave'>>({});
+  const [intensities, setIntensities] = useState<Record<string, AllergyIntensity>>({});
+  const [criteria, setCriteria] = useState<Record<string, AllergyCriterio>>({});
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [aiNote, setAiNote] = useState('');
   const [error, setError] = useState('');
+  const [configModalTarget, setConfigModalTarget] = useState<Allergen | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -82,26 +94,44 @@ export default function RegisterAllergiesScreen() {
     );
     setSelected(next);
     setIntensities(nextIntensities);
+    setCriteria((prev) => {
+      const copy = { ...prev };
+      if (selected.has(code)) {
+        for (const c of selected) {
+          if (!next.has(c)) delete copy[c];
+        }
+      } else {
+        for (const c of next) {
+          if (!selected.has(c) && !copy[c]) copy[c] = 'assoluto';
+        }
+      }
+      return copy;
+    });
   };
 
-  const updateIntensity = (code: string, level: 'lieve' | 'moderata' | 'grave') => {
+  const updateIntensity = (code: string, level: AllergyIntensity) => {
     const next = new Set(selected);
     next.add(code);
     setSelected(next);
     setIntensities((prev) => ({ ...prev, [code]: level }));
+    setCriteria((prev) => ({ ...prev, [code]: prev[code] || 'assoluto' }));
+  };
+
+  const updateCriterio = (code: string, criterio: AllergyCriterio) => {
+    const next = new Set(selected);
+    next.add(code);
+    setSelected(next);
+    setCriteria((prev) => ({ ...prev, [code]: criterio }));
+    setIntensities((prev) => ({ ...prev, [code]: prev[code] || 'moderata' }));
   };
 
   const onLongPress = (code: string, name: string) => {
-    Alert.alert(
-      isIt ? `Intensità: ${name}` : `Severity: ${name}`,
-      isIt ? 'Imposta quanto è grave questa allergia:' : 'Set how severe this allergy is:',
-      [
-        { text: isIt ? 'Lieve' : 'Mild', onPress: () => updateIntensity(code, 'lieve') },
-        { text: isIt ? 'Moderata' : 'Moderate', onPress: () => updateIntensity(code, 'moderata') },
-        { text: isIt ? 'Grave/Anafilassi' : 'Severe/Anaphylaxis', onPress: () => updateIntensity(code, 'grave'), style: 'destructive' },
-        { text: isIt ? 'Annulla' : 'Cancel', style: 'cancel' },
-      ],
-    );
+    promptAllergyConfig({
+      name,
+      isIt,
+      onIntensity: (level) => updateIntensity(code, level),
+      onCriterio: (criterio) => updateCriterio(code, criterio),
+    });
   };
 
   const applyExtractedCodes = (codes: string[], note?: string) => {
@@ -116,6 +146,13 @@ export default function RegisterAllergiesScreen() {
       const next = { ...prev };
       for (const c of expanded) {
         if (!next[c]) next[c] = 'moderata';
+      }
+      return next;
+    });
+    setCriteria((prev) => {
+      const next = { ...prev };
+      for (const c of expanded) {
+        if (!next[c]) next[c] = 'assoluto';
       }
       return next;
     });
@@ -171,8 +208,8 @@ export default function RegisterAllergiesScreen() {
     setError('');
     try {
       const codes = [...selected];
-      await api.saveAllergens(codes, intensities);
-      setAllergie(codes, intensities);
+      await api.saveAllergens(codes, intensities, criteria);
+      setAllergie(codes, intensities, criteria);
       setProfileCompleted(true);
       setRegisterAllergieStep(false);
       router.replace('/');
@@ -180,31 +217,6 @@ export default function RegisterAllergiesScreen() {
       setError((e as Error).message);
     }
     setBusy(false);
-  };
-
-  const Chip = ({ a }: { a: Allergen }) => {
-    const on = selected.has(a.code);
-    const isDiet = a.is_diet;
-    const label = isIt ? a.name_it : (TRANSLATED_ALLERGENS[a.code.toLowerCase()]?.en || a.name_it);
-    const intensitySuffix = on && intensities[a.code] === 'lieve' ? (isIt ? ' (Lieve)' : ' (Mild)')
-      : on && intensities[a.code] === 'grave' ? (isIt ? ' (Grave)' : ' (Severe)')
-      : on ? ' (Mod.)' : '';
-
-    return (
-      <Pressable
-        onPress={() => toggle(a.code)}
-        onLongPress={() => onLongPress(a.code, label)}
-        delayLongPress={300}
-        style={[styles.chip, on && (isDiet ? styles.chipOnDiet : styles.chipOnAllergy)]}
-      >
-        <AppText
-          variant="caption"
-          style={on ? (isDiet ? styles.chipTextOnDiet : styles.chipTextOnAllergy) : styles.chipText}
-        >
-          {a.emoji} {label}{intensitySuffix}
-        </AppText>
-      </Pressable>
-    );
   };
 
   const finishLabel = selected.size === 0
@@ -222,17 +234,20 @@ export default function RegisterAllergiesScreen() {
       />
 
       <GlassScreenScroll
+        headerFloat={false}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <AppText variant="h2" style={styles.step}>
-          {isIt ? 'Passo 2 di 2' : 'Step 2 of 2'}
-        </AppText>
-        <AppText variant="subtitle" style={styles.intro}>
-          {isIt
-            ? 'Carica un referto per compilare in automatico, oppure cerca e seleziona le tue allergie.'
-            : 'Upload a medical report for automatic filling, or search and select your allergies.'}
-        </AppText>
+        <View ref={introRef} onLayout={onIntroLayout} style={styles.introBlock}>
+          <AppText variant="h2" color={introInk.ink} style={styles.step}>
+            {isIt ? 'Passo 2 di 2' : 'Step 2 of 2'}
+          </AppText>
+          <AppText variant="subtitle" color={introInk.inkMuted} style={styles.intro}>
+            {isIt
+              ? 'Carica un referto per compilare in automatico, oppure cerca e seleziona le tue allergie.'
+              : 'Upload a medical report for automatic filling, or search and select your allergies.'}
+          </AppText>
+        </View>
 
         <GlassCard style={styles.uploadCard}>
           <View style={styles.uploadIcon}>
@@ -246,7 +261,7 @@ export default function RegisterAllergiesScreen() {
               ? 'PDF o foto: l\'AI legge il documento e seleziona le allergie per te in automatico.'
               : 'PDF or photo: AI reads the document and selects allergies for you automatically.'}
           </AppText>
-          <PuffyButton
+          <SurfaceButton
             label={uploading
               ? (isIt ? 'Analisi in corso…' : 'Analyzing…')
               : (isIt ? 'Carica e analizza' : 'Upload & analyze')}
@@ -273,100 +288,167 @@ export default function RegisterAllergiesScreen() {
             <Section
               title={isIt ? 'Cerca e seleziona' : 'Search & select'}
               subtitle={isIt
-                ? 'Tocca per selezionare. Gli allergeni correlati si aggiungono in automatico. Tieni premuto per la gravità.'
-                : 'Tap to select. Related allergens are added automatically. Long press for severity.'}
+                ? 'Tocca una pillola per selezionarla. Tieni premuta per personalizzare l\'intensità.'
+                : 'Tap a chip to select. Press & hold to customize severity.'}
             >
               <DebossedInput
                 value={search}
                 onChangeText={setSearch}
                 placeholder={t('search_allergen_placeholder')}
-                autoCorrect={false}
                 autoCapitalize="none"
+                autoCorrect={false}
                 returnKeyType="search"
               />
-              {search.trim() !== '' ? (
-                <AppText variant="caption" color={colors.onSurfaceMuted}>
+              {search.trim() !== '' && (
+                <AppText variant="caption" color={colors.onSurfaceMuted} style={{ marginTop: 4 }}>
                   {totalFiltered > 0
-                    ? (isIt ? `${totalFiltered} risultati` : `${totalFiltered} results`)
+                    ? (isIt ? `${totalFiltered} trovati` : `${totalFiltered} found`)
                     : (isIt ? 'Nessun risultato' : 'No results')}
                 </AppText>
-              ) : null}
+              )}
             </Section>
 
             {sections.map((section) => (
-              <Section
-                key={section.key}
-                title={getSectionTitle(section.key, lang)}
-                subtitle={section.key === 'preferenze'
-                  ? (isIt ? 'Preferenze alimentari' : 'Dietary preferences')
-                  : (isIt ? 'Allergeni obbligatori UE' : 'Mandatory EU allergens')}
-              >
+              <Section key={section.key} title={getSectionTitle(section.key, lang)} card={false}>
                 <View style={styles.grid}>
-                  {section.items.map((a) => <Chip key={a.code} a={a} />)}
+                  {section.items.map((a) => (
+                    <AllergyChip
+                      key={a.code}
+                      a={a}
+                      selected={selected.has(a.code)}
+                      intensity={intensities[a.code] || 'moderata'}
+                      criterio={criteria[a.code] || 'assoluto'}
+                      onToggle={() => toggle(a.code)}
+                      onConfigure={() => setConfigModalTarget(a)}
+                      isIt={isIt}
+                    />
+                  ))}
                 </View>
               </Section>
             ))}
           </>
         ) : null}
+
+        <View style={{ height: 100 + insets.bottom }} />
       </GlassScreenScroll>
 
-      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-        <PuffyButton
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+        <SurfaceButton
           label={busy ? (isIt ? 'Salvataggio…' : 'Saving…') : finishLabel}
           onPress={finish}
           disabled={busy || uploading || (all.length === 0 && !error)}
-          icon="arrow-forward"
+          fullWidth
         />
       </View>
+
+      {configModalTarget && (
+        <AllergyConfigModal
+          visible={Boolean(configModalTarget)}
+          onClose={() => setConfigModalTarget(null)}
+          allergenName={isIt ? configModalTarget.name_it : (TRANSLATED_ALLERGENS[configModalTarget.code.toLowerCase()]?.en || configModalTarget.name_it)}
+          allergenEmoji={configModalTarget.emoji ?? undefined}
+          isDiet={Boolean(configModalTarget.is_diet)}
+          intensity={intensities[configModalTarget.code] || 'moderata'}
+          criterio={criteria[configModalTarget.code] || 'assoluto'}
+          onSave={(intensity, criterio) => {
+            if (!selected.has(configModalTarget.code)) {
+              const next = new Set(selected);
+              next.add(configModalTarget.code);
+              setSelected(next);
+            }
+            setIntensities((prev) => ({ ...prev, [configModalTarget.code]: intensity }));
+            setCriteria((prev) => ({ ...prev, [configModalTarget.code]: criterio }));
+          }}
+          isIt={isIt}
+        />
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xl },
-  step: { color: colors.brand, textAlign: 'center' },
-  intro: { color: colors.onSurfaceMuted, textAlign: 'center', lineHeight: 22 },
-  uploadCard: { gap: spacing.sm, alignItems: 'center', paddingVertical: spacing.lg },
+  introBlock: { gap: 6, marginBottom: spacing.md },
+  step: { marginBottom: 2 },
+  intro: { marginBottom: spacing.sm },
+  uploadCard: { gap: spacing.sm, marginBottom: spacing.md },
   uploadIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.md,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.brand50,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  uploadSub: { textAlign: 'center', lineHeight: 18, marginBottom: spacing.xs },
+  uploadSub: { marginBottom: 4 },
   aiBanner: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
+    alignItems: 'center',
+    gap: 10,
     backgroundColor: colors.brand50,
-    borderWidth: 1,
-    borderColor: colors.brandTertiary,
     borderRadius: radius.md,
-    padding: spacing.md,
+    padding: 12,
+    marginBottom: spacing.md,
   },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   chip: {
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    borderRadius: 999,
-    paddingVertical: 8,
+    borderRadius: radius.pill,
+    paddingVertical: 9,
     paddingHorizontal: 14,
     minHeight: CHIP_MIN_HEIGHT,
     justifyContent: 'center',
   },
-  chipOnAllergy: { borderColor: '#fca5a5', backgroundColor: '#fff5f5' },
-  chipTextOnAllergy: { color: '#e11d48', fontWeight: '800' },
-  chipOnDiet: { borderColor: '#86efac', backgroundColor: '#f0fdf4' },
-  chipTextOnDiet: { color: '#16a34a', fontWeight: '800' },
-  chipText: { color: colors.onSurfaceMuted, fontWeight: '600' },
-  bottomBar: {
+  chipOnLieve: {
+    borderColor: colors.yellow,
+    backgroundColor: colors.yellowSoft,
+  },
+  chipTextOnLieve: {
+    color: colors.onYellow,
+    fontWeight: '700',
+  },
+  chipOnModerata: {
+    borderColor: colors.amber,
+    backgroundColor: colors.amberBg,
+  },
+  chipTextOnModerata: {
+    color: colors.onYellow,
+    fontWeight: '700',
+  },
+  chipOnGrave: {
+    borderColor: colors.redBorder,
+    backgroundColor: colors.redSoft,
+  },
+  chipTextOnGrave: {
+    color: colors.onRed,
+    fontWeight: '700',
+  },
+  chipOnDiet: {
+    borderColor: colors.greenBorder,
+    backgroundColor: colors.greenSoft,
+  },
+  chipTextOnDiet: {
+    color: colors.onGreen,
+    fontWeight: '700',
+  },
+  chipText: {
+    color: colors.brandInk,
+    fontWeight: '500',
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    borderTopWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
-    backgroundColor: colors.surface,
   },
 });

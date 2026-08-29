@@ -35,6 +35,11 @@ export default function ConsumerWebApp({ onBack, onLogout }: Props) {
   const [emergencyDraft, setEmergencyDraft] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  const [displayNameDraft, setDisplayNameDraft] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [accountMsg, setAccountMsg] = useState('');
 
   const [restaurants, setRestaurants] = useState<MenuOut[]>([]);
   const [menu, setMenu] = useState<MenuOut | null>(null);
@@ -73,6 +78,7 @@ export default function ConsumerWebApp({ onBack, onLogout }: Props) {
       setAllergens(all);
       setSelected(new Set(mine.map((a) => a.code)));
       setProfile(prof);
+      setDisplayNameDraft(prof.display_name ?? '');
       setReferral(ref);
       setDocuments(docs);
       setRestaurants(rs);
@@ -244,6 +250,58 @@ export default function ConsumerWebApp({ onBack, onLogout }: Props) {
       await api.updateAppleHealth(0, emergencyDraft.trim() || null, contactName.trim() || null, contactPhone.trim() || null);
       await loadData();
     } catch (e) { setError((e as Error).message); }
+    setBusy(false);
+  };
+
+  const saveDisplayName = async () => {
+    const name = displayNameDraft.trim();
+    if (!name) {
+      setAccountMsg('Inserisci un nome.');
+      return;
+    }
+    setBusy(true);
+    setAccountMsg('');
+    setError('');
+    try {
+      const p = await api.updateProfile(name);
+      setProfile(p);
+      setDisplayNameDraft(p.display_name ?? name);
+      setAccountMsg('Nome aggiornato.');
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg === 'SESSION_EXPIRED') onLogout();
+      else setError(msg);
+    }
+    setBusy(false);
+  };
+
+  const savePassword = async () => {
+    if (!currentPassword) {
+      setAccountMsg('Inserisci la password attuale.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setAccountMsg('La nuova password deve avere almeno 8 caratteri.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setAccountMsg('Le due password non coincidono.');
+      return;
+    }
+    setBusy(true);
+    setAccountMsg('');
+    setError('');
+    try {
+      await api.changePassword(currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setAccountMsg('Password aggiornata.');
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg === 'SESSION_EXPIRED') onLogout();
+      else setError(msg);
+    }
     setBusy(false);
   };
 
@@ -461,6 +519,25 @@ export default function ConsumerWebApp({ onBack, onLogout }: Props) {
                   <p className="text-xs text-neutral-600">{profile?.email}</p>
                 </WireZone>
 
+                <WireZone label="DATI ACCOUNT">
+                  <div className="p-2 space-y-2">
+                    <label className="text-[10px] font-bold block">Nome visualizzato</label>
+                    <WireInput value={displayNameDraft} onChange={setDisplayNameDraft} placeholder="Il tuo nome" />
+                    <WireBtn onClick={saveDisplayName} disabled={busy}>Salva nome</WireBtn>
+                    <label className="text-[10px] font-bold block mt-2">Email (sola lettura)</label>
+                    <p className="text-xs text-neutral-600">{profile?.email ?? '—'}</p>
+                    <p className="text-[10px] text-neutral-500">Per cambiare email: supporto@allertgy.it</p>
+                    <label className="text-[10px] font-bold block mt-3">Password attuale</label>
+                    <WireInput value={currentPassword} onChange={setCurrentPassword} placeholder="Password attuale" type="password" />
+                    <label className="text-[10px] font-bold block">Nuova password</label>
+                    <WireInput value={newPassword} onChange={setNewPassword} placeholder="Min. 8 caratteri" type="password" />
+                    <label className="text-[10px] font-bold block">Conferma nuova password</label>
+                    <WireInput value={confirmPassword} onChange={setConfirmPassword} placeholder="Ripeti password" type="password" />
+                    <WireBtn onClick={savePassword} disabled={busy}>Aggiorna password</WireBtn>
+                    {accountMsg ? <p className="text-xs text-emerald-700 font-bold">{accountMsg}</p> : null}
+                  </div>
+                </WireZone>
+
                 <WireZone label="IL TUO PROFILO">
                   <WireRow label="Allergie e intolleranze" value={`${selected.size} attive`} onClick={() => setOverlay('allergie')} />
                   <WireRow label="Profili famiglia" value="App mobile" />
@@ -504,7 +581,7 @@ export default function ConsumerWebApp({ onBack, onLogout }: Props) {
                     <p className="text-xs">
                       {hasPlus
                         ? `Piano attivo${plusActive ? '' : ' (omaggio/referral)'}`
-                        : (plusPlan?.tagline ?? 'Sottoprofili famiglia, scan illimitati, condivisione profilo')}
+                        : ((plusPlan as any)?.tagline ?? 'Sottoprofili famiglia, scan illimitati, condivisione profilo')}
                     </p>
                     {plusPlan && !hasPlus && (
                       <p className="text-xs mt-1 font-bold">
@@ -512,9 +589,9 @@ export default function ConsumerWebApp({ onBack, onLogout }: Props) {
                       </p>
                     )}
                     {hasPlus && plusActive ? (
-                      <WireBtn className="mt-2" onClick={managePlus} disabled={busy}>Gestisci abbonamento</WireBtn>
+                      <WireBtn onClick={managePlus} disabled={busy}>Gestisci abbonamento</WireBtn>
                     ) : !hasPlus ? (
-                      <WireBtn className="mt-2" onClick={purchasePlus} disabled={busy}>Attiva Plus Famiglia</WireBtn>
+                      <WireBtn onClick={purchasePlus} disabled={busy}>Attiva Plus Famiglia</WireBtn>
                     ) : null}
                   </WireBlock>
                 </WireZone>

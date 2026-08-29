@@ -87,9 +87,11 @@ type Props = {
   locale: Restaurant | null;
   /** Aggiorna badge/preview nel genitore (es. CollapseSection su Attività). */
   onStats?: (stats: { total: number; pending: number }) => void;
+  /** Carica solo le stats (niente lista UI) — utile per badge sull'hub Attività. */
+  statsOnly?: boolean;
 };
 
-export function OwnerReviewsPanel({ locale, onStats }: Props) {
+export function OwnerReviewsPanel({ locale, onStats, statsOnly }: Props) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
@@ -145,6 +147,8 @@ export function OwnerReviewsPanel({ locale, onStats }: Props) {
     }
     setBusyId(null);
   };
+
+  if (statsOnly) return null;
 
   if (!locale) {
     return <Text style={styles.muted}>Seleziona un locale per vedere le recensioni.</Text>;

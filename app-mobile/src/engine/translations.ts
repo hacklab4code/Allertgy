@@ -142,20 +142,20 @@ export const TRANSLATED_ALLERGENS: Record<string, { en: string; it: string; emoj
 // ---------------------------------------------------------------------------
 export const ALLERGEN_SECTIONS: Record<string, { [K in UILang]: string }> = {
   ue: {
-    it: "Allergeni obbligatori UE (Reg. 1169/2011)",
-    en: "EU mandatory allergens (Reg. 1169/2011)",
-    es: "Alérgenos obligatorios UE (Reg. 1169/2011)",
-    fr: "Allergènes obligatoires UE (Rég. 1169/2011)",
-    de: "Pflichtallergene EU (Verord. 1169/2011)",
-    pt: "Alergénios obrigatórios UE (Reg. 1169/2011)",
-    ar: "مسببات الحساسية الإلزامية في الاتحاد الأوروبي",
-    zh: "欧盟强制过敏原 (法规 1169/2011)",
-    ja: "EU必須アレルゲン (規則 1169/2011)",
-    ko: "EU 의무 알레르겐 (규정 1169/2011)",
-    ru: "Обязательные аллергены ЕС (рег. 1169/2011)",
-    tr: "AB Zorunlu Alerjenler (Yönet. 1169/2011)",
-    pl: "Obowiązkowe alergeny UE (Rozp. 1169/2011)",
-    nl: "Verplichte EU-allergenen (Verord. 1169/2011)",
+    it: "Allergeni Principali (UE)",
+    en: "Main EU Allergens",
+    es: "Alérgenos principales (UE)",
+    fr: "Allergènes principaux (UE)",
+    de: "Hauptallergene (EU)",
+    pt: "Alergénios principais (UE)",
+    ar: "مسببات الحساسية الرئيسية",
+    zh: "主要过敏原 (UE)",
+    ja: "主要アレルゲン (EU)",
+    ko: "주요 알레르겐 (EU)",
+    ru: "Основные аллергены (ЕС)",
+    tr: "Ana Alerjenler (AB)",
+    pl: "Główne alergeny (UE)",
+    nl: "Belangrijkste allergenen (EU)",
   },
   frutta_guscio: {
     it: "Frutta a guscio (dettaglio)", en: "Tree nuts (detail)", es: "Frutos secos (detalle)",
@@ -208,12 +208,24 @@ export function groupAllergensBySection<T extends { category?: string; sort_orde
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key)!.push(a);
   }
-  return SECTION_ORDER
-    .filter((key) => grouped.has(key))
-    .map((key) => ({
-      key,
-      items: grouped.get(key)!.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
-    }));
+  const result: { key: string; items: T[] }[] = [];
+  for (const key of SECTION_ORDER) {
+    if (grouped.has(key)) {
+      result.push({
+        key,
+        items: grouped.get(key)!.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+      });
+    }
+  }
+  for (const [key, items] of grouped.entries()) {
+    if (!SECTION_ORDER.includes(key as any)) {
+      result.push({
+        key,
+        items: items.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+      });
+    }
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,22 +1,30 @@
 import { Tabs } from 'expo-router';
 import { View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { OnboardingRedirect } from '../../src/hooks/onboardingGuard';
 import { ProfileContextSheet } from '../../src/components/ui/ProfileContextSheet';
-import { PuffyTabBar } from '../../src/components/ui/PuffyTabBar';
+import { GlassTabBar } from '../../src/components/ui/GlassTabBar';
 import { AmbientMesh } from '../../src/components/ui/AmbientMesh';
 import { HeaderFloatingActions } from '../../src/components/ui/HeaderFloatingActions';
+import { useFloatingHeader } from '../../src/store/floatingHeader';
 
-/** 4 route tab + Scansiona (azione su /scanner) — barra custom con 5 voci. */
-export default function TabsLayout() {
+export default function TabLayout() {
   return (
-    <View className="flex-1 bg-transparent">
+    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+      <StatusBar style="dark" />
       <AmbientMesh />
       <OnboardingRedirect area="customer" />
       <Tabs
-        tabBar={(props) => <PuffyTabBar {...props} />}
+        tabBar={(props) => <GlassTabBar {...props} />}
         screenOptions={{
           headerShown: false,
           sceneStyle: { backgroundColor: 'transparent' },
+          freezeOnBlur: true,
+        }}
+        screenListeners={{
+          focus: () => {
+            useFloatingHeader.getState().show();
+          },
         }}
       >
         <Tabs.Screen name="home" options={{ title: 'Home', tabBarLabel: 'Home' }} />

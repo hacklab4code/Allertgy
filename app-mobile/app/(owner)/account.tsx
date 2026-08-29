@@ -1,14 +1,28 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { API } from '../../src/api/client';
+import { Alert, Linking, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { logoutAndCleanup } from '../../src/services/authSession';
 import { useOwner } from '../../src/store/owner';
 import { useSession } from '../../src/store/session';
-import { CollapseSection, Screen } from '../../src/components/ui';
-import { TAB_BAR_CLEARANCE, spacing } from '../../src/theme';
+import { AppText, CollapseSection, GlassCard, GlassScreenScroll, SettingsDivider, SettingsRow } from '../../src/components/ui';
+import { colors, radius, spacing } from '../../src/theme';
 
-/** Scheda Account del ristoratore. */
+function ChecklistRow({ ok, label, onPress }: { ok: boolean; label: string; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.chkRow} onPress={onPress} activeOpacity={0.8}>
+      <View style={[styles.chkBadge, ok ? styles.chkBadgeOk : styles.chkBadgeWarn]}>
+        <AppText variant="caption" style={{ color: ok ? colors.onGreen : colors.onYellow, fontWeight: '800', fontSize: 10 }}>
+          {ok ? '✓' : '!'}
+        </AppText>
+      </View>
+      <AppText variant="bodyBold" style={{ flex: 1, fontSize: 13 }}>{label}</AppText>
+      <Ionicons name="chevron-forward" size={16} color={colors.onSurfaceMuted} />
+    </TouchableOpacity>
+  );
+}
+
+/** Scheda Account Ristoratore — Dimensioni bilanciate e tipografia compatta. */
 export default function OwnerAccount() {
   const { email } = useSession();
   const { restaurants, current, reset } = useOwner();
@@ -27,12 +41,12 @@ export default function OwnerAccount() {
   const [supportExpanded, setSupportExpanded] = useState(false);
 
   const checklistPreview = useMemo(() => {
-    if (setupComplete) return 'Setup completato';
+    if (setupComplete) return 'Setup completato (5/5)';
     return `${setupDone}/5 passaggi completati`;
   }, [setupComplete, setupDone]);
 
   const confirmLogout = () =>
-    Alert.alert('Esci dall\'account', 'Vuoi davvero uscire?', [
+    Alert.alert('Esci dall\'account', 'Vuoi davvero uscire dall\'account ristoratore?', [
       { text: 'Annulla', style: 'cancel' },
       {
         text: 'Esci', style: 'destructive',
@@ -41,154 +55,226 @@ export default function OwnerAccount() {
     ]);
 
   return (
-    <Screen edges={false}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.hero}>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{(email ?? 'A')[0].toUpperCase()}</Text></View>
-          <Text style={styles.email}>{email ?? 'Account'}</Text>
-          <Text style={styles.roleBadge}>Ristoratore</Text>
-        </View>
-
-        <View style={styles.block}>
-          <Text style={styles.blockTitle}>La mia attività</Text>
-          <Text style={styles.blockSub}>Stato del locale selezionato</Text>
-          <TouchableOpacity style={styles.item} onPress={() => router.push('/(owner)/locali')}>
-            <Text style={styles.itemIcon}>🏪</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.itemTitle}>{locale ? locale.name : 'Nessun locale selezionato'}</Text>
-              <Text style={styles.itemSub}>
-                {locale
-                  ? `${locale.city || 'Città da completare'} · codice ${locale.public_code} · ${restaurants.length} ${restaurants.length === 1 ? 'locale' : 'locali'}`
-                  : 'Crea il primo locale dalla sezione Attività.'}
-              </Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
-          <View style={styles.metricsRow}>
-            <View style={styles.metricBox}>
-              <Text style={styles.metricValue}>{setupDone}/5</Text>
-              <Text style={styles.metricLabel}>setup</Text>
-            </View>
-            <View style={styles.metricBox}>
-              <Text style={styles.metricValue}>{hasMenu ? 'OK' : 'NO'}</Text>
-              <Text style={styles.metricLabel}>menù</Text>
-            </View>
-            <View style={styles.metricBox}>
-              <Text style={styles.metricValue}>{planLabel}</Text>
-              <Text style={styles.metricLabel}>piano</Text>
-            </View>
+    <GlassScreenScroll headerFloat>
+      {/* Hero Card Ristoratore */}
+      <GlassCard style={styles.heroCard}>
+        <View style={styles.avatarRing}>
+          <View style={styles.avatarInner}>
+            <AppText variant="h2" color="#FFFFFF" style={{ fontSize: 20 }}>
+              {(email ?? 'A')[0].toUpperCase()}
+            </AppText>
           </View>
         </View>
 
-        <CollapseSection
-          icon="checkbox"
-          title="Checklist obbligatoria"
-          preview={checklistPreview}
-          expanded={checklistExpanded}
-          onToggle={() => setChecklistExpanded((v) => !v)}
-        >
-          <ChecklistRow ok={hasPublicProfile} label="Scheda pubblica completa" onPress={() => router.push('/(owner)/locali')} />
-          <ChecklistRow ok={hasMenu} label="Menù allergeni pubblicato" onPress={() => router.push('/(owner)/menu')} />
-          <ChecklistRow ok={hasLegalData} label="P.IVA e referente allergeni" onPress={() => router.push('/(owner)/locali')} />
-          <ChecklistRow ok={plan !== 'free' || status !== 'free'} label="Piano attivo (Base o Pro)" onPress={() => router.push('/(owner)/piano')} />
-          <Text style={styles.legalNote}>
-            Pubblicando il menù confermi la correttezza degli allergeni dichiarati (Reg. UE 1169/2011).
-          </Text>
-        </CollapseSection>
+        <AppText variant="h2" style={styles.emailText} numberOfLines={1}>
+          {email ?? 'Account Ristoratore'}
+        </AppText>
 
-        <CollapseSection
-          icon="rocket"
-          title="Crescita"
-          preview="QR, statistiche, piano, boost"
-          expanded={growthExpanded}
-          onToggle={() => setGrowthExpanded((v) => !v)}
-        >
-          <NavRow icon="🖨️" title="QR code tavoli" sub="Stampa il QR per i clienti" onPress={() => router.push('/(owner)/qr')} />
-          <NavRow icon="📊" title="Statistiche" sub="Visite menù e allergeni cercati" onPress={() => router.push('/(owner)/statistiche')} />
-          <NavRow icon="💳" title="Piano e fatturazione" sub="Abbonamento e fatture" onPress={() => router.push('/(owner)/piano')} />
-          <NavRow icon="🚀" title="Boost e notifiche push" sub="Visibilità e messaggi ai follower" onPress={() => router.push('/(owner)/crescita')} />
-        </CollapseSection>
+        <View style={styles.verifiedBadge}>
+          <AppText variant="caption" color={colors.onGreen} style={{ fontWeight: '800', fontSize: 10 }}>
+            Account ristoratore
+          </AppText>
+        </View>
+      </GlassCard>
 
-        <CollapseSection
-          icon="help-circle"
-          title="Assistenza"
-          preview="supporto@allertgy.it"
-          expanded={supportExpanded}
-          onToggle={() => setSupportExpanded((v) => !v)}
-        >
-          <NavRow
-            icon="✉️"
-            title="Contatta l'assistenza"
-            sub="supporto@allertgy.it"
-            onPress={() => Linking.openURL('mailto:supporto@allertgy.it?subject=Assistenza%20Ristoratori')}
-          />
-          <View style={styles.item}>
-            <Text style={styles.itemIcon}>ℹ️</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.itemTitle}>Informazioni app</Text>
-              <Text style={styles.itemSub}>AllerTgy ristoratori · server: {API}</Text>
-            </View>
+      <GlassCard style={styles.venueCard}>
+        <AppText variant="eyebrow" color={colors.onSurfaceMuted} style={styles.eyebrowText}>
+          LOCALE OPERATIVO · {planLabel}
+        </AppText>
+        <TouchableOpacity style={styles.localeRow} onPress={() => router.push('/(owner)/locali')} activeOpacity={0.8}>
+          <View style={styles.venueIconContainer}>
+            <Ionicons name="storefront-outline" size={20} color={colors.brandInk} />
           </View>
-        </CollapseSection>
-
-        <TouchableOpacity style={styles.logout} onPress={confirmLogout}>
-          <Text style={styles.logoutText}>Esci dall'account</Text>
+          <View style={{ flex: 1 }}>
+            <AppText variant="title" numberOfLines={1} style={{ fontSize: 15 }}>
+              {locale ? locale.name : 'Nessun locale selezionato'}
+            </AppText>
+            <AppText variant="caption" numberOfLines={1}>
+              {locale
+                ? `${locale.city || 'Città da completare'} · #${locale.public_code} · ${hasMenu ? 'Menù live' : 'Menù bozza'}`
+                : 'Tocca per registrare l’attività'}
+            </AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.onSurfaceMuted} />
         </TouchableOpacity>
-      </ScrollView>
-    </Screen>
-  );
-}
+      </GlassCard>
 
-function ChecklistRow({ ok, label, onPress }: { ok: boolean; label: string; onPress: () => void }) {
-  return (
-    <TouchableOpacity style={styles.checklistRow} onPress={onPress}>
-      <Text style={ok ? styles.checkOk : styles.checkWarn}>{ok ? '✓' : '!'}</Text>
-      <Text style={styles.checkText}>{label}</Text>
-      <Text style={styles.chevron}>›</Text>
-    </TouchableOpacity>
-  );
-}
+      {/* Checklist Complicanza Legale */}
+      <CollapseSection
+        icon="checkbox"
+        title="Checklist obbligatoria"
+        preview={checklistPreview}
+        expanded={checklistExpanded}
+        onToggle={() => setChecklistExpanded((v) => !v)}
+      >
+        <ChecklistRow ok={hasPublicProfile} label="Scheda pubblica completa" onPress={() => router.push('/(owner)/scheda')} />
+        <ChecklistRow ok={hasMenu} label="Menù allergeni pubblicato" onPress={() => router.push('/(owner)/menu')} />
+        <ChecklistRow ok={hasLegalData} label="P.IVA e referente allergeni" onPress={() => router.push('/(owner)/scheda?focus=legal')} />
+        <ChecklistRow ok={plan !== 'free' || status !== 'free'} label="Piano attivo (Base o Pro)" onPress={() => router.push('/(owner)/piano')} />
+        <AppText variant="caption" style={styles.legalNote}>
+          Pubblicando il menù dichiari sotto la tua responsabilità la conformità degli allergeni al Regolamento UE 1169/2011.
+        </AppText>
+      </CollapseSection>
 
-function NavRow({ icon, title, sub, onPress }: { icon: string; title: string; sub: string; onPress: () => void }) {
-  return (
-    <TouchableOpacity style={styles.item} onPress={onPress}>
-      <Text style={styles.itemIcon}>{icon}</Text>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.itemTitle}>{title}</Text>
-        <Text style={styles.itemSub}>{sub}</Text>
-      </View>
-      <Text style={styles.chevron}>›</Text>
-    </TouchableOpacity>
+      <CollapseSection
+        icon="construct"
+        title="Strumenti"
+        preview="QR, stats, piano, boost"
+        expanded={growthExpanded}
+        onToggle={() => setGrowthExpanded((v) => !v)}
+      >
+        <SettingsRow icon="qr-code" title="QR code tavoli" subtitle="Codice e locandina per i clienti" onPress={() => router.push('/(owner)/qr')} />
+        <SettingsDivider />
+        <SettingsRow icon="print" title="Registro Allergeni PDF" subtitle="Modulo ufficiale UE 1169/2011" onPress={() => router.push('/(owner)/registro')} />
+        <SettingsDivider />
+        <SettingsRow icon="bar-chart" title="Statistiche di ricerca" subtitle="Visite menù ed allergeni cercati dai clienti" onPress={() => router.push('/(owner)/statistiche')} />
+        <SettingsDivider />
+        <SettingsRow icon="card" title="Piano e fatturazione" subtitle="Gestione abbonamento e ricevute Stripe" onPress={() => router.push('/(owner)/piano')} />
+        <SettingsDivider />
+        <SettingsRow icon="megaphone" title="Boost e notifiche push" subtitle="Promozioni in evidenza e messaggi ai follower" onPress={() => router.push('/(owner)/crescita')} />
+        <SettingsDivider />
+        <SettingsRow icon="star" title="Recensioni ospiti" subtitle="Leggi e rispondi ai commenti dei clienti" onPress={() => router.push('/(owner)/recensioni')} />
+      </CollapseSection>
+
+      {/* Assistenza */}
+      <CollapseSection
+        icon="help-circle"
+        title="Assistenza & Supporto"
+        preview="supporto@allertgy.it"
+        expanded={supportExpanded}
+        onToggle={() => setSupportExpanded((v) => !v)}
+      >
+        <SettingsRow
+          icon="mail"
+          title="Invia una mail al supporto"
+          subtitle="supporto@allertgy.it"
+          onPress={() => Linking.openURL('mailto:supporto@allertgy.it')}
+        />
+      </CollapseSection>
+
+      <GlassCard style={styles.accountCard}>
+        <AppText variant="eyebrow" color={colors.onSurfaceMuted} style={styles.eyebrowText}>
+          DATI ACCOUNT
+        </AppText>
+        <SettingsRow
+          icon="person"
+          title="Nome, email e password"
+          subtitle="Modifica i tuoi dati di accesso"
+          onPress={() => router.push('/account-settings')}
+        />
+      </GlassCard>
+
+      {/* Logout */}
+      <TouchableOpacity style={styles.logoutButtonPill} onPress={confirmLogout} activeOpacity={0.8}>
+        <AppText variant="caption" color={colors.red} style={{ fontWeight: '800', fontSize: 12 }}>
+          Esci dall'Account Ristoratore
+        </AppText>
+      </TouchableOpacity>
+    </GlassScreenScroll>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { padding: spacing.lg, paddingBottom: TAB_BAR_CLEARANCE, gap: spacing.md },
-  hero: { alignItems: 'center', gap: 4, paddingVertical: spacing.sm },
-  avatar: {
-    width: 64, height: 64, borderRadius: 32, borderWidth: 1, borderColor: '#000',
-    alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+  heroCard: {
+    padding: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    borderRadius: radius.md,
   },
-  avatarText: { fontSize: 24, fontWeight: '800' },
-  email: { fontSize: 16, fontWeight: '800' },
-  roleBadge: { fontSize: 12, color: '#666' },
-  block: { gap: 6 },
-  blockTitle: { fontSize: 16, fontWeight: '800' },
-  blockSub: { fontSize: 12, color: '#666', marginBottom: 4 },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, minHeight: 48 },
-  itemIcon: { fontSize: 18, width: 28 },
-  itemTitle: { fontWeight: '700', fontSize: 14 },
-  itemSub: { color: '#666', fontSize: 12, marginTop: 2 },
-  chevron: { fontSize: 20, color: '#999' },
-  metricsRow: { flexDirection: 'row', gap: 8, paddingTop: 4 },
-  metricBox: { flex: 1, alignItems: 'center', borderWidth: 1, borderColor: '#000', padding: 8, gap: 2 },
-  metricValue: { fontSize: 16, fontWeight: '900' },
-  metricLabel: { fontSize: 10, color: '#666' },
-  checklistRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, minHeight: 44 },
-  checkOk: { fontWeight: '900', width: 20 },
-  checkWarn: { fontWeight: '900', width: 20 },
-  checkText: { flex: 1, fontSize: 13, fontWeight: '600' },
-  legalNote: { fontSize: 11, color: '#666', lineHeight: 16, paddingTop: 4 },
-  logout: { borderWidth: 1, borderColor: '#000', padding: 14, alignItems: 'center', marginTop: spacing.sm },
-  logoutText: { fontWeight: '800', fontSize: 14 },
+  avatarRing: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 4,
+  },
+  avatarInner: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emailText: {
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  accountCard: {
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderRadius: radius.md,
+    gap: spacing.xs,
+  },
+  verifiedBadge: {
+    marginTop: 4,
+    backgroundColor: colors.greenSoft,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.greenBorder,
+  },
+  venueCard: {
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderRadius: radius.md,
+  },
+  eyebrowText: {
+    fontSize: 9,
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  localeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 4,
+    gap: spacing.sm,
+  },
+  venueIconContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.surfaceTertiary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    gap: spacing.sm,
+  },
+  chkBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chkBadgeOk: {
+    backgroundColor: colors.greenSoft,
+  },
+  chkBadgeWarn: {
+    backgroundColor: colors.yellowSoft,
+  },
+  legalNote: {
+    fontSize: 10,
+    marginTop: 4,
+    lineHeight: 14,
+  },
+  logoutButtonPill: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.redSoft,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    marginBottom: spacing['2xl'],
+  },
 });

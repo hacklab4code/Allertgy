@@ -6,13 +6,14 @@ import {
   View,
 } from 'react-native';
 import { api } from '../../src/api/client';
+import { OwnerScreenHeader } from '../../src/components/owner/OwnerScreenHeader';
 import {
   AppText,
   CollapseSection,
   GlassCard,
   GlassScreenScroll,
   MetricTile,
-  PuffyButton,
+  SurfaceButton,
   Screen,
 } from '../../src/components/ui';
 import { useOwner } from '../../src/store/owner';
@@ -60,7 +61,7 @@ export default function OwnerStatistiche() {
           <AppText variant="body" color={colors.onSurfaceMuted} style={styles.emptyText}>
             Seleziona l’attività di cui vuoi leggere andamento e preferenze.
           </AppText>
-          <PuffyButton label="Vai ad Attività" onPress={() => router.push('/(owner)/locali')} />
+          <SurfaceButton label="Vai ad Attività" onPress={() => router.push('/(owner)/locali')} />
         </View>
       </Screen>
     );
@@ -73,15 +74,11 @@ export default function OwnerStatistiche() {
   );
 
   return (
-    <Screen edges={false}>
-    <GlassScreenScroll>
-      <View style={styles.pageHead}>
-        <AppText variant="eyebrow">Dati del locale</AppText>
-        <AppText variant="h1">Statistiche</AppText>
-        <AppText variant="subtitle" numberOfLines={2}>
-          {locale.name} · scansioni QR e filtri allergici
-        </AppText>
-      </View>
+    <GlassScreenScroll headerFloat>
+      <OwnerScreenHeader
+        title="Statistiche"
+        subtitle={`${locale.name} · QR e filtri allergici`}
+      />
 
       {loading ? (
         <ActivityIndicator color={colors.brand} style={styles.loader} />
@@ -92,7 +89,7 @@ export default function OwnerStatistiche() {
           <AppText variant="body" color={colors.onSurfaceMuted}>
               Statistiche disponibili con piano Pro attivo. Passa a Pro per vedere scansioni e allergeni più cercati.
           </AppText>
-          <PuffyButton label="Scopri i piani" onPress={() => router.push('/(owner)/piano')} />
+          <SurfaceButton label="Scopri i piani" onPress={() => router.push('/(owner)/piano')} />
         </GlassCard>
       ) : (
         <>
@@ -201,7 +198,6 @@ export default function OwnerStatistiche() {
         </>
       )}
     </GlassScreenScroll>
-    </Screen>
   );
 }
 

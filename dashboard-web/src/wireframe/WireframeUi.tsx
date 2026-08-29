@@ -1,15 +1,11 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import { Salad } from 'lucide-react';
 
-/** Layout wireframe — bordi neri, etichette funzionali, zero decorazione. */
-
-const box: CSSProperties = {
-  border: '1px solid #000',
-  background: '#fff',
-};
+/** Premium Emerald Design System — Stesso Stile dell'Area Cliente (ClientArea.tsx) */
 
 export function WireApp({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-white text-black font-mono text-sm" style={{ fontFamily: 'ui-monospace, monospace' }}>
+    <div className="min-h-screen bg-[#F7FAF8] text-[#10201B] font-sans text-sm antialiased selection:bg-[#BFE9D2] selection:text-[#0B5D4D]">
       {children}
     </div>
   );
@@ -25,10 +21,17 @@ export function WireHeader({
   right?: ReactNode;
 }) {
   return (
-    <header style={{ ...box, borderTop: 'none', borderLeft: 'none', borderRight: 'none' }} className="px-4 py-2 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs px-6 py-3.5 flex items-center justify-between gap-4">
       <div className="flex items-center gap-3 min-w-0">
         {left}
-        <span className="font-bold truncate">[{title}]</span>
+        <div className="flex items-center gap-2.5">
+          <span className="grid place-items-center w-9 h-9 rounded-xl bg-emerald-600 text-white shadow-sm">
+            <Salad className="w-5 h-5" strokeWidth={2} />
+          </span>
+          <span className="font-extrabold text-xl tracking-tight text-slate-800 font-heading truncate">
+            {title}
+          </span>
+        </div>
       </div>
       {right && <div className="flex items-center gap-2 shrink-0">{right}</div>}
     </header>
@@ -48,27 +51,30 @@ export function WireNav({
 }) {
   return (
     <nav
-      style={box}
-      className={vertical ? 'flex flex-col' : 'flex flex-wrap'}
+      className={`p-1.5 bg-white/90 backdrop-blur-md rounded-2xl border border-slate-200/80 shadow-xs ${
+        vertical ? 'flex flex-col gap-1.5' : 'flex flex-wrap items-center gap-2'
+      }`}
       aria-label="Navigazione principale"
     >
-      {items.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => onChange(item.id)}
-          style={{
-            border: '1px solid #000',
-            borderTop: vertical ? undefined : 'none',
-            borderLeft: vertical ? 'none' : undefined,
-            background: active === item.id ? '#000' : '#fff',
-            color: active === item.id ? '#fff' : '#000',
-          }}
-          className={`px-4 py-2 text-left text-xs font-bold ${vertical ? 'border-l-0 border-r-0' : 'border-b-0'}`}
-        >
-          {active === item.id ? '▸ ' : '  '}{item.label}
-        </button>
-      ))}
+      {items.map((item) => {
+        const isSelected = active === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onChange(item.id)}
+            className={`px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer ${
+              vertical ? 'w-full text-left' : ''
+            } ${
+              isSelected
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'bg-white border border-slate-200/70 text-slate-600 hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50/50'
+            }`}
+          >
+            {item.label}
+          </button>
+        );
+      })}
     </nav>
   );
 }
@@ -86,11 +92,15 @@ export function WireZone({
 }) {
   return (
     <section
-      style={{ ...box, borderStyle: dashed ? 'dashed' : 'solid' }}
-      className={`p-3 ${className}`}
+      className={`bg-white rounded-3xl border ${
+        dashed ? 'border-dashed border-emerald-300' : 'border-slate-200/70'
+      } shadow-sm p-5 md:p-6 mb-6 transition-all ${className}`}
     >
-      <div className="text-[10px] font-bold uppercase tracking-wide mb-2 border-b border-black pb-1">
-        [{label}]
+      <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+        <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+        <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+          {label}
+        </h3>
       </div>
       {children}
     </section>
@@ -113,11 +123,12 @@ export function WireRow({
     <Tag
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      style={{ ...box, borderLeft: 'none', borderRight: 'none' }}
-      className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-xs ${onClick ? 'hover:bg-neutral-100 cursor-pointer' : ''}`}
+      className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left text-xs font-bold rounded-2xl border border-slate-200/60 bg-slate-50/50 mb-2 transition-all ${
+        onClick ? 'hover:bg-emerald-50/60 hover:border-emerald-300 cursor-pointer hover:translate-x-0.5' : ''
+      }`}
     >
-      <span>{label}</span>
-      <span className="text-neutral-600 shrink-0">
+      <span className="text-slate-800 font-extrabold">{label}</span>
+      <span className="text-slate-500 font-semibold shrink-0 flex items-center gap-1">
         {value ?? action ?? '›'}
       </span>
     </Tag>
@@ -131,8 +142,13 @@ export function WireGrid({
   cols: 2 | 3 | 4;
   children: ReactNode;
 }) {
-  const gridClass = cols === 2 ? 'grid-cols-2' : cols === 3 ? 'grid-cols-3' : 'grid-cols-4';
-  return <div className={`grid ${gridClass} gap-2`}>{children}</div>;
+  const gridClass =
+    cols === 2
+      ? 'grid-cols-1 sm:grid-cols-2'
+      : cols === 3
+      ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+      : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4';
+  return <div className={`grid ${gridClass} gap-4`}>{children}</div>;
 }
 
 export function WireBlock({
@@ -145,8 +161,11 @@ export function WireBlock({
   minHeight?: number;
 }) {
   return (
-    <div style={{ ...box, minHeight }} className="p-2 text-xs">
-      {label && <div className="font-bold mb-1">[{label}]</div>}
+    <div
+      style={{ minHeight }}
+      className="p-4 text-xs bg-white rounded-2xl border border-slate-200/70 shadow-xs"
+    >
+      {label && <div className="font-extrabold text-slate-800 mb-2">{label}</div>}
       {children}
     </div>
   );
@@ -165,18 +184,29 @@ export function WireBtn({
   disabled?: boolean;
   variant?: 'default' | 'danger';
 }) {
+  if (variant === 'danger') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className="px-4 py-2 text-xs font-extrabold rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white shadow-xs disabled:opacity-40 transition-all cursor-pointer"
+      >
+        {children}
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      style={{
-        ...box,
-        background: active ? '#000' : variant === 'danger' ? '#fff' : '#fff',
-        color: active ? '#fff' : '#000',
-        opacity: disabled ? 0.4 : 1,
-      }}
-      className="px-3 py-1.5 text-xs font-bold disabled:cursor-not-allowed"
+      className={`px-4 py-2 text-xs font-extrabold rounded-full transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+        active
+          ? 'bg-emerald-600 text-white shadow-sm'
+          : 'bg-white text-slate-700 border border-slate-200 hover:border-emerald-400 hover:text-emerald-700 shadow-xs'
+      }`}
     >
       {children}
     </button>
@@ -202,8 +232,7 @@ export function WireInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      style={box}
-      className={`w-full px-2 py-1.5 text-xs bg-white focus:outline-none ${className}`}
+      className={`w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 rounded-xl transition-all outline-none ${className}`}
     />
   );
 }
@@ -218,13 +247,15 @@ export function WireLayout({
   aside?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col lg:flex-row gap-0 min-h-[calc(100vh-120px)]">
+    <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-100px)]">
       {sidebar && (
-        <div className="lg:w-56 shrink-0 border-r border-black">{sidebar}</div>
+        <div className="lg:w-64 shrink-0 bg-white/80 backdrop-blur-md rounded-3xl p-4 border border-slate-200/70 shadow-xs">
+          {sidebar}
+        </div>
       )}
-      <div className="flex-1 min-w-0 p-4">{main}</div>
+      <div className="flex-1 min-w-0 space-y-6">{main}</div>
       {aside && (
-        <div className="lg:w-72 shrink-0 border-l border-black p-4">{aside}</div>
+        <div className="lg:w-72 shrink-0 space-y-6">{aside}</div>
       )}
     </div>
   );

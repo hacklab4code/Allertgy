@@ -278,6 +278,78 @@
       </div>
     </x-import>
   </div>
+
+  <!-- 07 Schermata Salvavita -->
+  <div data-screen-label="Schermata Salvavita" style="display:flex;flex-direction:column;gap:14px;flex-shrink:0">
+    <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:#596B63">07 · Schermata Salvavita</div>
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+      <div style="min-height:100%;background:#F3F1FA;display:flex;flex-direction:column;padding:60px 18px 24px;gap:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+        
+        <!-- Statusbar simulation -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px 4px;font-weight:600;font-size:17px;color:#2A2452">
+          <span>11:26</span><span>🔋</span>
+        </div>
+
+        <!-- Primary Alert Callout -->
+        <div style="background:#FFFFFF;border:2.5px solid #E5484D;border-radius:18px;padding:18px 20px">
+          <div style="font-size:12px;font-weight:800;letter-spacing:0.06em;color:#E5484D;text-transform:uppercase;margin-bottom:8px">Allergia grave — rischio shock anafilattico</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:26px;font-weight:900;color:#E5484D">🥜 Arachidi</div>
+          <div style="margin-top:8px;font-size:13.5px;color:#6B6690;line-height:1.5">Questa è l'unica allergia grave nel profilo. Verificare immediatamente se il paziente ha avuto contatto con arachidi o derivati.</div>
+        </div>
+
+        <!-- Emergency Info Card -->
+        <div style="background:#FFFFFF;border-radius:18px;overflow:hidden;border:1px solid #E4E0F5">
+          <div style="display:flex;align-items:center;gap:14px;padding:18px 20px">
+            <div style="width:40px;height:40px;border-radius:50%;background:#FCE9EA;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">💊</div>
+            <div>
+              <strong style="display:block;font-size:15px;color:#2A2452">Farmaci di emergenza</strong>
+              <span style="font-size:13px;color:#E5484D;font-weight:700">Nessun farmaco inserito</span>
+            </div>
+          </div>
+          <div style="border-top:1px solid #E4E0F5;display:flex;align-items:center;gap:14px;padding:18px 20px">
+            <div style="width:40px;height:40px;border-radius:50%;background:#FCE9EA;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📞</div>
+            <div>
+              <strong style="display:block;font-size:15px;color:#2A2452">Contatto di emergenza</strong>
+              <span style="font-size:13px;color:#E5484D;font-weight:700">Nessun contatto salvato — aggiungilo ora</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Moderate Allergies -->
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:12.5px;font-weight:800;letter-spacing:0.06em;color:#6B6690;text-transform:uppercase">Altre allergie moderate (25)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:9px">
+            <div style="padding:9px 15px;border-radius:100px;font-weight:700;font-size:13.5px;background:#FDF3E3;color:#8A5300;border:1.5px solid #F5A524">Uova</div>
+            <div style="padding:9px 15px;border-radius:100px;font-weight:700;font-size:13.5px;background:#FDF3E3;color:#8A5300;border:1.5px solid #F5A524">Frutta a guscio</div>
+            <div style="padding:9px 15px;border-radius:100px;font-weight:700;font-size:13.5px;background:#FDF3E3;color:#8A5300;border:1.5px solid #F5A524">Lupini</div>
+            <div style="padding:9px 15px;border-radius:100px;font-weight:700;font-size:13.5px;background:#FDF3E3;color:#8A5300;border:1.5px solid #F5A524">Mandorle</div>
+            <div style="padding:9px 15px;border-radius:100px;font-weight:700;font-size:13.5px;background:#FDF3E3;color:#8A5300;border:1.5px solid #F5A524">Nocciole</div>
+            <div style="padding:9px 15px;border-radius:100px;font-weight:700;font-size:13.5px;background:#FDF3E3;color:#8A5300;border:1.5px solid #F5A524">Noci</div>
+            <div style="padding:9px 15px;border-radius:100px;font-weight:700;font-size:13.5px;background:#FDF3E3;color:#8A5300;border:1.5px solid #F5A524">Noci pecan</div>
+            <div style="padding:9px 15px;border-radius:100px;font-weight:700;font-size:13.5px;background:#FDF3E3;color:#8A5300;border:1.5px solid #F5A524">Noci brasiliane</div>
+            <div style="padding:9px 15px;border-radius:100px;font-weight:700;font-size:13.5px;background:#FDF3E3;color:#8A5300;border:1.5px solid #F5A524">Pistacchi</div>
+            <div style="padding:9px 15px;border-radius:100px;font-weight:700;font-size:13.5px;background:#FDF3E3;color:#8A5300;border:1.5px solid #F5A524">Anacardi</div>
+          </div>
+          <div style="font-size:13.5px;font-weight:700;color:#322A63;margin-top:4px">▾ Mostra tutte le 25 allergie moderate</div>
+        </div>
+
+        <!-- Mild Allergies -->
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:12.5px;font-weight:800;letter-spacing:0.06em;color:#6B6690;text-transform:uppercase">Lievi / preferenze (1)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:9px">
+            <div style="padding:9px 15px;border-radius:100px;font-weight:700;font-size:13.5px;background:#F3F1FA;color:#6B6690;border:1.5px solid #E4E0F5">Kiwi</div>
+          </div>
+        </div>
+
+        <!-- CTA Buttons -->
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:12px;padding-top:12px">
+          <button style="width:100%;padding:19px;border-radius:16px;font-size:16.5px;font-weight:800;border:none;background:#E5484D;color:white;box-shadow:0 8px 22px rgba(229,72,77,0.35);cursor:pointer">📞 Chiama soccorsi (112)</button>
+          <button style="width:100%;padding:19px;border-radius:16px;font-size:16.5px;font-weight:800;border:none;background:#322A63;color:white;cursor:pointer">💬 Invia SMS di SOS</button>
+        </div>
+
+      </div>
+    </x-import>
+  </div>
 </div>
 </x-dc>
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script type="text/x-dc" data-dc-script>
@@ -313,11 +385,12 @@ class Component extends DCLogic {
 
   chipStyle(active) {
     return {
-      minHeight: '44px', padding: '10px 16px', borderRadius: '999px',
-      fontSize: '14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-      background: active ? '#0B5D4D' : '#FFFFFF',
-      color: active ? '#FFFFFF' : '#10201B',
-      border: active ? '1px solid #0B5D4D' : '1px solid #DDE8E2'
+      padding: '8px 14px', borderRadius: '999px',
+      fontSize: '13.5px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+      display: 'inline-flex', alignItems: 'center', gap: '6px',
+      background: active ? '#FFEDD5' : '#F1EDF9',
+      color: active ? '#7C2D12' : '#36255C',
+      border: active ? '1.5px solid #F97316' : '1.5px solid #D8CEEC'
     };
   }
 

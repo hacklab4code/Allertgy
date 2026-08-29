@@ -50,12 +50,14 @@ export const useExperienceMood = create<ExperienceMoodState>((set, get) => ({
     scheduleMoodReset();
   },
   setLiveMood: (verdict) => {
+    // Mood di contesto schermo (es. filtro menù): resta finché la schermata lo tiene.
+    // Non usare scheduleMoodReset — quel timer è solo per lo scan.
     if (!verdict || verdict === 'neutral') {
       set({ liveMood: null });
       return;
     }
+    clearMoodResetTimer();
     set({ liveMood: moodFromVerdict(verdict) });
-    scheduleMoodReset();
   },
   syncFromHistory: async () => {
     const history = await loadScanHistory();

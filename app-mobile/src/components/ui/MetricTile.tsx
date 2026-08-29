@@ -3,18 +3,18 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { colors, spacing } from '../../theme';
 import { AppText } from './AppText';
 import { GlassCard } from './GlassCard';
-import type { PuffyTint } from './PuffyCard';
+import type { SurfaceTint } from './SurfaceCard';
 
 type Props = {
   value: string | number;
   label: string;
   detail?: string;
-  tint?: PuffyTint;
+  tint?: SurfaceTint;
   accent?: string;
   style?: StyleProp<ViewStyle>;
 };
 
-/** Numero operativo in primo piano, su superficie puffy. */
+/** Numero operativo in primo piano, su superficie flat. */
 export function MetricTile({
   value,
   label,

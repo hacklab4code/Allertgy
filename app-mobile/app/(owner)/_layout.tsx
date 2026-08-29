@@ -1,76 +1,41 @@
 import { Tabs } from 'expo-router';
-import { Text, View, StyleSheet } from 'react-native';
-import NotificationBell from '../../src/components/NotificationBell';
+import { View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { OnboardingRedirect } from '../../src/hooks/onboardingGuard';
-import { colors, WIREFRAME_MODE } from '../../src/theme';
-import { GlassHeaderBackground } from '../../src/components/ui/GlassHeaderBackground';
-
-const icon = (label: string) =>
-  ({ focused }: { focused: boolean }) => (
-    WIREFRAME_MODE ? (
-      <View style={[styles.wfIcon, focused && styles.wfIconOn]}>
-        <Text style={{ fontSize: 9, color: focused ? '#FFF' : '#000' }}>{label.slice(0, 2)}</Text>
-      </View>
-    ) : (
-      <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>{label}</Text>
-    )
-  );
+import { GlassOwnerTabBar } from '../../src/components/ui/GlassOwnerTabBar';
+import { AmbientMesh } from '../../src/components/ui/AmbientMesh';
+import { HeaderFloatingActions } from '../../src/components/ui/HeaderFloatingActions';
 
 /**
- * Area ristoratore — 4 tab in basso.
- * Crescita, Piani, Recensioni e Statistiche si aprono da Impostazioni.
+ * Area Ristoratore dell'App Mobile — Stesso layout, ambient mesh e glass tab bar dell'Area Cliente.
  */
 export default function OwnerLayout() {
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+      <StatusBar style="dark" />
+      <AmbientMesh />
       <OnboardingRedirect area="owner" />
       <Tabs
-      screenOptions={{
-        headerTintColor: WIREFRAME_MODE ? '#000' : colors.brand,
-        headerTitleStyle: { fontWeight: '700', color: WIREFRAME_MODE ? '#000' : colors.onSurface },
-        headerStyle: { backgroundColor: 'transparent' },
-        headerBackground: () => <GlassHeaderBackground />,
-        headerShadowVisible: false,
-        headerRight: () => (
-          <View style={{ marginRight: 12 }}>
-            <NotificationBell />
-          </View>
-        ),
-        tabBarActiveTintColor: WIREFRAME_MODE ? '#000' : colors.brand,
-        tabBarInactiveTintColor: WIREFRAME_MODE ? '#666' : colors.onSurfaceMuted,
-        tabBarLabelStyle: { fontWeight: '700', fontSize: 11 },
-        tabBarStyle: WIREFRAME_MODE
-          ? { height: 56, borderTopWidth: 1, borderColor: '#000', backgroundColor: '#FFF' }
-          : {
-              height: 84,
-              paddingTop: 6,
-              backgroundColor: colors.surfaceSecondary,
-              borderTopColor: colors.border,
-            },
-        sceneStyle: { backgroundColor: WIREFRAME_MODE ? '#FFF' : colors.surface },
-      }}
-    >
-      <Tabs.Screen name="locali" options={{ title: 'Attività', tabBarLabel: 'Attività', tabBarIcon: icon('🏪') }} />
-      <Tabs.Screen name="menu" options={{ title: 'Gestione menù', tabBarLabel: 'Menù', tabBarIcon: icon('📋') }} />
-      <Tabs.Screen name="qr" options={{ title: 'QR per i tavoli', tabBarLabel: 'QR', tabBarIcon: icon('🖨️') }} />
-      <Tabs.Screen name="account" options={{ title: 'Impostazioni attività', tabBarLabel: 'Profilo', tabBarIcon: icon('👤') }} />
-      <Tabs.Screen name="crescita" options={{ href: null, title: 'Boost e notifiche' }} />
-      <Tabs.Screen name="piano" options={{ href: null, title: 'Piani e fatturazione' }} />
-      <Tabs.Screen name="recensioni" options={{ href: null, title: 'Recensioni' }} />
-      <Tabs.Screen name="statistiche" options={{ href: null, title: 'Statistiche' }} />
-    </Tabs>
-    </>
+        tabBar={(props) => <GlassOwnerTabBar {...props} />}
+        initialRouteName="menu"
+        screenOptions={{
+          headerShown: false,
+          sceneStyle: { backgroundColor: 'transparent' },
+          freezeOnBlur: true,
+        }}
+      >
+        <Tabs.Screen name="locali" options={{ title: 'Attività', tabBarLabel: 'Attività' }} />
+        <Tabs.Screen name="menu" options={{ title: 'Gestione menù', tabBarLabel: 'Menù' }} />
+        <Tabs.Screen name="qr" options={{ title: 'QR per i tavoli', tabBarLabel: 'QR' }} />
+        <Tabs.Screen name="account" options={{ title: 'Impostazioni attività', tabBarLabel: 'Profilo' }} />
+        <Tabs.Screen name="scheda" options={{ href: null, title: 'Scheda pubblica' }} />
+        <Tabs.Screen name="registro" options={{ href: null, title: 'Registro Allergeni' }} />
+        <Tabs.Screen name="crescita" options={{ href: null, title: 'Boost e notifiche' }} />
+        <Tabs.Screen name="piano" options={{ href: null, title: 'Piani e fatturazione' }} />
+        <Tabs.Screen name="recensioni" options={{ href: null, title: 'Recensioni' }} />
+        <Tabs.Screen name="statistiche" options={{ href: null, title: 'Statistiche' }} />
+      </Tabs>
+      <HeaderFloatingActions area="owner" />
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wfIcon: {
-    width: 28,
-    height: 28,
-    borderWidth: 1,
-    borderColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  wfIconOn: { backgroundColor: '#000' },
-});

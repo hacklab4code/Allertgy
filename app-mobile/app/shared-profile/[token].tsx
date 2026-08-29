@@ -8,7 +8,7 @@ import {
   AppText,
   GlassCard,
   GlassScreenScroll,
-  PuffyButton,
+  SurfaceButton,
   Screen,
 } from '../../src/components/ui';
 import { colors, spacing, radius } from '../../src/theme';
@@ -34,7 +34,10 @@ export default function SharedProfileScreen() {
     const intensities = Object.fromEntries(
       profile.allergens.map((a) => [a.code, a.intensity]),
     ) as Record<string, 'lieve' | 'moderata' | 'grave'>;
-    setAllergie(profile.allergens.map((a) => a.code), intensities);
+    const criteria = Object.fromEntries(
+      profile.allergens.map((a) => [a.code, a.criterio || 'assoluto']),
+    ) as Record<string, 'assoluto' | 'crudo' | 'cotto'>;
+    setAllergie(profile.allergens.map((a) => a.code), intensities, criteria);
     setProfileCompleted(true);
     router.replace('/(tabs)/home');
   };
@@ -42,7 +45,7 @@ export default function SharedProfileScreen() {
   return (
     <Screen edges={false} ambient>
       <Stack.Screen options={{ title: isIt ? 'Profilo condiviso' : 'Shared profile' }} />
-      <GlassScreenScroll>
+      <GlassScreenScroll headerFloat={false}>
         {loading ? (
           <ActivityIndicator color={colors.brand} />
         ) : error ? (
@@ -80,6 +83,7 @@ export default function SharedProfileScreen() {
                     <View key={a.code} style={styles.chip}>
                       <AppText variant="caption">
                         {a.emoji} {a.name_it} · {a.intensity}
+                        {a.criterio && a.criterio !== 'assoluto' ? ` · ${a.criterio}` : ''}
                       </AppText>
                     </View>
                   ))}
@@ -87,7 +91,7 @@ export default function SharedProfileScreen() {
               )}
             </GlassCard>
 
-            <PuffyButton
+            <SurfaceButton
               label={isIt ? 'Usa questo profilo ora' : 'Use this profile now'}
               onPress={useProfileNow}
             />

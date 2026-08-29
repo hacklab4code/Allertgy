@@ -214,7 +214,7 @@ export function PuffyTabBar({ state, descriptors, navigation }: BottomTabBarProp
         <LiquidGlassContainer spacing={16} style={[styles.barBody, { width: barWidth, height: BAR_H, top: BLOB_OVERHANG }]}>
           <LiquidGlassView
             glassStyle="clear"
-            tintColor="rgba(210, 195, 246, 0.14)"
+            tintColor="rgba(124, 92, 255, 0.06)"
             fallbackIntensity={98}
             style={StyleSheet.absoluteFill}
           />

@@ -5,6 +5,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel
 from ..config import settings
+from .gemini_model import GEMINI_MODEL, gemini_json_config
 
 class TranslationItem(BaseModel):
     dish_id: int
@@ -41,15 +42,12 @@ def translate_dishes(dishes_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
         }
         
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=GEMINI_MODEL,
             contents=[
                 f"Piatti da tradurre:\n\n{json.dumps(input_data, ensure_ascii=False)}\n\n",
                 PROMPT_TRANSLATION
             ],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=GeminiTranslationOutput,
-            )
+            config=gemini_json_config(GeminiTranslationOutput),
         )
         
         result = response.parsed

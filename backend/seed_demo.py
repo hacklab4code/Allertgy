@@ -14,8 +14,17 @@ Account creati (idempotente: se esistono già, non li duplica):
 """
 from app.database import SessionLocal
 from app.legal import LEGAL_TERMS_VERSION, MENU_CONFIRMATION_VERSION, PRIVACY_VERSION, SAFETY_DISCLAIMER_VERSION
-from app.models import Allergen, Dish, DishAllergen, Restaurant, User, UserAllergen
+from app.models import Allergen, Dish, DishAllergen, Restaurant, RestaurantPhoto, User, UserAllergen
 from app.security import hash_password
+from app.services import storage
+
+DEMO_GALLERY_URLS = [
+    "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?auto=format&fit=crop&w=1200&q=80",
+]
 
 MENU = [
     # (nome, descrizione, categoria, prezzo_cents, contenuti, tracce)
@@ -125,6 +134,7 @@ def main() -> None:
     rest.subscription_status = "comped"
     rest.plan_price_cents = 0
     rest.is_verified = 1
+    rest.cuisine = rest.cuisine or "italiana"
     rest.commercial_notes = rest.commercial_notes or "Demo: piano Pro omaggio per testare menu, QR e registro allergeni."
 
     if not rest.dishes:
@@ -150,6 +160,58 @@ def main() -> None:
         rest.menu_legal_confirmed_at = rest.menu_legal_confirmed_at or now
         rest.menu_legal_confirmed_by = rest.menu_legal_confirmed_by or owner.id
         rest.menu_legal_version = rest.menu_legal_version or MENU_CONFIRMATION_VERSION
+
+    if len(rest.photos) < len(DEMO_GALLERY_URLS):
+        import urllib.request
+
+        added = 0
+        existing_orders = {p.sort_order for p in rest.photos}
+        for i, url in enumerate(DEMO_GALLERY_URLS):
+            if i in existing_orders:
+                continue
+            try:
+                data = urllib.request.urlopen(url, timeout=20).read()
+            except Exception as exc:
+                print(f"⚠️  galleria demo: download fallito per foto {i + 1} ({exc})")
+                continue
+            key = f"gallery/{rest.id}/demo-{i + 1}.jpg"
+            storage.put_bytes(key, data, "image/jpeg")
+            db.add(RestaurantPhoto(
+                restaurant_id=rest.id,
+                storage_key=key,
+                is_cover=1 if i == 0 and not rest.photos else 0,
+                sort_order=i,
+            ))
+            added += 1
+        if added:
+            print(f"✅ galleria demo: aggiunte {added} foto al locale 100001")
+    else:
+        print(f"• galleria demo: {len(rest.photos)} foto già presenti")
+
+    # ---- Osteria Qui Se Magna (locale con Piano Pro) ----
+    osteria = db.query(Restaurant).filter_by(public_code="271282").first()
+    if not osteria:
+        osteria = Restaurant(
+            public_code="271282",
+            name="Osteria Qui Se Magna",
+            city="Roma",
+            latitude=41.9028,
+            longitude=12.4964,
+            image_url="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=200&h=200&q=80"
+        )
+        db.add(osteria)
+        db.flush()
+        print("✅ creato locale 271282 — Osteria Qui Se Magna")
+    else:
+        osteria.name = "Osteria Qui Se Magna"
+        osteria.city = "Roma"
+
+    osteria.business_plan = "pro_notify"
+    osteria.subscription_status = "active"
+    osteria.plan_price_cents = 1900
+    osteria.is_verified = 1
+    osteria.cuisine = osteria.cuisine or "italiana"
+    osteria.commercial_notes = "Piano Pro attivo per Osteria Qui Se Magna (€19/mese)."
 
     db.commit()
     db.close()

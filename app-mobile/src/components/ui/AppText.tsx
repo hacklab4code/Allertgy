@@ -27,8 +27,8 @@ const wfVariants: Record<Variant, TextStyle> = {
   metric: { fontSize: 32, lineHeight: 38, fontWeight: '800', color: '#000' },
 };
 
-const puffyVariants: Record<Variant, TextStyle> = {
-  h1: { fontFamily: font.displayBold, fontSize: 30, lineHeight: 35, letterSpacing: -0.7, color: colors.onSurface },
+const appVariants: Record<Variant, TextStyle> = {
+  h1: { fontFamily: font.displayBold, fontSize: 26, lineHeight: 30, letterSpacing: -0.7, color: colors.onSurface },
   h2: { fontFamily: font.displaySemibold, fontSize: 20, lineHeight: 25, letterSpacing: -0.3, color: colors.onSurface },
   title: { fontFamily: font.displaySemibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2, color: colors.onSurface },
   subtitle: { fontFamily: font.semibold, fontSize: 14, lineHeight: 20, color: colors.onSurfaceMuted },
@@ -56,8 +56,9 @@ const puffyVariants: Record<Variant, TextStyle> = {
 type Props = TextProps & { variant?: Variant; color?: string };
 
 export function AppText({ variant = 'body', color, style, ...rest }: Props) {
-  const variants = WIREFRAME_MODE ? wfVariants : puffyVariants;
-  return <Text style={[variants[variant], color ? { color } : null, style]} {...rest} />;
+  const variants = WIREFRAME_MODE ? wfVariants : appVariants;
+  // `color` vince sullo style annidato: serve per ink adattivo su AmbientMesh.
+  return <Text style={[variants[variant], style, color ? { color } : null]} {...rest} />;
 }
 
-export const appTextVariants = WIREFRAME_MODE ? wfVariants : puffyVariants;
+export const appTextVariants = WIREFRAME_MODE ? wfVariants : appVariants;

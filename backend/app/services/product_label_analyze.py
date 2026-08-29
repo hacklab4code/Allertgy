@@ -7,6 +7,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from ..config import settings
+from .gemini_model import GEMINI_MODEL, gemini_json_config
 
 EU_ALLERGEN_CODES = [
     "glutine", "crostacei", "uova", "pesce", "arachidi", "soia", "latte",
@@ -70,15 +71,12 @@ def _analyze_with_gemini(image_bytes: bytes, mime_type: str) -> ProductLabelAnal
     try:
         client = genai.Client(api_key=settings.gemini_api_key)
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=GEMINI_MODEL,
             contents=[
                 types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
                 PROMPT_GEMINI,
             ],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=GeminiProductLabelOutput,
-            ),
+            config=gemini_json_config(GeminiProductLabelOutput),
         )
         result = response.parsed
         if result is None or not hasattr(result, "ingredients"):

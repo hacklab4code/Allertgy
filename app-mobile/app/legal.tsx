@@ -6,7 +6,7 @@ import { api } from '../src/api/client';
 import { useSession } from '../src/store/session';
 import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
 import { useTranslation } from '../src/constants/translations';
-import { AppText, GlassScreenScroll, PuffyButton, Screen, Section } from '../src/components/ui';
+import { AppText, GlassScreenScroll, SurfaceButton, Screen, Section } from '../src/components/ui';
 import { colors, spacing, MIN_TOUCH_TARGET } from '../src/theme';
 
 function Check({ checked, onPress, text }: { checked: boolean; onPress: () => void; text: string }) {
@@ -61,7 +61,7 @@ export default function LegalScreen() {
     <Screen edges={false} ambient>
       <Stack.Screen options={{ headerRight: () => <LanguageFlagsRow inHeader /> }} />
 
-      <GlassScreenScroll showsVerticalScrollIndicator={false}>
+      <GlassScreenScroll headerFloat={false} showsVerticalScrollIndicator={false}>
         <AppText variant="h1" style={styles.icon}>⚖️</AppText>
         <AppText variant="h2" style={styles.title}>{t('legal_title')}</AppText>
         <AppText variant="body" style={styles.text}>{t('legal_intro')}</AppText>
@@ -85,7 +85,7 @@ export default function LegalScreen() {
       </GlassScreenScroll>
 
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-        <PuffyButton
+        <SurfaceButton
           label={busy ? (isIt ? 'Salvataggio…' : 'Saving…') : t('accept_continue')}
           onPress={accept}
           disabled={!ready || busy}

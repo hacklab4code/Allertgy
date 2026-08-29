@@ -7,10 +7,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TS_IP=$(tailscale ip -4 2>/dev/null || true)
 WIFI_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)
 
-if [ -n "$TS_IP" ]; then
+if [ "${ALLERTGY_REMOTE:-0}" = "1" ] && [ -n "$TS_IP" ]; then
   IP="$TS_IP"
 elif [ -n "$WIFI_IP" ]; then
   IP="$WIFI_IP"
+elif [ -n "$TS_IP" ]; then
+  IP="$TS_IP"
 else
   IP="localhost"
 fi

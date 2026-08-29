@@ -10,6 +10,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from ..config import settings
+from .gemini_model import GEMINI_MODEL, gemini_json_config
 
 # I 14 allergeni del Reg. UE 1169/2011 di default se non forniti
 STANDARD_ALLERGEN_CODES = [
@@ -134,15 +135,12 @@ def _analyze_with_gemini(
     try:
         client = genai.Client(api_key=settings.gemini_api_key)
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=GEMINI_MODEL,
             contents=[
                 types.Part.from_bytes(data=data, mime_type=mime_type),
                 prompt,
             ],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=GeminiMedicalOutput,
-            ),
+            config=gemini_json_config(GeminiMedicalOutput),
         )
         result = response.parsed
         if result is None or not hasattr(result, "allergeni"):

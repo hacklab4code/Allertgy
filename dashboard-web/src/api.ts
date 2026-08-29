@@ -71,19 +71,19 @@ export const setInternalAdminKey = (t: string) => { internalAdminKey = t; localS
 export const clearInternalAdminKey = () => { internalAdminKey = ''; localStorage.removeItem('allertgy_internal_admin_key'); };
 export const hasInternalAdminKey = () => !!internalAdminKey;
 
-async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function req<T>(path: string, init: RequestInit = {}, timeoutMs = 15000): Promise<T> {
   const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (internalAdminKey) headers['X-Admin-Key'] = internalAdminKey;
   if (init.body && typeof init.body === 'string') headers['Content-Type'] = 'application/json';
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
     res = await fetch(`${API}${path}`, { ...init, headers, signal: controller.signal });
   } catch (e) {
     if (e instanceof Error && e.name === 'AbortError') {
-      throw new Error('Richiesta scaduta: il server non ha risposto entro 15 secondi.');
+      throw new Error(`Richiesta scaduta: il server non ha risposto entro ${Math.round(timeoutMs / 1000)} secondi.`);
     }
     throw new Error(
       `Impossibile contattare il server AllerTgy (${API}). ` +
@@ -352,19 +352,57 @@ export const api = {
   analyze: (file: File) => {
     const fd = new FormData();
     fd.append('file', file);
-    return req<{ ai_stub: boolean; note: string; piatti: DishIn[] }>('/admin/menu/analyze', {
-      method: 'POST', body: fd,
-    });
+    return req<{ ai_stub: boolean; note: string; piatti: DishIn[] }>(
+      '/admin/menu/analyze',
+      { method: 'POST', body: fd },
+      120000,
+    );
   },
   analyzeUrl: (url: string) => {
-    return req<{ ai_stub: boolean; note: string; piatti: DishIn[] }>('/admin/menu/analyze-url', {
-      method: 'POST', body: JSON.stringify({ url }),
-    });
+    return req<{ ai_stub: boolean; note: string; piatti: DishIn[] }>(
+      '/admin/menu/analyze-url',
+      { method: 'POST', body: JSON.stringify({ url }) },
+      120000,
+    );
   },
   saveMenu: (rid: number, piatti: DishIn[]) =>
-    req<DishIn[]>(`/admin/restaurants/${rid}/menu`, { method: 'PUT', body: JSON.stringify({ piatti, replace: true }) }),
+    req<DishOut[]>(`/admin/restaurants/${rid}/menu`, { method: 'PUT', body: JSON.stringify({ piatti, replace: true }) }),
+  createDish: (rid: number, dish: DishIn, publish = true) =>
+    req<{
+      dish: DishOut;
+      menu_version: number;
+      menu_updated_at: string | null;
+      published: boolean;
+      registry_ready: boolean;
+    }>(`/admin/restaurants/${rid}/dishes?publish=${publish ? 'true' : 'false'}`, {
+      method: 'POST',
+      body: JSON.stringify(dish),
+    }),
+  updateDish: (rid: number, dishId: number, dish: DishIn, publish = true) =>
+    req<{
+      dish: DishOut;
+      menu_version: number;
+      menu_updated_at: string | null;
+      published: boolean;
+      registry_ready: boolean;
+    }>(`/admin/restaurants/${rid}/dishes/${dishId}?publish=${publish ? 'true' : 'false'}`, {
+      method: 'PUT',
+      body: JSON.stringify(dish),
+    }),
+  confirmKitchenAll: (rid: number, publish = true) =>
+    req<{
+      updated: number;
+      menu_version: number;
+      menu_updated_at: string | null;
+      published: boolean;
+      registry_ready: boolean;
+    }>(`/admin/restaurants/${rid}/dishes/confirm-kitchen-all?publish=${publish ? 'true' : 'false'}`, {
+      method: 'POST',
+    }),
+  deleteDish: (rid: number, dishId: number) =>
+    req<void>(`/admin/restaurants/${rid}/dishes/${dishId}`, { method: 'DELETE' }),
   translateMenu: (rid: number) =>
-    req<{ status: string; count: number }>(`/admin/restaurants/${rid}/menu/translate`, { method: 'POST' }),
+    req<{ status: string; count: number }>(`/admin/restaurants/${rid}/menu/translate`, { method: 'POST' }, 120000),
   listMenus: (rid: number) =>
     req<MenuOutItem[]>(`/admin/restaurants/${rid}/menus`),
   createMenu: (rid: number, name: string, isActive?: boolean, sortOrder?: number) =>
@@ -379,10 +417,13 @@ export const api = {
     }),
   deleteMenu: (rid: number, menuId: number) =>
     req(`/admin/restaurants/${rid}/menus/${menuId}`, { method: 'DELETE' }),
-  approve: (rid: number, legalAcknowledged: boolean) =>
+  approve: (rid: number, legalAcknowledged: boolean, republishOnly = false) =>
     req<Restaurant>(`/admin/restaurants/${rid}/approve`, {
       method: 'POST',
-      body: JSON.stringify({ legal_acknowledged: legalAcknowledged }),
+      body: JSON.stringify({
+        legal_acknowledged: legalAcknowledged,
+        republish_only: republishOnly,
+      }),
     }),
   menuAudit: (rid: number) =>
     req<{
@@ -416,12 +457,22 @@ export const api = {
       body: fd,
     });
   },
-  // --- Recupero password ---
+  // --- Recupero / cambio password ---
   forgotPassword: (email: string) =>
     req<{ detail: string }>('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: (resetToken: string, newPassword: string) =>
     req<{ detail: string }>('/auth/reset-password', {
       method: 'POST', body: JSON.stringify({ token: resetToken, new_password: newPassword }),
+    }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    req<{ detail: string }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }),
+  updateProfile: (displayName: string) =>
+    req<UserProfile>('/profile', {
+      method: 'PUT',
+      body: JSON.stringify({ display_name: displayName }),
     }),
 
   // --- Pagina pubblica + recensioni ---

@@ -112,6 +112,10 @@ class UserAllergen(Base):
     intensity: Mapped[str] = mapped_column(
         Enum("lieve", "moderata", "grave", name="user_allergen_intensity"), default="moderata"
     )
+    # assoluto = qualsiasi forma; crudo/cotto = solo quella forma (semaforo giallo se presente)
+    criterio: Mapped[str] = mapped_column(
+        Enum("assoluto", "crudo", "cotto", name="user_allergen_criterio"), default="assoluto"
+    )
     confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     allergen: Mapped["Allergen"] = relationship(lazy="joined", overlaps="allergens")
@@ -162,6 +166,7 @@ class Restaurant(Base):
     website: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     menu_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cuisine: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     stripe_price_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -563,7 +568,7 @@ class CustomerUsage(Base):
 
 
 class ProductLabelCache(Base):
-    """Etichette prodotto analizzate con AI, condivise per barcode (no ripetizione AI)."""
+    """Etichette prodotto analizzate con AI o verificate tramite multi-database a cascata."""
     __tablename__ = "product_label_cache"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -573,6 +578,14 @@ class ProductLabelCache(Base):
     ingredients: Mapped[str] = mapped_column(Text, nullable=False, default="")
     allergeni_contenuti_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     allergeni_tracce_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    source: Mapped[str] = mapped_column(String(50), nullable=False, default="ai_label")
+    image_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    confidence_score: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    verification_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    report_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_verified_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
+    )
     created_by_user_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -580,7 +593,7 @@ class ProductLabelCache(Base):
         DateTime, server_default=text("CURRENT_TIMESTAMP")
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+        DateTime, server_default=text("CURRENT_TIMESTAMP")
     )
 
 
@@ -627,6 +640,9 @@ class ProfileAllergen(Base):
     )
     intensity: Mapped[str] = mapped_column(
         String(30), default="moderata"
+    )
+    criterio: Mapped[str] = mapped_column(
+        String(30), default="assoluto"
     )
 
     allergen: Mapped["Allergen"] = relationship(lazy="joined", overlaps="allergens")

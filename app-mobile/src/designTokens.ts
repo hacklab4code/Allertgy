@@ -2,7 +2,7 @@
  * Bridge unico: design_guidelines.json → token TypeScript.
  * Non duplicare valori qui — aggiungili al JSON e mappa qui sotto.
  */
-import guidelines from '../design_guidelines.json';
+import guidelines from '../design_guidelines.json' with { type: 'json' };
 
 const { color: c, verdict: v, spacing: s, radius_tokens: r, shadow: sh, fonts: f } = guidelines;
 
@@ -42,6 +42,8 @@ export const puffyColors = {
   brandDark: c.brandDark,
   brandDarker: c.brandDarker,
   brandInk: c.brandInk,
+  cosmic: c.cosmic ?? '#23212C',
+  vanilla: c.vanilla ?? '#F1FEC8',
   brand50: c.brand50,
   brand100: c.brand100,
   brand200: c.brand200,
@@ -109,5 +111,88 @@ export const verdictEmoji = {
 
 export const tokenTypographyScale = guidelines.typography.scale;
 
+/**
+ * Semaforo tokens assoluti per AllerTgy
+ * 🟢 Safe / Idoneo: #10B981
+ * 🟡 Warning / Attenzione: #F59E0B
+ * 🔴 Danger / Non idoneo: #EF4444
+ */
+export const SEMAFORO_TOKENS = {
+  safe: {
+    key: 'safe',
+    solid: '#10B981',
+    soft: '#ECFDF5',
+    border: '#6EE7B7',
+    text: '#065F46',
+    label: 'Idoneo',
+    sublabel: 'Nessun allergene rilevato',
+    emoji: '🟢',
+    icon: 'checkmark-circle' as const,
+  },
+  warning: {
+    key: 'warning',
+    solid: '#F59E0B',
+    soft: '#FFFBEB',
+    border: '#FCD34D',
+    text: '#92400E',
+    label: 'Attenzione',
+    sublabel: 'Tracce o dati incompleti',
+    emoji: '🟡',
+    icon: 'alert-circle' as const,
+  },
+  danger: {
+    key: 'danger',
+    solid: '#EF4444',
+    soft: '#FEF2F2',
+    border: '#FCA5A5',
+    text: '#991B1B',
+    label: 'Non idoneo',
+    sublabel: 'Contiene allergeni esclusi',
+    emoji: '🔴',
+    icon: 'close-circle' as const,
+  },
+  neutral: {
+    key: 'neutral',
+    solid: '#64748B',
+    soft: '#F1F5F9',
+    border: '#CBD5E1',
+    text: '#334155',
+    label: 'Non verificato',
+    sublabel: 'Dati non disponibili',
+    emoji: '⚪',
+    icon: 'help-circle' as const,
+  },
+} as const;
+
+export type SemaforoStatus = keyof typeof SEMAFORO_TOKENS;
+
+/**
+ * Normalizza qualsiasi input status in uno stato semaforico canonico
+ */
+export function normalizeSemaforoStatus(status?: string | null): SemaforoStatus {
+  if (!status) return 'neutral';
+  const s = status.toLowerCase().trim();
+  if (s === 'safe' || s === 'green' || s === 'verde' || s === 'ok' || s === 'idoneo') return 'safe';
+  if (s === 'warning' || s === 'yellow' || s === 'giallo' || s === 'amber' || s === 'attenzione') return 'warning';
+  if (s === 'danger' || s === 'red' || s === 'rosso' || s === 'error' || s === 'non idoneo' || s === 'vietato') return 'danger';
+  return 'neutral';
+}
+
+/** Brand Action standard (Cosmic + Vanilla) */
+export const BRAND_TOKENS = {
+  primary: '#23212C',
+  dark: '#1A1822',
+  hover: '#2E2B3A',
+  light: '#3D384D',
+  soft: '#F1FEC8',
+  border: '#E6DFF5',
+  text: '#23212C',
+  ink: '#23212C',
+  cosmic: '#23212C',
+  vanilla: '#F1FEC8',
+  lavender: '#F1FEC8',
+} as const;
+
 /** Esporta il JSON grezzo per tooling / documentazione */
 export const designGuidelines = guidelines;
+

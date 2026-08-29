@@ -2,136 +2,194 @@
 
 Quando un testo cambia: aggiorna la costante di versione corrispondente; app e web
 richiederanno una nuova accettazione agli utenti con versione diversa.
-
-⚠️ Bozza tecnica da far rivedere a un legale prima del lancio pubblico
-(in particolare TERMS §8 — limitazione di responsabilità — e B2B).
 """
 
-LEGAL_TERMS_VERSION = "2026-07-11"
-PRIVACY_VERSION = "2026-07-11"
-SAFETY_DISCLAIMER_VERSION = "2026-07-11"
-MENU_CONFIRMATION_VERSION = "2026-07-11"
-COOKIE_VERSION = "2026-07-11"
-B2B_TERMS_VERSION = "2026-07-11"
+LEGAL_TERMS_VERSION = "2026-08-29"
+PRIVACY_VERSION = "2026-08-29"
+SAFETY_DISCLAIMER_VERSION = "2026-08-29"
+MENU_CONFIRMATION_VERSION = "2026-08-29"
+COOKIE_VERSION = "2026-08-29"
+B2B_TERMS_VERSION = "2026-08-29"
+COPYRIGHT_VERSION = "2026-08-29"
+
+COPYRIGHT_MARKDOWN = """
+# Copyright e Proprietà Intellettuale
+
+**© 2026 AllerTgy. Tutti i diritti riservati.**
+
+### 1. Titolarità dei Diritti
+Tutti i contenuti, le funzionalità, il codice sorgente, i loghi, il marchio **AllerTgy**, la grafica, l'interfaccia utente (UI/UX), il design e le banche dati correlate sono di esclusiva proprietà di AllerTgy e sono protetti dalle leggi vigenti sul diritto d'autore e sulla proprietà industriale (Legge 22 aprile 1941 n. 633, D.Lgs. 10 febbraio 2005 n. 30 e successive modifiche).
+
+### 2. Divieti e Limitazioni d'Uso
+È fatto espresso divieto di:
+- Copiare, riprodurre, pubblicare, distribuire o trasmettere in qualsiasi forma, totale o parziale, il software e i contenuti proprietari senza previo consenso scritto.
+- Compiere azioni di reverse engineering, decompilazione o estrazione non autorizzata dei dati (data scraping / screen scraping).
+- Utilizzare il marchio, il logo o i segni distintivi di AllerTgy in assenza di licenza formale.
+
+### 3. Contenuti dei Ristoratori
+I loghi, le denominazioni commerciali, le fotografie e i menù caricati dai Ristoratori restano di titolarità dei rispettivi esercenti, i quali concedono ad AllerTgy licenza d'uso gratuita, non esclusiva e limitata all'erogazione dei servizi della piattaforma.
+"""
 
 TERMS_MARKDOWN = """
-# Termini di Servizio
+# Termini e Condizioni Generali di Servizio
 
-**1. Oggetto** — AllerTgy è una piattaforma che mette in contatto clienti con allergie/intolleranze alimentari e ristoratori, tramite un sistema di segnalazione degli allergeni ("il semaforo": 🟢 nessun allergene dichiarato, 🟡 possibili tracce, 🔴 allergene dichiarato come contenuto).
+**1. Oggetto del Servizio** — AllerTgy è una piattaforma tecnologica che connette consumatori con allergie o intolleranze alimentari e attività di ristorazione. La piattaforma fornisce un sistema visivo di comparazione allergenica ("il semaforo": 🟢 nessun allergene dichiarato, 🟡 possibili tracce / attenzione, 🔴 allergene presente dichiarato).
 
 **2. Definizioni**
-- *Cliente*: utente privato che utilizza l'app per consultare menù e gestire il proprio profilo allergenico.
-- *Ristoratore*: utente professionale titolare di uno o più *Locali*, responsabile dell'inserimento dei dati sul menù.
-- *Contenuti del Locale*: menù, piatti, allergeni dichiarati, foto, orari, inseriti dal Ristoratore.
+- *Cliente/Utente*: persona fisica che utilizza l'applicazione per consultare menù e gestire il proprio profilo allergenico.
+- *Ristoratore/Esercente*: utente professionale titolare o gestore di un locale, responsabile esclusivo dell'inserimento dei dati del menù.
+- *Contenuti del Locale*: piatti, ingredienti, allergeni dichiarati, prezzi, foto e orari pubblicati dall'Esercente.
 
-**3. Natura del servizio e limiti** — AllerTgy è uno **strumento di supporto informativo**. Non è un dispositivo medico, non fornisce diagnosi né consulenza medica, e **non sostituisce la comunicazione diretta con il personale del Locale prima di ordinare**. Il semaforo (🟢/🟡/🔴) indica solo la compatibilità tra il profilo allergenico che hai inserito e gli allergeni **dichiarati dal Ristoratore** nel menù: non garantisce l'assenza di rischi in cucina. I dati sugli allergeni possono non riflettere variazioni last-minute in cucina o rischi di contaminazione crociata non dichiarati.
+**3. Natura del Servizio e Limiti di Responsabilità** — AllerTgy è un **servizio informativo di supporto**. Non costituisce un dispositivo medico, non formula diagnosi né terapie sanitarie e **non sostituisce mai la comunicazione diretta e verbale con il personale del ristorante prima di ordinare**. Il semaforo indica unicamente la corrispondenza logica tra il profilo inserito dall'utente e gli allergeni **espressamente dichiarati dal ristoratore**. AllerTgy non garantisce l'assenza assoluta di contaminazioni crociate all'interno delle cucine né variazioni estemporanee di ricetta.
 
-**4. Registrazione e obblighi dell'utente** — L'utente si impegna a fornire dati veritieri (identità, email, allergie dichiarate) e a mantenere aggiornato il proprio profilo allergenico. **Prima di ogni ordine, anche in presenza di semaforo verde, l'utente deve comunicare le proprie allergie e intolleranze al personale del Locale** e verificare ingredienti, preparazione e rischio di contaminazione crociata. La sicurezza delle credenziali è responsabilità dell'utente.
+**4. Obblighi dell'Utente (Cliente)** — L'Utente si impegna a:
+- Fornire informazioni veritiere e mantenere aggiornato il proprio profilo allergenico.
+- **Comunicare SEMPRE le proprie allergie e intolleranze al personale di sala prima di consumare qualsiasi alimento o bevanda**, anche in presenza di semaforo verde.
+- Custodire le proprie credenziali di accesso in modo sicuro e riservato.
 
-**5. Obblighi del Ristoratore** — Il Ristoratore garantisce l'accuratezza e l'aggiornamento dei dati su allergeni inseriti per ciascun piatto, si impegna ad aggiornare il menù ad ogni variazione di ricetta o fornitore, e riconosce che l'inserimento errato di un allergene può causare un danno grave alla salute di un Cliente.
+**5. Obblighi del Ristoratore (Regolamento UE 1169/2011)** — Il Ristoratore dichiara e garantisce che:
+- Tutte le informazioni sugli allergeni inserite sono accurate, aggiornate e conformi al Regolamento UE 1169/2011 e al piano HACCP del locale.
+- Ogni variazione di ricetta, fornitore o ingrediente comporterà l'immediato aggiornamento del menù su AllerTgy.
+- La generazione del menù tramite scansione automatizzata o AI richiede sempre la revisione e approvazione manuale dell'esercente prima della pubblicazione.
 
-**6. Piani a pagamento** — I piani Base e Pro sono abbonamenti mensili a rinnovo automatico, gestiti tramite Stripe. Il Ristoratore può disdire in qualsiasi momento dal Customer Portal; la disdetta ha effetto alla fine del periodo di fatturazione in corso, senza rimborso della quota già pagata salvo diversa previsione di legge.
+**6. Piani di Abbonamento e Fatturazione (B2B)** — I piani a pagamento per Ristoratori (Base, Pro) sono gestiti tramite Stripe. Il rinnovo è automatico e disattivabile in qualsiasi momento dal portale clienti, con validità fino al termine del periodo pagato.
 
-**7. Proprietà intellettuale** — Il software, il marchio e i contenuti editoriali di AllerTgy restano di proprietà di AllerTgy. I Contenuti del Locale restano di proprietà del Ristoratore, che concede ad AllerTgy licenza d'uso per mostrarli sulla piattaforma.
+**7. Proprietà Intellettuale** — Il software, il marchio, l'algoritmo del semaforo e i contenuti editoriali di AllerTgy appartengono in via esclusiva ad AllerTgy.
 
-**8. Limitazione di responsabilità** — Nei limiti massimi consentiti dalla legge, AllerTgy non risponde di danni derivanti da: inesattezza dei dati sugli allergeni inseriti dal Ristoratore; mancata comunicazione delle proprie allergie al personale del Locale da parte del Cliente; contaminazioni crociate o variazioni di ricetta non aggiornate nel menù; uso del servizio in modo difforme dal Disclaimer di sicurezza. *(Clausola da tarare con un legale in base alla forma societaria e alle coperture assicurative.)*
+**8. Limitazione di Responsabilità** — Nei limiti inderogabili di legge, AllerTgy declina ogni responsabilità per danni alla salute derivanti da: dati inesatti o omessi dal ristoratore; mancata segnalazione verbale al personale da parte del cliente; contaminazioni accidentali in cucina; mancato rispetto del Disclaimer di sicurezza.
 
-**9. Sospensione e cessazione** — AllerTgy può sospendere un account in caso di dati palesemente falsi, uso fraudolento del servizio o mancato pagamento oltre il periodo di grazia.
-
-**10. Modifiche, legge applicabile, foro competente** — AllerTgy può aggiornare i presenti Termini notificando gli utenti e richiedendo una nuova accettazione. Legge applicabile: italiana. Foro competente: quello del consumatore per i Clienti, quello della sede legale di AllerTgy per i rapporti B2B con i Ristoratori (salvo diversa norma inderogabile).
+**9. Legge Applicabile e Foro Competente** — Il contratto è regolato dalla legge italiana. Per gli utenti consumatori è competente il foro di residenza o domicilio del consumatore. Per i rapporti commerciali con i ristoratori (B2B) è competente in via esclusiva il Foro della sede legale di AllerTgy.
 """
 
 PRIVACY_MARKDOWN = """
-# Informativa Privacy
+# Informativa Privacy e Trattamento Dati Personali
+*Ai sensi degli Artt. 13 e 14 del Regolamento (UE) 2016/679 ("GDPR")*
 
-**1. Titolare del trattamento** — [Ragione sociale/nome del titolare da inserire], email di contatto per richieste privacy: [inserire].
+**1. Titolare del Trattamento**  
+Il Titolare del trattamento è [Ragione sociale/nome del titolare da inserire], contattabile all'indirizzo email: [inserire].
 
-**2. Categorie di dati trattati**
-- Dati identificativi e di contatto (email, nome visualizzato).
-- Dati di autenticazione (password in hash, mai in chiaro).
-- **Dati particolari ex art. 9 GDPR**: allergie, intolleranze, preferenze alimentari, documenti medici caricati (referti allergologici).
-- Dati di pagamento (gestiti direttamente da Stripe, AllerTgy non memorizza numeri di carta).
-- Dati di utilizzo (log accessi, indirizzo IP per rate limiting e sicurezza).
+**2. Categorie di Dati Trattati**
+- **Dati comuni identificativi:** Nome, cognome, indirizzo email, identificativo dispositivo.
+- **Credenziali:** Password memorizzata esclusivamente tramite hash crittografico irreversibile.
+- **Dati Particolari / Sanitari (Art. 9 GDPR):** Profilo allergenico (14 allergeni UE, gravità della reazione es. lieve/moderata/grave, intolleranze) e documenti medici facoltativi caricati dall'utente (referti allergologici).
+- **Dati di pagamento (B2B e Clienti Plus):** Gestiti in modo sicuro e conforme PCI-DSS da Stripe; AllerTgy non accede né memorizza dati di carte di credito.
+- **Dati tecnici:** Log di sicurezza, indirizzi IP per rate-limiting e tutela dell'infrastruttura.
 
-**3. Finalità e base giuridica**
-- Erogazione del servizio (esecuzione del contratto): profilo allergenico, consultazione menù, semaforo.
-- Trattamento dei dati sanitari: **consenso esplicito e specifico** (art. 9.2.a GDPR), revocabile in qualsiasi momento dal profilo.
-- Analisi AI dei documenti medici: **consenso specifico e separato per ogni singolo documento caricato**, distinto dal consenso generale ai dati sanitari.
-- Sicurezza e prevenzione abusi (rate limiting, log accessi): legittimo interesse.
-- Fatturazione e adempimenti fiscali: obbligo di legge.
+**3. Basi Giuridiche del Trattamento**
+- *Erogazione del servizio contrattuale (Art. 6.1.b GDPR):* Creazione account, consultazione menù, calcolo semaforo.
+- *Dati sanitari (Art. 9.2.a GDPR):* **Consenso esplicito, specifico e libero**, revocabile in qualsiasi momento dall'area profilo.
+- *Analisi AI dei referti medici:* **Consenso specifico per-documento**, con elaborazione assistiva e conferma manuale obbligatoria da parte dell'utente.
+- *Obblighi di legge e fiscali (Art. 6.1.c GDPR):* Fatturazione abbonamenti.
+- *Legittimo interesse (Art. 6.1.f GDPR):* Sicurezza informatica e prevenzione frodi.
 
-**4. Destinatari e sub-responsabili del trattamento**
+**4. Destinatari e Sub-Responsabili (Data Processors)**
+I dati possono essere trattati da fornitori tecnici vincolati da accordi ex Art. 28 GDPR:
+- **Hostinger International Ltd.** (Hosting e Database nell'Unione Europea).
+- **Cloudflare R2** (Storage privato crittografato per file e referti, con URL firmati a scadenza).
+- **Google Cloud / Gemini Vision** (Elaborazione AI immagini, senza memorizzazione permanente né riuso per training sui dati sanitari).
+- **Stripe Payments Europe Ltd.** (Elaborazione pagamenti e fatturazione).
+- **Resend** (Email transazionali per password reset e avvisi di sicurezza).
+- **Expo** (Consegna notifiche push al dispositivo).
 
-| Fornitore | Ruolo | Dati coinvolti |
-|---|---|---|
-| Hostinger | Hosting database | tutti i dati applicativi |
-| Cloudflare (R2) | Storage file privati | foto profilo/locale, documenti medici |
-| Google (Gemini Vision) | Analisi AI immagini | foto menù, documenti medici (solo se l'utente attiva l'estrazione) |
-| Stripe | Pagamenti e fatturazione | dati di pagamento, dati fiscali del Ristoratore |
-| Resend | Invio email transazionali | indirizzo email |
-| Expo | Notifiche push | token dispositivo |
+**5. Conservazione dei Dati (Data Retention)**
+- I dati del profilo sanitario e i documenti medici restano memorizzati fino alla cancellazione dell'account o per un massimo di 24 mesi di inattività.
+- L'utente può richiedere in ogni momento la cancellazione immediata dei propri dati.
+- I dati fiscali e di fatturazione sono conservati per 10 anni a norma di legge.
 
-Con ciascun fornitore che tratta dati fuori SEE (in particolare Google e Stripe) sono verificate Clausole Contrattuali Standard o un quadro di adeguatezza equivalente.
+**6. Diritti dell'Interessato (Artt. 15-22 GDPR)**
+L'utente ha diritto di: accedere ai propri dati, richiederne la rettifica o la cancellazione ("oblio"), limitare il trattamento, richiedere la portabilità dei dati in formato elettronico, revocare il consenso in qualsiasi momento e proporre reclamo al Garante per la Protezione dei Dati Personali (www.garanteprivacy.it).
 
-**5. Conservazione dei dati** — I documenti medici vengono conservati finché l'account è attivo e cancellati automaticamente dopo 24 mesi di inattività, o su richiesta immediata dell'utente. I dati di fatturazione sono conservati per il periodo previsto dalla normativa fiscale italiana (10 anni).
-
-**6. Diritti dell'interessato** — Accesso, rettifica, cancellazione, portabilità, limitazione e opposizione al trattamento, revoca del consenso in qualsiasi momento senza pregiudicare la liceità del trattamento già effettuato, reclamo al Garante per la Protezione dei Dati Personali.
-
-**7. Minori** — Il servizio non è rivolto a minori di 14 anni, data la natura dei dati sanitari trattati; in caso di minori tra 14 e 18 anni è richiesto il consenso di chi esercita la responsabilità genitoriale per il trattamento dei dati sanitari.
-
-**8. Sicurezza** — Password in hash, documenti medici su storage privato con URL firmati a scadenza breve, log di ogni accesso ai documenti medici, connessioni cifrate HTTPS.
+**7. Minori di Età**
+La gestione autonoma di un profilo con dati sanitari è riservata a utenti con almeno 14 anni. Per i minori di 14 anni, il profilo deve essere gestito da un genitore o tutore tramite le funzioni di profilo famiglia.
 """
 
 SAFETY_MARKDOWN = """
-# Disclaimer di sicurezza e salute
+# Disclaimer di Sicurezza, Salute e Tutela Medica
 
-**AllerTgy è uno strumento di supporto, non un dispositivo medico e non sostituisce il parere di un medico o allergologo.**
+### ⚠️ ALLERTGY NON È UN DISPOSITIVO MEDICO
+AllerTgy è uno strumento software di supporto e consultazione. Non fornisce consulenza medica, non effettua diagnosi e non può sostituire il giudizio clinico di un medico specialista.
 
-Gli allergeni indicati per ogni piatto sono **dichiarati dal Ristoratore** sotto la propria responsabilità. AllerTgy non entra fisicamente nelle cucine dei locali e non può garantire l'assenza di contaminazioni crociate o di variazioni dell'ultimo minuto negli ingredienti.
+### 🍽️ RESPONSABILITÀ DEI DATI DEL MENÙ
+Le informazioni sugli ingredienti e sugli allergeni di ciascun piatto sono **dichiarate sotto l'esclusiva responsabilità del Ristoratore** ai sensi del Reg. UE 1169/2011. AllerTgy non ha il controllo diretto delle cucine e non può escludere contaminazioni crociate accidentali o modifiche dell'ultimo minuto non registrate.
 
-**Il semaforo automatico**
-- 🟢 *Verde*: nessun allergene del tuo profilo risulta **dichiarato** nel piatto. **Non significa che il piatto sia sicuro al 100%**: comunica comunque le tue allergie al personale.
-- 🟡 *Giallo*: possibili tracce di un allergene del tuo profilo. Chiedi sempre conferma al personale prima di ordinare.
-- 🔴 *Rosso*: allergene del tuo profilo dichiarato come contenuto. Evita il piatto e verifica con il personale eventuali alternative.
+### 🚥 IL SEMAFORO ALLERTGY
+- 🟢 **Verde (Nessun allergene dichiarato):** Il piatto non contiene gli allergeni specificati nel tuo profilo in base a quanto inserito dal ristorante. **Non garantisce il rischio zero: comunica sempre le tue allergie al personale.**
+- 🟡 **Giallo (Possibili tracce / Attenzione):** Il piatto potrebbe presentare rischi di contaminazione crociata dichiarati dal locale. Chiedi chiarimenti prima di ordinare.
+- 🔴 **Rosso (Allergene presente):** Il piatto contiene uno o più allergeni non compatibili con il tuo profilo. Evita il consumo.
 
-**Comunica SEMPRE le tue allergie al personale di sala prima di ordinare**, anche se il semaforo mostra 🟢. In presenza di allergie gravi (rischio di shock anafilattico), consulta sempre il tuo medico sulle precauzioni da adottare mangiando fuori casa.
+### 🗣️ COMUNICAZIONE OBBLIGATORIA AL PERSONALE
+**Prima di ordinare, comunica SEMPRE le tue allergie o intolleranze al personale di sala**, accertandoti delle modalità di preparazione del cibo.
 
-Le segnalazioni di altri clienti (warning) sono opinioni non verificate da AllerTgy: usale solo come spunto per parlare con il personale, non come prova di sicurezza.
-
-Se un documento medico viene analizzato con intelligenza artificiale, i risultati sono **suggerimenti da confermare manualmente**: l'AI può commettere errori di lettura, e nessun dato viene aggiunto al tuo profilo senza la tua conferma esplicita.
-
-In caso di reazione allergica, contatta immediatamente i servizi di emergenza (**112**) e utilizza l'eventuale terapia prescritta dal tuo medico (es. adrenalina autoiniettabile). AllerTgy non fornisce assistenza medica di emergenza.
+### 🚨 GESTIONE DELLE EMERGENZE
+In caso di reazione allergica o anafilassi:
+1. **Contatta immediatamente il Numero Unico di Emergenza 112**.
+2. Utilizza tempestivamente i dispositivi medici salvavita prescritti dal tuo medico (es. autoiniettore di adrenalina).
+3. AllerTgy non gestisce chiamate di soccorso né monitora emergenze sanitarie.
 """
 
 OWNER_DECLARATION_MARKDOWN = """
-# Dichiarazione di responsabilità del Ristoratore
+# Dichiarazione di Responsabilità del Ristoratore
+*(Regolamento UE n. 1169/2011 - Art. 44 e Allegato II)*
 
-Il sottoscritto, in qualità di titolare o responsabile del Locale, dichiara che le informazioni sugli allergeni inserite per ciascun piatto sono accurate, aggiornate e verificate con la propria cucina al momento della pubblicazione. Si impegna ad aggiornare tempestivamente il menù in caso di variazione di ricette, fornitori o processi di preparazione, e riconosce che un'informazione errata sugli allergeni può causare un grave danno alla salute di un cliente. Il Locale è l'unico responsabile dell'accuratezza dei Contenuti del Locale caricati sulla piattaforma.
-
-Se il menù è stato generato con l'analisi AI della foto: *confermo di aver rivisto e corretto manualmente i piatti generati automaticamente prima della pubblicazione.*
+Il sottoscritto, in qualità di titolare, gestore o referente per la sicurezza alimentare dell'Esercizio:
+1. **Dichiara** che le informazioni sugli allergeni inserite per ciascun piatto sono veritiere, complete e aggiornate in conformità al piano di autocontrollo (HACCP) del locale.
+2. **Si impegna** ad aggiornare immediatamente il menù su AllerTgy in caso di variazioni negli ingredienti, ricette o fornitori.
+3. **Conferma**, nel caso di utilizzo di strumenti di riconoscimento ottico / intelligenza artificiale per l'acquisizione dei menù, di aver eseguito un controllo manuale su ciascun piatto prima di procedere alla pubblicazione.
+4. **Riconosce** che la corretta informazione alla clientela è un obbligo di legge inderogabile e che l'Esercizio rimane l'unico responsabile dei contenuti pubblicati.
 """
 
-COOKIES_MARKDOWN = """
-# Cookie Policy
+REGISTRY_PDF_LEGAL_NOTICE = (
+    "Documento informativo sugli allergeni ai sensi del Regolamento (UE) n. 1169/2011 "
+    "(informazione sugli alimenti non preimballati — art. 44 e Allegato II). "
+    "Elenca le sostanze o i prodotti che provocano allergie o intolleranze utilizzati "
+    "nella preparazione di ciascun piatto offerto dal locale, incluse le possibili tracce "
+    "da contaminazione crociata dichiarate dal responsabile. "
+    "Il presente registro deve essere aggiornato a ogni modifica del menù, tenuto a "
+    "disposizione della clientela e delle autorità di controllo (ASL/NAS), ed esposto "
+    "o reso consultabile insieme all’avviso al consumatore (es. QR code AllerTgy). "
+    "La responsabilità dell’accuratezza dei dati è esclusivamente del titolare/gestore "
+    "dell’esercizio. AllerTgy fornisce solo lo strumento di redazione e stampa."
+)
 
-- **Cookie tecnici** (sessione di login, preferenze lingua): necessari al funzionamento del servizio, nessun consenso richiesto.
-- **Cookie di terze parti** (es. Stripe Checkout durante il pagamento): attivati solo nella pagina di pagamento; informativa dedicata di Stripe.
-- Nessun cookie di profilazione o analytics è attivo. Se in futuro verrà aggiunto un tool di analytics, un banner di consenso comparirà prima dell'attivazione.
+REGISTRY_PDF_CONSUMER_NOTICE = (
+    "Avviso al consumatore: le informazioni sugli allergeni sono disponibili in formato "
+    "digitale tramite QR code e in questo registro cartaceo su richiesta al personale. "
+    "Comunicare sempre allergie e intolleranze al personale prima di ordinare."
+)
+
+COOKIES_MARKDOWN = """
+# Cookie Policy e Tracciamento
+
+**1. Cookie Tecnici Essenziali**  
+AllerTgy utilizza cookie tecnici necessari a garantire la navigazione sicura, la gestione della sessione autenticata (JWT) e il mantenimento delle preferenze di interfaccia. Non richiedono consenso preventivo.
+
+**2. Cookie di Terze Parti per Pagamenti (Stripe)**  
+Durante le operazioni di abbonamento e checkout B2B, Stripe raccoglie cookie tecnici e antifrode strettamente necessari all'elaborazione sicura delle transazioni conformemente agli standard bancari PCI-DSS.
+
+**3. Nessun Cookie di Profilazione Commerciale**  
+AllerTgy non impiega cookie di profilazione pubblicitaria né cede dati di navigazione a terze parti a scopo di marketing o rivendita dati.
 """
 
 B2B_MARKDOWN = """
-# Condizioni contrattuali abbonamenti (Ristoratori)
+# Condizioni Contrattuali Abbonamenti B2B (Ristoratori)
 
-Il Ristoratore che sottoscrive un piano a pagamento agisce come professionista/azienda, non come consumatore: il diritto di recesso di 14 giorni del Codice del Consumo non si applica automaticamente a questo rapporto.
+**1. Natura Professionale del Contratto**  
+Il Ristoratore che attiva un abbonamento su AllerTgy agisce nell'esercizio della propria attività imprenditoriale o professionale (B2B). Non si applicano le tutele del Codice del Consumo relative al diritto di recesso entro 14 giorni.
 
-- Rinnovo automatico mensile via Stripe, disdicibile in ogni momento dal Customer Portal, con effetto a fine periodo.
-- Nessun rimborso pro-quota, salvo diversa indicazione contrattuale o norma inderogabile.
-- Fatturazione elettronica tramite i dati SDI/PEC comunicati dal Ristoratore.
-- In caso di pagamento fallito, dopo i solleciti automatici e il periodo di grazia il locale viene riportato al piano Gratis.
+**2. Rinnovo e Disdetta**  
+- Gli abbonamenti (Base, Pro Notifiche) si rinnovano tacitamente su base mensile.
+- La disdetta può essere richiesta in qualsiasi momento tramite il portale di gestione Stripe accessibile dalla dashboard; ha effetto al termine del ciclo di fatturazione corrente, senza penali né rimborsi pro-quota.
+
+**3. Fatturazione Elettronica**  
+La fatturazione avviene tramite i dati fiscali (Partita IVA, Codice Destinatario SDI o PEC) forniti dall'Esercente.
+
+**4. Mancato Pagamento**  
+In caso di fallimento della transazione di rinnovo, dopo i tentativi automatici e il periodo di tolleranza, la scheda del locale viene automaticamente riportata al profilo base gratuito fino a regolarizzazione.
 """
 
-# doc → (titolo, versione, testo)
+# Mappatura documenti per API: doc → (titolo, versione, testo)
 LEGAL_DOCUMENTS: dict[str, tuple[str, str, str]] = {
+    "copyright": ("Copyright e Proprietà Intellettuale", COPYRIGHT_VERSION, COPYRIGHT_MARKDOWN),
     "terms": ("Termini di Servizio", LEGAL_TERMS_VERSION, TERMS_MARKDOWN),
     "privacy": ("Informativa Privacy", PRIVACY_VERSION, PRIVACY_MARKDOWN),
     "safety": ("Disclaimer di sicurezza e salute", SAFETY_DISCLAIMER_VERSION, SAFETY_MARKDOWN),

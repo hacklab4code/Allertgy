@@ -25,7 +25,7 @@ export const Nav = ({ scrollTo, onEnter, onClienti }: NavProps) => {
   return (
     <header
       data-testid="main-nav"
-      className="fixed top-0 inset-x-0 z-50 bg-[#FAF8F5]/70 backdrop-blur-xl backdrop-saturate-150 border-b border-[#EFEBE1]"
+      className="fixed top-0 inset-x-0 z-50 bg-[#F6F2FC]/70 backdrop-blur-xl backdrop-saturate-150 border-b border-[#E6DFF5]"
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between px-6 md:px-12 py-4">
         <button
@@ -33,11 +33,11 @@ export const Nav = ({ scrollTo, onEnter, onClienti }: NavProps) => {
           data-testid="nav-logo"
           className="flex items-center gap-2 group"
         >
-          <span className="grid place-items-center w-9 h-9 rounded-xl badge-clay-green text-white group-hover:-translate-y-0.5 transition-transform">
+          <span className="grid place-items-center w-9 h-9 rounded-xl bg-[#36255C] text-white group-hover:-translate-y-0.5 transition-transform">
             <Salad className="w-5 h-5" strokeWidth={2} />
           </span>
-          <span className="text-xl font-extrabold tracking-tight text-[#1C221F]">
-            Aller<span className="text-[#16A34A]">Tgy</span>
+          <span className="text-xl font-extrabold tracking-tight text-[#36255C]">
+            Aller<span className="text-[#B9A6E8]">Tgy</span>
           </span>
         </button>
 
@@ -47,7 +47,7 @@ export const Nav = ({ scrollTo, onEnter, onClienti }: NavProps) => {
               key={l.target}
               onClick={() => go(l.target)}
               data-testid={`nav-link-${l.target}`}
-              className="text-sm font-medium text-[#4A524D] hover:text-[#16A34A] transition-colors bg-transparent border-0 cursor-pointer"
+              className="text-sm font-medium text-[#6B6575] hover:text-[#36255C] transition-colors bg-transparent border-0 cursor-pointer"
             >
               {l.label}
             </button>
@@ -58,7 +58,7 @@ export const Nav = ({ scrollTo, onEnter, onClienti }: NavProps) => {
           <button
             onClick={onClienti}
             data-testid="nav-clienti-btn"
-            className="text-sm font-semibold text-[#1C221F] hover:text-[#16A34A] transition-colors px-3 py-2 bg-transparent border-0 cursor-pointer"
+            className="text-sm font-semibold text-[#36255C] hover:text-[#36255C] transition-colors px-3 py-2 bg-transparent border-0 cursor-pointer"
           >
             Area Clienti
           </button>
@@ -74,20 +74,20 @@ export const Nav = ({ scrollTo, onEnter, onClienti }: NavProps) => {
         <button
           onClick={() => setOpen((v) => !v)}
           data-testid="nav-mobile-toggle"
-          className="md:hidden grid place-items-center w-10 h-10 rounded-xl border border-[#EFEBE1] text-[#1C221F] bg-transparent"
+          className="md:hidden grid place-items-center w-10 h-10 rounded-xl border border-[#E6DFF5] text-[#36255C] bg-transparent"
         >
           {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>
 
       {open && (
-        <div className="md:hidden border-t border-[#EFEBE1] bg-[#FAF8F5] px-6 py-4 space-y-1">
+        <div className="md:hidden border-t border-[#E6DFF5] bg-[#F6F2FC] px-6 py-4 space-y-1">
           {LINKS.map((l) => (
             <button
               key={l.target}
               onClick={() => go(l.target)}
               data-testid={`nav-mobile-link-${l.target}`}
-              className="block w-full text-left py-2.5 text-[#1C221F] font-medium bg-transparent border-0 cursor-pointer"
+              className="block w-full text-left py-2.5 text-[#36255C] font-medium bg-transparent border-0 cursor-pointer"
             >
               {l.label}
             </button>

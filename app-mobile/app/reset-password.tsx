@@ -14,7 +14,7 @@ import {
   DebossedInput,
   GlassCard,
   GlassScreenScroll,
-  PuffyButton,
+  SurfaceButton,
   Screen,
 } from '../src/components/ui';
 import { colors, spacing } from '../src/theme';
@@ -72,7 +72,7 @@ export default function ResetPassword() {
               <AppText variant="body" color={colors.brand}>
                 Password aggiornata. Ora puoi accedere.
               </AppText>
-              <PuffyButton label="Vai all'accesso" onPress={() => router.replace('/login')} />
+              <SurfaceButton label="Vai all'accesso" onPress={() => router.replace('/login')} />
             </GlassCard>
           ) : (
             <GlassCard style={styles.formCard}>
@@ -94,7 +94,7 @@ export default function ResetPassword() {
                   onChangeText={setConfirm}
                 />
               </View>
-              <PuffyButton
+              <SurfaceButton
                 label="Imposta password"
                 onPress={submit}
                 disabled={busy || !token || password.length < 8}

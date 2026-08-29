@@ -1,6 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { api, API, clearToken, type Allergen, type DishIn, type Photo, type Restaurant, type MenuOutItem } from './api';
 import MenuEditor from './components/MenuEditor';
+import {
+  markRegistryPrinted,
+  registryNeedsReprint,
+} from './utils/registryPrint';
 import NotificationsPanel from './components/NotificationsPanel';
 import PushNotificationPanel from './components/PushNotificationPanel';
 import TimeSeriesChart from './components/TimeSeriesChart';
@@ -13,7 +17,7 @@ import {
   restaurantCanUseMenu, restaurantCanPushNotify,
 } from './data/plans';
 import OwnerWebShell, { type OwnerTab } from './owner/OwnerWebShell';
-import { WireBtn, WireRow, WireZone } from './wireframe/WireframeUi';
+import { WireBtn, WireInput, WireRow, WireZone } from './wireframe/WireframeUi';
 
 type Props = {
   onLogout: () => void;
@@ -47,11 +51,19 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
   const [searchSuggestions, setSearchSuggestions] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [menuLegalAck, setMenuLegalAck] = useState(false);
+  const [registryReadyMsg, setRegistryReadyMsg] = useState('');
+  const [pdfReprintNeeded, setPdfReprintNeeded] = useState(false);
   const [menus, setMenus] = useState<MenuOutItem[]>([]);
   const [selectedMenuId, setSelectedMenuId] = useState<number | null>(null);
   const [newMenuName, setNewMenuName] = useState('');
   const [showAddMenuModal, setShowAddMenuModal] = useState(false);
   const [webLang, setWebLang] = useState('it');
+  const [ownerDisplayName, setOwnerDisplayName] = useState('');
+  const [ownerEmail, setOwnerEmail] = useState('');
+  const [ownerCurrentPassword, setOwnerCurrentPassword] = useState('');
+  const [ownerNewPassword, setOwnerNewPassword] = useState('');
+  const [ownerConfirmPassword, setOwnerConfirmPassword] = useState('');
+  const [ownerAccountMsg, setOwnerAccountMsg] = useState('');
 
   const TRANSLATIONS: Record<string, Record<string, string>> = {
     it: {
@@ -148,6 +160,63 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
     }
   }, [current]);
 
+  useEffect(() => {
+    if (activeSubTab !== 'profilo') return;
+    api.getProfile()
+      .then((p) => {
+        setOwnerDisplayName(p.display_name ?? '');
+        setOwnerEmail(p.email ?? '');
+      })
+      .catch(() => {});
+  }, [activeSubTab]);
+
+  const saveOwnerDisplayName = async () => {
+    const name = ownerDisplayName.trim();
+    if (!name) {
+      setOwnerAccountMsg('Inserisci un nome.');
+      return;
+    }
+    setBusy(true);
+    setOwnerAccountMsg('');
+    setError('');
+    try {
+      const p = await api.updateProfile(name);
+      setOwnerDisplayName(p.display_name ?? name);
+      setOwnerAccountMsg('Nome aggiornato.');
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    setBusy(false);
+  };
+
+  const saveOwnerPassword = async () => {
+    if (!ownerCurrentPassword) {
+      setOwnerAccountMsg('Inserisci la password attuale.');
+      return;
+    }
+    if (ownerNewPassword.length < 8) {
+      setOwnerAccountMsg('La nuova password deve avere almeno 8 caratteri.');
+      return;
+    }
+    if (ownerNewPassword !== ownerConfirmPassword) {
+      setOwnerAccountMsg('Le due password non coincidono.');
+      return;
+    }
+    setBusy(true);
+    setOwnerAccountMsg('');
+    setError('');
+    try {
+      await api.changePassword(ownerCurrentPassword, ownerNewPassword);
+      setOwnerCurrentPassword('');
+      setOwnerNewPassword('');
+      setOwnerConfirmPassword('');
+      setOwnerAccountMsg('Password aggiornata.');
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    setBusy(false);
+  };
+
   // Inizializza la mappa interattiva per le impostazioni locale
   useEffect(() => {
     if (activeSubTab !== 'attivita') {
@@ -232,7 +301,8 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
       const m = await api.publicMenu(r.public_code);
       setHasPublished(m.piatti.length > 0);
       if (m.piatti.length > 0) {
-        setPiatti(m.piatti.map(({ id, ...p }) => p));
+        // Manteniamo l'id dei piatti per poterli cancellare dal DB
+        setPiatti(m.piatti);
       } else {
         setPiatti(null);
       }
@@ -247,7 +317,8 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
     setBusy(true); setError('');
     try {
       const m = await api.publicMenu(current.public_code);
-      setPiatti(m.piatti.map(({ id, ...p }) => p));
+      // Manteniamo gli id dei piatti per permettere la cancellazione dal DB
+      setPiatti(m.piatti);
       setAiNote('');
     } catch (e) { setError((e as Error).message); }
     setBusy(false);
@@ -257,10 +328,14 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
     setBusy(true); setError(''); setApproved(null);
     try {
       const res = await api.analyze(file);
-      setPiatti(res.piatti);
       setAiNote(res.note);
+      if (res.ai_stub || !res.piatti?.length) {
+        setError(res.note || 'Analisi AI non riuscita. Riprova con una foto più nitida.');
+        return;
+      }
+      setPiatti(res.piatti);
     } catch (e) { setError((e as Error).message); }
-    setBusy(false);
+    finally { setBusy(false); }
   };
 
   const analyzeFromUrl = async () => {
@@ -268,11 +343,100 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
     setBusy(true); setError(''); setApproved(null);
     try {
       const res = await api.analyzeUrl(menuUrl.trim());
-      setPiatti(res.piatti);
       setAiNote(res.note);
+      if (res.ai_stub || !res.piatti?.length) {
+        setError(res.note || 'Analisi del link non riuscita.');
+        setMenuUrl('');
+        return;
+      }
+      setPiatti(res.piatti);
       setMenuUrl('');
     } catch (e) { setError((e as Error).message); }
-    setBusy(false);
+    finally { setBusy(false); }
+  };
+
+  const legalAlreadyCurrent = !!(
+    current?.menu_legal_confirmed_at && current?.menu_legal_version
+  );
+
+  const syncPdfReprintFlag = (rid: number, menuVersion: number | null | undefined) => {
+    setPdfReprintNeeded(registryNeedsReprint(rid, menuVersion));
+  };
+
+  useEffect(() => {
+    if (current?.id) syncPdfReprintFlag(current.id, current.menu_version);
+  }, [current?.id, current?.menu_version]);
+
+  const downloadRegistryPdf = async () => {
+    if (!current) return;
+    setBusy(true);
+    setError('');
+    try {
+      const blob = await api.downloadRegistryPdf(current.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `registro_allergeni_${current.slug || current.public_code || 'locale'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      markRegistryPrinted(current.id, current.menu_version || 0);
+      setPdfReprintNeeded(false);
+      setRegistryReadyMsg(`Registro PDF v${current.menu_version || 0} scaricato`);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDishSaved = (res: {
+    dish: { id: number };
+    menu_version: number;
+    menu_updated_at: string | null;
+    published: boolean;
+    registry_ready: boolean;
+    silent?: boolean;
+  }) => {
+    if (!current) return;
+    setCurrent({
+      ...current,
+      menu_version: res.menu_version,
+      menu_updated_at: res.menu_updated_at,
+    });
+    if (res.published) setHasPublished(true);
+    syncPdfReprintFlag(current.id, res.menu_version);
+    if (res.registry_ready && !res.silent) {
+      setRegistryReadyMsg(
+        res.published
+          ? `Piatto salvato · menù v${res.menu_version} live`
+          : `Piatto salvato · conferma legale e pubblica per attivare QR e Registro`,
+      );
+    } else if (res.published && res.silent) {
+      setRegistryReadyMsg(`Autosave · menù v${res.menu_version}`);
+    }
+  };
+
+  const handleKitchenAllConfirmed = (res: {
+    updated: number;
+    menu_version: number;
+    menu_updated_at: string | null;
+    published: boolean;
+  }) => {
+    if (!current) return;
+    setCurrent({
+      ...current,
+      menu_version: res.menu_version,
+      menu_updated_at: res.menu_updated_at,
+    });
+    if (res.published) setHasPublished(true);
+    syncPdfReprintFlag(current.id, res.menu_version);
+    setRegistryReadyMsg(
+      res.updated > 0
+        ? `Cucina OK su ${res.updated} piatti · menù v${res.menu_version}`
+        : 'Cucina già confermata su tutti i piatti',
+    );
   };
 
   const save = async () => {
@@ -282,21 +446,110 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
       setActiveSubTab('piano');
       return;
     }
-    if (!menuLegalAck) {
+    const republishOnly = legalAlreadyCurrent && hasPublished;
+    if (!republishOnly && !menuLegalAck) {
       setError('Prima di pubblicare devi confermare la verifica di allergeni, tracce e responsabilità del menù.');
       return;
     }
     setBusy(true); setError('');
     try {
-      await api.saveMenu(current.id, piatti);
-      const r = await api.approve(current.id, menuLegalAck);
+      const allNew = piatti.every((p) => !p.id);
+      if (allNew) {
+        // Import AI / primo menù: un solo replace è più veloce
+        const saved = await api.saveMenu(current.id, piatti);
+        setPiatti(saved.map((p) => ({
+          id: p.id,
+          nome_piatto: p.nome_piatto,
+          descrizione: p.descrizione ?? null,
+          categoria: p.categoria ?? null,
+          prezzo_cents: p.prezzo_cents ?? null,
+          image_url: p.image_url ?? null,
+          menu_group: p.menu_group ?? null,
+          menu_id: p.menu_id ?? null,
+          kitchen_protocol_confirmed: p.kitchen_protocol_confirmed,
+          cross_contamination_checked_at: p.cross_contamination_checked_at ?? null,
+          allergeni_contenuti: p.allergeni_contenuti || [],
+          allergeni_tracce: p.allergeni_tracce || [],
+          translations: p.translations,
+        })));
+      } else {
+        const next: DishIn[] = [];
+        for (const p of piatti) {
+          const payload = {
+            nome_piatto: p.nome_piatto.trim(),
+            descrizione: p.descrizione ?? null,
+            categoria: p.categoria ?? null,
+            prezzo_cents: p.prezzo_cents ?? null,
+            image_url: p.image_url ?? null,
+            menu_group: p.menu_group ?? 'Principale',
+            menu_id: p.menu_id ?? null,
+            kitchen_protocol_confirmed: p.kitchen_protocol_confirmed ?? 0,
+            cross_contamination_checked_at: p.cross_contamination_checked_at ?? null,
+            allergeni_contenuti: p.allergeni_contenuti || [],
+            allergeni_tracce: p.allergeni_tracce || [],
+            translations: p.translations,
+          };
+          const res = p.id
+            ? await api.updateDish(current.id, p.id, payload, false)
+            : await api.createDish(current.id, payload, false);
+          next.push({
+            id: res.dish.id,
+            nome_piatto: res.dish.nome_piatto,
+            descrizione: res.dish.descrizione ?? null,
+            categoria: res.dish.categoria ?? null,
+            prezzo_cents: res.dish.prezzo_cents ?? null,
+            image_url: res.dish.image_url ?? null,
+            menu_group: res.dish.menu_group ?? null,
+            menu_id: res.dish.menu_id ?? null,
+            kitchen_protocol_confirmed: res.dish.kitchen_protocol_confirmed,
+            cross_contamination_checked_at: res.dish.cross_contamination_checked_at ?? null,
+            allergeni_contenuti: res.dish.allergeni_contenuti || [],
+            allergeni_tracce: res.dish.allergeni_tracce || [],
+            translations: res.dish.translations,
+          });
+        }
+        setPiatti(next);
+      }
+      const r = await api.approve(current.id, menuLegalAck || republishOnly, republishOnly);
       setApproved(r); setHasPublished(true);
       setMenuLegalAck(false);
-      // Aggiorna localmente
       setCurrent(r);
+      syncPdfReprintFlag(r.id, r.menu_version);
+      setRegistryReadyMsg(`Menù pubblicato v${r.menu_version ?? 0} · ristampa il Registro PDF`);
     } catch (e) { setError((e as Error).message); }
     setBusy(false);
   };
+
+  // Elimina un piatto dal DB immediatamente quando l'utente clicca ✕
+  const handleDeleteDish = async (dishToDelete: DishIn, newPiatti: DishIn[]) => {
+    const precedenti = piatti;
+    setPiatti(newPiatti);
+    if (!current) return;
+    try {
+      if (dishToDelete.id) {
+        try {
+          await api.deleteDish(current.id, dishToDelete.id);
+        } catch (e) {
+          const msg = (e as Error).message || '';
+          if (/non trovato|404/i.test(msg) || hasPublished || (precedenti || []).some((p) => p.id)) {
+            const saved = await api.saveMenu(current.id, newPiatti);
+            setPiatti(saved);
+          } else {
+            throw e;
+          }
+        }
+        if (newPiatti.length === 0) setHasPublished(false);
+      } else if (hasPublished || (precedenti || []).some((p) => p.id)) {
+        const saved = await api.saveMenu(current.id, newPiatti);
+        setPiatti(saved);
+        if (saved.length === 0) setHasPublished(false);
+      }
+    } catch (e) {
+      setError(`Errore eliminazione piatto: ${(e as Error).message}`);
+      setPiatti(precedenti);
+    }
+  };
+
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -466,8 +719,8 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
       onToggleGuide={() => setShowGuide(!showGuide)}
       error={error}
       noVenue={
-        <WireZone label="SELEZIONE LOCALE — come tab Attività mobile">
-          <p className="text-xs mb-3">Crea un nuovo locale o seleziona uno esistente:</p>
+        <WireZone label="SELEZIONE E REGISTRAZIONE LOCALE">
+          <p className="text-xs mb-3 font-semibold text-slate-600">Seleziona uno dei tuoi locali attivi oppure registrane uno nuovo:</p>
             
             {restaurants.length > 0 && (
               <div className="space-y-2">
@@ -767,7 +1020,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                               setBusy(true);
                               try {
                                 const m = await api.publicMenu(current.public_code);
-                                setPiatti(m.piatti.map(({ id, ...p }) => p));
+                                setPiatti(m.piatti);
                               } catch (e) {
                                 setError((e as Error).message);
                               }
@@ -939,7 +1192,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                               setBusy(true);
                               try {
                                 const m = await api.publicMenu(current.public_code);
-                                setPiatti(m.piatti.map(({ id, ...p }) => p));
+                                setPiatti(m.piatti);
                               } catch (e) {
                                 setError((e as Error).message);
                               }
@@ -953,28 +1206,9 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                           <span>🖨️</span> Stampa Scheda
                         </button>
                         <button
-                          onClick={async () => {
-                            if (!current) return;
-                            setBusy(true);
-                            setError('');
-                            try {
-                              const blob = await api.downloadRegistryPdf(current.id);
-                              const url = window.URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `registro_allergeni_${current.slug || 'locale'}.pdf`;
-                              document.body.appendChild(a);
-                              a.click();
-                              a.remove();
-                              window.URL.revokeObjectURL(url);
-                            } catch (err) {
-                              setError((err as Error).message);
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                          disabled={!piatti || piatti.length === 0}
-                          className={`flex-1 md:flex-initial text-center bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer ${(!piatti || piatti.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          onClick={downloadRegistryPdf}
+                          disabled={!hasPublished && (!piatti || piatti.length === 0)}
+                          className={`flex-1 md:flex-initial text-center bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer ${(!hasPublished && (!piatti || piatti.length === 0)) ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           <span>📥</span> Scarica PDF
                         </button>
@@ -1016,43 +1250,66 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
               {/* TAB: PROFILO — come account mobile ristoratore */}
               {activeSubTab === 'profilo' && current && (
                 <div className="space-y-3">
-                  <WireZone label="HERO — Account ristoratore">
-                    <p className="text-xs font-bold">Ristoratore</p>
-                    <p className="text-xs text-neutral-600">{current.name} · #{current.public_code}</p>
+                  <WireZone label="PROFILO RISTORATORE">
+                    <p className="text-xs font-extrabold text-slate-800">
+                      {ownerDisplayName || 'Ristoratore'}
+                    </p>
+                    <p className="text-xs text-slate-500 font-semibold">
+                      {ownerEmail || `${current.name} · #${current.public_code}`}
+                    </p>
                     <select
                       value={webLang}
                       onChange={(e) => setWebLang(e.target.value)}
-                      className="mt-2 border border-black px-2 py-1 text-xs"
+                      className="mt-2 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 bg-slate-50 font-bold"
                     >
-                      <option value="it">IT</option>
-                      <option value="en">EN</option>
+                      <option value="it">🇮🇹 Italiano</option>
+                      <option value="en">🇬🇧 English</option>
                     </select>
+                  </WireZone>
+
+                  <WireZone label="DATI ACCOUNT">
+                    <div className="p-2 space-y-2">
+                      <label className="text-[10px] font-bold block text-slate-500">Nome visualizzato</label>
+                      <WireInput value={ownerDisplayName} onChange={setOwnerDisplayName} placeholder="Il tuo nome" />
+                      <WireBtn onClick={saveOwnerDisplayName} disabled={busy}>Salva nome</WireBtn>
+                      <label className="text-[10px] font-bold block text-slate-500 mt-2">Email (sola lettura)</label>
+                      <p className="text-xs text-slate-600 font-semibold">{ownerEmail || '—'}</p>
+                      <p className="text-[10px] text-slate-400">Per cambiare email: supporto@allertgy.it</p>
+                      <label className="text-[10px] font-bold block text-slate-500 mt-3">Password attuale</label>
+                      <WireInput value={ownerCurrentPassword} onChange={setOwnerCurrentPassword} placeholder="Password attuale" type="password" />
+                      <label className="text-[10px] font-bold block text-slate-500">Nuova password</label>
+                      <WireInput value={ownerNewPassword} onChange={setOwnerNewPassword} placeholder="Min. 8 caratteri" type="password" />
+                      <label className="text-[10px] font-bold block text-slate-500">Conferma nuova password</label>
+                      <WireInput value={ownerConfirmPassword} onChange={setOwnerConfirmPassword} placeholder="Ripeti password" type="password" />
+                      <WireBtn onClick={saveOwnerPassword} disabled={busy}>Aggiorna password</WireBtn>
+                      {ownerAccountMsg ? <p className="text-xs text-emerald-700 font-bold">{ownerAccountMsg}</p> : null}
+                    </div>
                   </WireZone>
 
                   <WireZone label="LA MIA ATTIVITÀ">
                     <WireRow label={current.name} value={`${setupDone}/5 setup`} onClick={() => setActiveSubTab('attivita')} />
-                    <div className="flex gap-2 p-2 text-xs border-t border-black">
+                    <div className="flex gap-2 p-2 text-xs border-t border-slate-100 text-slate-500 font-semibold">
                       <span>Menù: {hasMenu ? 'OK' : 'NO'}</span>
                       <span>· Piano: {currentPlanLabel}</span>
                     </div>
                   </WireZone>
 
-                  <WireZone label="CHECKLIST OBBLIGATORIA — collassabile">
+                  <WireZone label="CHECKLIST COMPLIANCE & SETUP">
                     <WireRow label={hasPublicProfile ? '✓ Scheda pubblica' : '! Scheda pubblica'} onClick={() => setActiveSubTab('attivita')} />
                     <WireRow label={hasMenu ? '✓ Menù pubblicato' : '! Menù pubblicato'} onClick={() => setActiveSubTab('menu')} />
                     <WireRow label={hasLegalData ? '✓ Dati legali' : '! P.IVA e referente'} onClick={() => setActiveSubTab('attivita')} />
                     <WireRow label={currentPlan !== 'free' ? '✓ Piano attivo' : '! Piano attivo'} onClick={() => setActiveSubTab('piano')} />
-                    <p className="text-[10px] p-2 border-t border-black">
+                    <p className="text-[10px] p-2 border-t border-slate-100 text-slate-500 font-bold">
                       {setupComplete ? 'Setup completato' : `${setupDone}/5 passaggi`}
                     </p>
                   </WireZone>
 
-                  <WireZone label="CRESCITA — link sezioni secondarie">
-                    <WireRow label="QR code tavoli" onClick={() => setActiveSubTab('qr')} />
-                    <WireRow label="Statistiche" onClick={() => setActiveSubTab('statistiche')} />
-                    <WireRow label="Piano e fatturazione" onClick={() => setActiveSubTab('piano')} />
-                    <WireRow label="Boost e notifiche push" onClick={() => setActiveSubTab('crescita')} />
-                    <WireRow label="Recensioni" onClick={() => setActiveSubTab('recensioni')} />
+                  <WireZone label="STRUMENTI & PROMOZIONI">
+                    <WireRow label="📱 QR code tavoli" onClick={() => setActiveSubTab('qr')} />
+                    <WireRow label="📊 Statistiche di ricerca" onClick={() => setActiveSubTab('statistiche')} />
+                    <WireRow label="💳 Piano e fatturazione" onClick={() => setActiveSubTab('piano')} />
+                    <WireRow label="🚀 Boost e notifiche push" onClick={() => setActiveSubTab('crescita')} />
+                    <WireRow label="⭐ Recensioni ospiti" onClick={() => setActiveSubTab('recensioni')} />
                   </WireZone>
 
                   <WireZone label="ASSISTENZA">
@@ -1231,93 +1488,90 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                     </div>
                   )}
 
-                  {/* Scelta come caricare */}
+                  {/* Scelta come caricare — core: piatto a mano; AI = extra */}
                   {!piatti && !approved && (
-                    <div className="grid md:grid-cols-3 gap-6">
-                      
-                      {/* Drag and Drop o File Upload per AI Vision */}
-                      <section
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) upload(f); }}
-                        className="bg-white border-2 border-dashed border-emerald-300 rounded-3xl p-6 text-center flex flex-col items-center justify-between space-y-4 hover:bg-emerald-50/10 transition-colors cursor-pointer"
-                      >
-                        <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-4xl shadow-inner">📸</div>
-                        <div>
-                          <p className="text-lg font-extrabold text-slate-800">Foto menù cartaceo (AI)</p>
-                          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto leading-relaxed">
-                            Carica la foto del menù. L'AI estrarrà piatti, descrizioni e allergeni previsti.
-                          </p>
-                        </div>
-                        <label className="inline-block w-full px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs cursor-pointer shadow shadow-emerald-600/10 transition-colors">
-                          {busy ? 'Analisi in corso...' : 'Seleziona immagine'}
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            disabled={busy}
-                            onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} 
-                          />
-                        </label>
-                      </section>
-
-                      {/* Analizza da URL/Link */}
-                      <section className="bg-white border border-slate-200 rounded-3xl p-6 text-center flex flex-col items-center justify-between space-y-4 shadow-sm">
-                        <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-4xl shadow-inner">🔗</div>
-                        <div>
-                          <p className="text-lg font-extrabold text-slate-800">Link del menù (AI)</p>
-                          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto leading-relaxed">
-                            Inserisci il link di un menù online (es. PDF o sito). L'AI analizzerà scritte e allergeni.
-                          </p>
-                        </div>
-                        <div className="w-full space-y-2">
-                          <input
-                            type="url"
-                            value={menuUrl}
-                            onChange={(e) => setMenuUrl(e.target.value)}
-                            placeholder="https://esempio.it/menu.pdf"
-                            className="w-full border border-slate-250 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-500 bg-slate-50 focus:bg-white"
-                          />
-                          <button
-                            onClick={analyzeFromUrl}
-                            disabled={busy || !menuUrl.trim()}
-                            className="w-full px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow shadow-emerald-600/10 transition-colors disabled:opacity-50"
-                          >
-                            {busy ? 'Analisi in corso...' : 'Analizza Link'}
-                          </button>
-                        </div>
-                      </section>
-
-                      {/* Pulsanti manuali */}
-                      <div className="flex flex-col gap-4">
+                    <div className="space-y-6">
+                      <div className="grid md:grid-cols-2 gap-4">
                         {hasPublished && (
-                          <button 
-                            onClick={loadExisting} 
+                          <button
+                            onClick={loadExisting}
                             disabled={busy}
-                            className="flex-1 bg-white rounded-3xl border border-slate-200 p-6 text-left hover:border-emerald-500 hover:shadow-md transition-all group flex flex-col justify-between"
+                            className="bg-emerald-600 text-white rounded-3xl p-6 text-left hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/15"
                           >
-                            <div className="text-3xl">✏️</div>
-                            <div>
-                              <div className="font-extrabold text-sm text-slate-800 group-hover:text-emerald-700">Modifica menù attuale</div>
-                              <div className="text-xs text-slate-400 mt-1 leading-relaxed">
-                                Recupera i piatti pubblicati e aggiornali nell'editor visuale.
-                              </div>
+                            <div className="font-extrabold text-base">Modifica menù attuale</div>
+                            <div className="text-xs text-emerald-50/90 mt-1 leading-relaxed">
+                              Apri i piatti pubblicati. Salva allergeni in pochi secondi — QR e Registro si aggiornano.
                             </div>
                           </button>
                         )}
-                        <button 
-                          onClick={() => { setPiatti([{ nome_piatto: 'Nuovo piatto', categoria: 'Primi', prezzo_cents: 1000, allergeni_contenuti: [], allergeni_tracce: [] }]); setAiNote(''); }}
-                          className="flex-1 bg-white rounded-3xl border border-slate-200 p-6 text-left hover:border-emerald-500 hover:shadow-md transition-all group flex flex-col justify-between"
+                        <button
+                          onClick={() => {
+                            setPiatti([{
+                              nome_piatto: 'Nuovo piatto',
+                              categoria: 'Primi',
+                              prezzo_cents: 1000,
+                              allergeni_contenuti: [],
+                              allergeni_tracce: [],
+                              kitchen_protocol_confirmed: 0,
+                            }]);
+                            setAiNote('');
+                          }}
+                          className={`rounded-3xl border p-6 text-left transition-all group ${
+                            hasPublished
+                              ? 'bg-white border-slate-200 hover:border-emerald-500'
+                              : 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/15'
+                          }`}
                         >
-                          <div className="text-3xl">➕</div>
-                          <div>
-                            <div className="font-extrabold text-sm text-slate-800 group-hover:text-emerald-700">Inserisci a mano</div>
-                            <div className="text-xs text-slate-400 mt-1 leading-relaxed">
-                              Crea il menù da zero inserendo i piatti uno per uno.
-                            </div>
+                          <div className={`font-extrabold text-base ${hasPublished ? 'text-slate-800 group-hover:text-emerald-700' : ''}`}>
+                            + Aggiungi piatto
+                          </div>
+                          <div className={`text-xs mt-1 leading-relaxed ${hasPublished ? 'text-slate-400' : 'text-emerald-50/90'}`}>
+                            Nome → allergeni → conferma cucina → Salva. Il loop quotidiano del ristoratore.
                           </div>
                         </button>
                       </div>
 
+                      <details className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                        <summary className="text-xs font-bold text-slate-500 cursor-pointer select-none">
+                          Extra: importa con AI (foto o link)
+                        </summary>
+                        <div className="grid md:grid-cols-2 gap-4 mt-4">
+                          <section
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) upload(f); }}
+                            className="bg-white border border-dashed border-slate-300 rounded-2xl p-4 text-center space-y-3"
+                          >
+                            <p className="text-sm font-extrabold text-slate-700">Foto menù cartaceo</p>
+                            <label className="inline-block w-full px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs cursor-pointer">
+                              {busy ? 'Analisi...' : 'Seleziona immagine'}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={busy}
+                                onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }}
+                              />
+                            </label>
+                          </section>
+                          <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                            <p className="text-sm font-extrabold text-slate-700">Link menù / PDF</p>
+                            <input
+                              type="url"
+                              value={menuUrl}
+                              onChange={(e) => setMenuUrl(e.target.value)}
+                              placeholder="https://esempio.it/menu.pdf"
+                              className="w-full border border-slate-250 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
+                            />
+                            <button
+                              onClick={analyzeFromUrl}
+                              disabled={busy || !menuUrl.trim()}
+                              className="w-full px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs disabled:opacity-50"
+                            >
+                              {busy ? 'Analisi...' : 'Analizza link'}
+                            </button>
+                          </section>
+                        </div>
+                      </details>
                     </div>
                   )}
 
@@ -1325,54 +1579,105 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                   {piatti && !approved && (
                     <div className="space-y-6">
                       {aiNote && (
-                        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-2xl flex items-center gap-2">
-                          <span>⚡ Note AI:</span>
-                          <span>{aiNote}</span>
+                        <div className="p-4 bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-2xl">
+                          Import AI: verifica allergeni e conferma cucina, poi Salva su ogni piatto.
+                          <span className="block mt-1 text-slate-500">{aiNote}</span>
                         </div>
                       )}
-                      
-                      <MenuEditor piatti={piatti} allergens={allergens} onChange={setPiatti} restaurantPhotos={photos} menus={menus} />
-                      
-                      <button
-                        type="button"
-                        onClick={() => setMenuLegalAck(!menuLegalAck)}
-                        className="w-full bg-white border border-slate-200 rounded-2xl p-4 flex items-start gap-3 text-left hover:border-emerald-300 transition-colors"
-                      >
-                        <span className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center text-xs font-black shrink-0 ${menuLegalAck ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-slate-50 border-slate-300 text-transparent'}`}>
-                          ✓
-                        </span>
-                        <span className="text-xs text-slate-600 font-semibold leading-relaxed">
-                          Confermo di aver verificato ingredienti, allergeni contenuti e possibili tracce.
-                          Sono consapevole che le informazioni pubblicate su AllerTgy sono sotto la responsabilità del locale
-                          e devono essere aggiornate a ogni variazione di ricetta, fornitore o procedura di cucina.
-                        </span>
-                      </button>
-                      
+
+                      {(registryReadyMsg || pdfReprintNeeded) && (
+                        <div className={`p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-3 justify-between border ${
+                          pdfReprintNeeded
+                            ? 'bg-amber-50 border-amber-300'
+                            : 'bg-emerald-50 border-emerald-200'
+                        }`}>
+                          <p className={`text-xs font-bold ${pdfReprintNeeded ? 'text-amber-950' : 'text-emerald-800'}`}>
+                            {pdfReprintNeeded
+                              ? `Registro PDF da ristampare — menù v${current?.menu_version ?? 0} più recente della copia stampata`
+                              : registryReadyMsg}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={downloadRegistryPdf}
+                            disabled={busy}
+                            className={`shrink-0 px-4 py-2 rounded-xl text-white text-xs font-black ${
+                              pdfReprintNeeded
+                                ? 'bg-amber-800 hover:bg-amber-900'
+                                : 'bg-emerald-700 hover:bg-emerald-800'
+                            }`}
+                          >
+                            {pdfReprintNeeded ? 'Ristampa Registro PDF' : 'Scarica Registro PDF'}
+                          </button>
+                        </div>
+                      )}
+
+                      <p className="text-xs text-slate-500 font-semibold">
+                        Loop rapido: tap allergeni (autosave) → conferma cucina → fatto.
+                        {legalAlreadyCurrent
+                          ? ' Con conferma legale attiva, QR e Registro restano allineati.'
+                          : ' Alla prima pubblicazione serve la conferma legale una sola volta.'}
+                      </p>
+
+                      <MenuEditor
+                        piatti={piatti}
+                        allergens={allergens}
+                        onChange={setPiatti}
+                        onDelete={handleDeleteDish}
+                        restaurantPhotos={photos}
+                        menus={menus}
+                        restaurantId={current?.id}
+                        onDishSaved={handleDishSaved}
+                        onKitchenAllConfirmed={handleKitchenAllConfirmed}
+                      />
+
+                      {!legalAlreadyCurrent && (
+                        <button
+                          type="button"
+                          onClick={() => setMenuLegalAck(!menuLegalAck)}
+                          className="w-full bg-white border border-slate-200 rounded-2xl p-4 flex items-start gap-3 text-left hover:border-emerald-300 transition-colors"
+                        >
+                          <span className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center text-xs font-black shrink-0 ${menuLegalAck ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-slate-50 border-slate-300 text-transparent'}`}>
+                            ✓
+                          </span>
+                          <span className="text-xs text-slate-600 font-semibold leading-relaxed">
+                            Confermo di aver verificato ingredienti, allergeni contenuti e possibili tracce.
+                            Sono consapevole che le informazioni pubblicate su AllerTgy sono sotto la responsabilità del locale
+                            e devono essere aggiornate a ogni variazione di ricetta, fornitore o procedura di cucina.
+                          </span>
+                        </button>
+                      )}
+
                       <div className="flex justify-between items-center pt-4 border-t border-slate-200">
-                        <button 
-                          onClick={() => setPiatti(null)} 
+                        <button
+                          onClick={() => { setPiatti(null); setRegistryReadyMsg(''); }}
                           className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-100 transition-colors"
                         >
-                          ↩︎ Annulla
+                          Chiudi editor
                         </button>
-                        <button 
-                          onClick={save} 
-                          disabled={busy || piatti.length === 0 || !menuLegalAck}
+                        <button
+                          onClick={save}
+                          disabled={busy || piatti.length === 0 || (!legalAlreadyCurrent && !menuLegalAck)}
                           className="px-8 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black disabled:opacity-40 transition-all shadow-md shadow-emerald-600/10"
                         >
-                          {busy ? 'Salvataggio...' : '✓ Salva e Pubblica menù'}
+                          {busy
+                            ? 'Pubblicazione...'
+                            : legalAlreadyCurrent
+                              ? 'Pubblica tutte le modifiche'
+                              : 'Pubblica menù + attiva QR'}
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {/* Pubblicato con visualizzazione QR e anteprima */}
+                  {/* Pubblicato con QR + Registro PDF nel loop */}
                   {approved && (
                     <section className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-8 text-center">
                       <div className="space-y-2">
                         <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 text-3xl flex items-center justify-center mx-auto shadow-inner">✓</div>
-                        <h2 className="text-2xl font-black text-slate-800">Menù pubblicato con successo!</h2>
-                        <p className="text-xs text-slate-400">Il locale è attivo. I tuoi clienti possono scansionare il codice ed ordinare in sicurezza.</p>
+                        <h2 className="text-2xl font-black text-slate-800">QR-menu verificato attivo</h2>
+                        <p className="text-xs text-slate-400">
+                          Versione menù {approved.menu_version ?? 0}. Clienti al tavolo e Registro allergeni sono allineati.
+                        </p>
                       </div>
 
                       <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 space-y-4 max-w-sm mx-auto">
@@ -1380,26 +1685,38 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                           <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Codice Locale</span>
                           <span className="font-mono font-black text-3xl text-emerald-800 block mt-1 tracking-widest">{approved.public_code}</span>
                         </div>
-                        
+
                         <div className="bg-white p-3 rounded-2xl shadow-inner border border-slate-200 inline-block">
-                          <img 
-                            alt={`QR ${approved.public_code}`} 
+                          <img
+                            alt={`QR ${approved.public_code}`}
                             className="w-48 h-48"
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(window.location.origin + '/r/' + (approved.slug || approved.public_code))}`} 
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(window.location.origin + '/r/' + (approved.slug || approved.public_code))}`}
                           />
                         </div>
-
-                        <p className="text-[10px] text-slate-455 font-semibold leading-relaxed">
-                          Usa la sezione <b>QR Code</b> per scaricarlo o stamparlo.
-                        </p>
                       </div>
 
-                      <div className="pt-4 border-t border-slate-100 flex flex-col gap-3 items-center">
-                        <button 
-                          onClick={() => { setPiatti(null); setApproved(null); }}
-                          className="text-xs font-bold text-emerald-700 hover:text-emerald-850 hover:underline"
+                      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <button
+                          type="button"
+                          onClick={downloadRegistryPdf}
+                          disabled={busy}
+                          className={`px-6 py-3 rounded-2xl text-white text-xs font-black ${
+                            pdfReprintNeeded
+                              ? 'bg-amber-800 hover:bg-amber-900'
+                              : 'bg-emerald-700 hover:bg-emerald-800'
+                          }`}
                         >
-                          Modifica ancora il menù del locale
+                          {pdfReprintNeeded ? 'Ristampa Registro PDF' : 'Scarica Registro PDF aggiornato'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setApproved(null);
+                            setRegistryReadyMsg('Modifica un piatto e premi Salva — PDF e QR restano allineati.');
+                          }}
+                          className="px-6 py-3 rounded-2xl border border-emerald-300 text-emerald-800 text-xs font-black hover:bg-emerald-50"
+                        >
+                          Modifica ancora un piatto
                         </button>
                       </div>
                     </section>
@@ -2134,7 +2451,7 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                             setBusy(true);
                             try {
                               const m = await api.publicMenu(current.public_code);
-                              setPiatti(m.piatti.map(({ id, ...p }) => p));
+                              setPiatti(m.piatti);
                             } catch (e) {
                               setError((e as Error).message);
                             }
@@ -2223,9 +2540,10 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
           <thead>
             <tr className="bg-slate-100">
               <th className="border border-slate-300 p-3 text-xs font-bold w-1/4">Piatto</th>
-              <th className="border border-slate-300 p-3 text-xs font-bold w-1/5">Categoria / Sezione</th>
+              <th className="border border-slate-300 p-3 text-xs font-bold w-1/6">Categoria / Sezione</th>
               <th className="border border-slate-300 p-3 text-xs font-bold w-1/4 text-rose-700">Allergeni Contenuti</th>
               <th className="border border-slate-300 p-3 text-xs font-bold w-1/4 text-amber-700">Possibili Tracce</th>
+              <th className="border border-slate-300 p-3 text-xs font-bold w-16">Cucina</th>
             </tr>
           </thead>
           <tbody>
@@ -2244,6 +2562,9 @@ export default function OwnerDashboard({ onLogout, onBackToLanding }: Props) {
                     .filter(c => c !== 'vegano' && c !== 'vegetariano')
                     .map(getAllergenName)
                     .join(', ') || 'Nessuna'}
+                </td>
+                <td className="border border-slate-300 p-3 text-xs font-bold text-center">
+                  {p.kitchen_protocol_confirmed === 1 ? 'OK' : '—'}
                 </td>
               </tr>
             ))}

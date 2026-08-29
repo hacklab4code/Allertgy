@@ -2,17 +2,17 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Linking, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View,
 } from 'react-native';
 import { api, type Extraction, type MedicalDocument } from '../src/api/client';
 import { useSession } from '../src/store/session';
 import { TRANSLATED_ALLERGENS } from '../src/engine/translations';
 import { expandAllergieCodes, toggleAllergieSelection } from '../src/engine/allergyLinks';
-import { AppText, GlassScreenScroll, HeaderAddButton, PuffyButton, Screen, Section } from '../src/components/ui';
-import { colors, spacing } from '../src/theme';
+import { AppText, GlassScreenScroll, HeaderAddButton, SurfaceButton, Screen, Section } from '../src/components/ui';
+import { colors, radius, spacing } from '../src/theme';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
-/** Documenti medici: upload su storage privato, analisi AI con consenso
- * per-documento e conferma manuale obbligatoria prima di toccare il profilo. */
 export default function Documenti() {
   const { setAllergie } = useSession();
   const [docs, setDocs] = useState<MedicalDocument[]>([]);
@@ -26,6 +26,7 @@ export default function Documenti() {
   useEffect(() => { load(); }, []);
 
   const pickAndUpload = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const result = await DocumentPicker.getDocumentAsync({
       type: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
       copyToCacheDirectory: true,
@@ -33,7 +34,6 @@ export default function Documenti() {
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
 
-    // Consenso AI specifico e separato per QUESTO documento (art. 9 GDPR)
     Alert.alert(
       'Analisi automatica (AI)',
       'Autorizzi l\'analisi automatica di questo documento tramite intelligenza artificiale (Gemini Vision) ' +
@@ -57,6 +57,7 @@ export default function Documenti() {
         aiConsent,
       );
       await load();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) { setError((e as Error).message); }
     setBusy(false);
   };
@@ -83,6 +84,7 @@ export default function Documenti() {
       const updated = await api.confirmExtraction(suggestions.docId, expandAllergieCodes(selectedCodes));
       setAllergie(updated.map((a) => a.code));
       setSuggestions(null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Profilo aggiornato', 'Gli allergeni confermati sono stati aggiunti al tuo profilo.');
     } catch (e) { setError((e as Error).message); }
     setBusy(false);
@@ -91,7 +93,7 @@ export default function Documenti() {
   const remove = (doc: MedicalDocument) =>
     Alert.alert(
       'Elimina documento',
-      'Il file verrà cancellato definitivamente anche dallo storage. Continuare?',
+      'Il file verrà cancellato definitivamente dallo storage. Continuare?',
       [
         { text: 'Annulla', style: 'cancel' },
         {
@@ -120,19 +122,23 @@ export default function Documenti() {
           ),
         }}
       />
-      <GlassScreenScroll showsVerticalScrollIndicator={false}>
-        <AppText variant="subtitle" style={styles.tagline}>
-          Carica referti allergologici (PDF o foto). Privati e cancellabili. Analisi AI facoltativa (max 5/mese).
-        </AppText>
+      <GlassScreenScroll headerFloat={false} showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
+        <Section title="Documentazione medica" subtitle="Carica referti allergologici (PDF o immagini). Privati e decifrabili su richiesta.">
+          <SurfaceButton
+            label="Carica nuovo documento"
+            onPress={pickAndUpload}
+            fullWidth
+          />
+        </Section>
 
         {error ? <AppText variant="caption" color={colors.red}>{error}</AppText> : null}
 
         {suggestions ? (
           <Section title="Conferma suggerimenti AI" subtitle="Verifica gli allergeni rilevati prima di aggiungerli al profilo.">
             <View style={styles.suggestBox}>
-              <AppText variant="bodyBold">🤖 Abbiamo rilevato questi allergeni</AppText>
+              <AppText variant="bodyBold">🤖 Allergeni rilevati</AppText>
               <AppText variant="caption">{suggestions.note}</AppText>
-              <AppText variant="caption">Tocca per deselezionare quelli non corretti, poi conferma:</AppText>
+              <AppText variant="caption" color={colors.onSurfaceMuted}>Tocca per deselezionare quelli non corretti:</AppText>
               <View style={styles.chips}>
                 {[...new Set([
                   ...suggestions.items.map((e) => e.allergen_code),
@@ -141,7 +147,7 @@ export default function Documenti() {
                   const extraction = suggestions.items.find((e) => e.allergen_code === code);
                   const on = selectedCodes.includes(code);
                   return (
-                    <TouchableOpacity
+                    <Pressable
                       key={code}
                       style={[styles.chip, on && styles.chipOn]}
                       onPress={() => {
@@ -149,24 +155,23 @@ export default function Documenti() {
                         setSelectedCodes([...next]);
                       }}
                     >
-                      <Text style={[styles.chipText, on && styles.chipTextOn]}>
+                      <AppText style={[styles.chipText, on && styles.chipTextOn]}>
                         {allergenLabel(code)}
                         {extraction?.confidence != null ? ` · ${Math.round(extraction.confidence * 100)}%` : ''}
-                        {!extraction ? ' · correlato' : ''}
-                      </Text>
-                    </TouchableOpacity>
+                      </AppText>
+                    </Pressable>
                   );
                 })}
               </View>
-              <PuffyButton
-                label="Confermo: aggiungi al mio profilo"
+              <SurfaceButton
+                label="Confermo: aggiungi al profilo"
                 onPress={confirm}
                 disabled={busy || selectedCodes.length === 0}
                 fullWidth
               />
-              <TouchableOpacity onPress={() => setSuggestions(null)}>
-                <AppText variant="caption" color={colors.onSurfaceMuted} style={{ textAlign: 'center' }}>Non ora</AppText>
-              </TouchableOpacity>
+              <Pressable onPress={() => setSuggestions(null)} style={{ alignSelf: 'center', paddingVertical: 4 }}>
+                <AppText variant="caption" color={colors.onSurfaceMuted}>Non ora</AppText>
+              </Pressable>
             </View>
           </Section>
         ) : null}
@@ -174,56 +179,70 @@ export default function Documenti() {
         <Section
           title="I tuoi documenti"
           subtitle={docs.length === 0
-            ? 'Tocca + in alto per caricare un referto.'
-            : `${docs.length} documento${docs.length === 1 ? '' : 'i'} archiviato${docs.length === 1 ? '' : 'i'}.`}
+            ? 'Nessun documento caricato'
+            : `${docs.length} documento${docs.length === 1 ? '' : 'i'} in archivio`}
         >
-      {docs.length === 0 ? (
-        <Text style={styles.empty}>Nessun documento caricato.</Text>
-      ) : (
-        docs.map((doc) => (
-          <View key={doc.id} style={styles.docCard}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.docName} numberOfLines={1}>
-                {doc.mime_type === 'application/pdf' ? '📄' : '🖼️'} {doc.filename}
-              </Text>
-              <Text style={styles.docMeta}>
-                {doc.uploaded_at.slice(0, 10)} · {doc.status === 'processed' ? 'Analizzato' : doc.status === 'failed' ? 'Analisi fallita' : 'Caricato'}
-                {doc.ai_consent_at ? ' · consenso AI ✓' : ' · senza analisi AI'}
-              </Text>
-              <View style={styles.docActions}>
-                {doc.ai_consent_at && (
-                  <TouchableOpacity style={styles.smallBtn} disabled={extracting === doc.id} onPress={() => extract(doc)}>
-                    {extracting === doc.id
-                      ? <ActivityIndicator size="small" color="#0B5D4D" />
-                      : <Text style={styles.smallBtnText}>🤖 Analizza</Text>}
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={styles.smallBtn}
-                  onPress={async () => {
-                    try {
-                      const d = await api.downloadMedicalDocument(doc.id);
-                      if (d.url) Linking.openURL(d.url);
-                    } catch (e) { setError((e as Error).message); }
-                  }}
-                >
-                  <Text style={styles.smallBtnText}>👁️ Apri (5 min)</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.smallBtn} onPress={() => remove(doc)}>
-                  <Text style={[styles.smallBtnText, { color: '#dc2626' }]}>🗑️ Elimina</Text>
-                </TouchableOpacity>
-              </View>
+          {docs.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="document-text-outline" size={32} color={colors.borderStrong} />
+              <AppText variant="caption" color={colors.onSurfaceMuted}>
+                Nessun referto medico caricato. Tocca in alto a destra per aggiungerne uno.
+              </AppText>
             </View>
-          </View>
-        ))
-        )}
+          ) : (
+            docs.map((doc) => (
+              <View key={doc.id} style={styles.docCard}>
+                <View style={styles.docIconWrap}>
+                  <Ionicons
+                    name={doc.mime_type === 'application/pdf' ? 'document-text' : 'image'}
+                    size={22}
+                    color={colors.brand}
+                  />
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="bodyBold" numberOfLines={1}>
+                    {doc.filename}
+                  </AppText>
+                  <AppText variant="caption" color={colors.onSurfaceMuted}>
+                    {doc.uploaded_at.slice(0, 10)} · {doc.status === 'processed' ? 'Analizzato' : 'Caricato'}
+                    {doc.ai_consent_at ? ' · AI ✓' : ''}
+                  </AppText>
+                  <View style={styles.docActions}>
+                    {doc.ai_consent_at && (
+                      <Pressable
+                        style={styles.actionBtn}
+                        disabled={extracting === doc.id}
+                        onPress={() => extract(doc)}
+                      >
+                        {extracting === doc.id
+                          ? <ActivityIndicator size="small" color={colors.brand} />
+                          : <AppText variant="caption" color={colors.brand} style={styles.actionText}>🤖 Analizza</AppText>}
+                      </Pressable>
+                    )}
+                    <Pressable
+                      style={styles.actionBtn}
+                      onPress={async () => {
+                        try {
+                          const d = await api.downloadMedicalDocument(doc.id);
+                          if (d.url) Linking.openURL(d.url);
+                        } catch (e) { setError((e as Error).message); }
+                      }}
+                    >
+                      <AppText variant="caption" color={colors.brandInk} style={styles.actionText}>👁️ Apri</AppText>
+                    </Pressable>
+                    <Pressable style={styles.actionBtn} onPress={() => remove(doc)}>
+                      <AppText variant="caption" color={colors.red} style={styles.actionText}>🗑️ Elimina</AppText>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            ))
+          )}
         </Section>
 
-        <Section title="Privacy e sicurezza" subtitle="Come vengono conservati i tuoi documenti sanitari.">
-          <AppText variant="caption" color={colors.onSurfaceMuted}>
-            🔒 I documenti sono conservati su storage privato e ogni accesso viene registrato.
-            L'AI può commettere errori: i suggerimenti vanno sempre verificati e nessun dato entra nel
-            profilo senza la tua conferma esplicita.
+        <Section title="Privacy & Sicurezza" subtitle="Gestione riservata dei dati sulla salute (GDPR)">
+          <AppText variant="caption" color={colors.onSurfaceMuted} style={styles.privacyNote}>
+            🔒 I tuoi documenti medici sono archiviati su server sicuri con crittografia. Ogni analisi AI è facoltativa e nessun allergene viene salvato sul profilo senza la tua approvazione esplicita.
           </AppText>
         </Section>
       </GlassScreenScroll>
@@ -232,35 +251,80 @@ export default function Documenti() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
-  tagline: { color: colors.onSurfaceMuted, lineHeight: 20 },
-  suggestBox: {
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#0F8A6A',
-    borderRadius: 16, padding: 16, marginBottom: 16, gap: 10,
+  container: {
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
   },
-  suggestTitle: { fontWeight: '800', fontSize: 15, color: '#10201B' },
-  suggestNote: { color: '#596B63', fontSize: 12.5, lineHeight: 18 },
+  suggestBox: {
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.brand,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: 10,
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    borderWidth: 1, borderColor: '#DDE8E2', backgroundColor: '#F7FAF8',
-    borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
-  chipOn: { backgroundColor: '#DDF8EA', borderColor: '#0F8A6A' },
-  chipText: { fontSize: 13, color: '#596B63', fontWeight: '600' },
-  chipTextOn: { color: '#0B5D4D', fontWeight: '800' },
-  cancelLink: { textAlign: 'center', color: '#596B63', fontWeight: '600', paddingVertical: 4 },
-  empty: { color: '#8AA096', textAlign: 'center', marginVertical: 24, fontWeight: '600' },
+  chipOn: {
+    backgroundColor: colors.greenSoft,
+    borderColor: colors.greenBorder,
+  },
+  chipText: { fontSize: 13, color: colors.brandInk },
+  chipTextOn: { color: colors.onGreen, fontWeight: '700' },
+  emptyCard: {
+    padding: spacing.lg,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    gap: 10,
+  },
   docCard: {
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#DDE8E2',
-    borderRadius: 16, padding: 14, marginBottom: 10, flexDirection: 'row',
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: 14,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
   },
-  docName: { fontWeight: '700', fontSize: 14.5, color: '#10201B' },
-  docMeta: { color: '#8AA096', fontSize: 12, marginTop: 2 },
-  docActions: { flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' },
-  smallBtn: {
-    borderWidth: 1, borderColor: '#DDE8E2', borderRadius: 10,
-    paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#F7FAF8',
+  docIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.brand50,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  smallBtnText: { fontSize: 12.5, fontWeight: '700', color: '#0B5D4D' },
-  privacyNote: { color: '#8AA096', fontSize: 11.5, lineHeight: 17, marginTop: 16 },
+  docActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+    flexWrap: 'wrap',
+  },
+  actionBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: colors.surface,
+  },
+  actionText: {
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  privacyNote: {
+    lineHeight: 18,
+  },
 });

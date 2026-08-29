@@ -56,24 +56,25 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
   // Extension point for config-plugins
 
   override func sourceURL(for bridge: RCTBridge) -> URL? {
-    // needed to return the correct URL for expo-dev-client.
-    bridge.bundleURL ?? bundleURL()
+#if DEBUG
+    // Ignore bridge.bundleURL: DevClient/DevMenu often stores https://<lan-ip>:8081
+    // and Metro is HTTP-only, so that URL always fails on Wi‑Fi.
+    return bundleURL()
+#else
+    return bridge.bundleURL ?? bundleURL()
+#endif
   }
 
   override func bundleURL() -> URL? {
 #if DEBUG
-    // Physical device cannot use localhost — pin Metro to the Mac Tailscale IP.
-    // Prefer REACT_NATIVE_PACKAGER_HOSTNAME from the build env via ip.txt if present.
-    let settings = RCTBundleURLProvider.sharedSettings()
-    if let ipPath = Bundle.main.path(forResource: "ip", ofType: "txt"),
-       let ip = try? String(contentsOfFile: ipPath, encoding: .utf8)
-        .trimmingCharacters(in: .whitespacesAndNewlines),
-       !ip.isEmpty {
-      settings.jsLocation = "\(ip):8081"
-    } else {
-      settings.jsLocation = "100.71.166.117:8081"
-    }
-    return settings.jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
+    // Simulator → localhost. Device → Wi‑Fi LAN (never stale Tailscale when offline).
+    #if targetEnvironment(simulator)
+    let host = "127.0.0.1"
+    #else
+    let host = ProcessInfo.processInfo.environment["REACT_NATIVE_PACKAGER_HOSTNAME"]
+      ?? "192.168.1.98"
+    #endif
+    return URL(string: "http://\(host):8081/node_modules/expo-router/entry.bundle?platform=ios&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.bytecode=1&transform.routerRoot=app&unstable_transformProfile=hermes-stable")
 #else
     return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif

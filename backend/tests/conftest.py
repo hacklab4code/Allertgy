@@ -11,13 +11,22 @@ from unittest.mock import patch
 # Assicura che il backend sia nel PYTHONPATH
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+os.environ.setdefault("DB_HOST", "localhost")
+os.environ.setdefault("DB_PORT", "3306")
+os.environ.setdefault("DB_NAME", ":memory:")
+os.environ.setdefault("DB_USER", "test")
+os.environ.setdefault("DB_PASSWORD", "test")
+os.environ.setdefault("JWT_SECRET", "test-secret-che-non-deve-mai-essere-usato-in-produzione")
+os.environ.setdefault("CORS_ORIGINS", "*")
+os.environ.setdefault("INTERNAL_ADMIN_KEY", "test-admin-key")
+os.environ.setdefault("APP_ENV", "development")
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 # Override del settings PRIMA di importare qualsiasi cosa dal backend
-# Usiamo patch per bypassare il file .env che pydantic-settings leggerebbe
 from app.config import settings as _settings
 
 _settings.db_host = "localhost"

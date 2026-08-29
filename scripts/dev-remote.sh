@@ -41,7 +41,7 @@ wait_for_url() {
   while [ "$i" -lt "$timeout" ]; do
     if [ -f "$file" ]; then
       local url
-      url=$(grep -Eo "$pattern" "$file" | head -n 1 || true)
+      url=$(grep -aEo "$pattern" "$file" | head -n 1 || true)
       if [ -n "$url" ]; then
         echo "$url"
         return 0
@@ -176,3 +176,4 @@ npx concurrently \
   "cd backend && CORS_ORIGINS='*' PUBLIC_API_URL='$API_URL' .venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000" \
   "cd dashboard-web && npm run dev" \
   "cd app-mobile && EXPO_PUBLIC_API_URL='$API_URL' REACT_NATIVE_PACKAGER_HOSTNAME='$REACT_NATIVE_PACKAGER_HOSTNAME' CI=false npm run $EXPO_SCRIPT"
+  "cd app-mobile && EXPO_PUBLIC_API_URL='$API_URL' $PACKAGER_ENV CI=false npm run $EXPO_SCRIPT"

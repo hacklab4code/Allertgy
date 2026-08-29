@@ -40,9 +40,9 @@ pkill -f "uvicorn app.main" 2>/dev/null || true
 pkill -f "concurrently" 2>/dev/null || true
 sleep 2
 
-bash "$ROOT/scripts/sync-packager-ip.sh" >/dev/null
-
 # ── 2. IP ────────────────────────────────────────────────────
+# In modalità casa NON usare Tailscale: Expo/.env devono puntare al Wi‑Fi
+# altrimenti il telefono non raggiunge Metro/API sulla LAN.
 if [ "$MODE" = "fuori" ]; then
   IP=$(tailscale ip -4 2>/dev/null || true)
   if [ -z "$IP" ]; then
@@ -55,6 +55,14 @@ else
   IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "localhost")
   echo -e "${GREEN}🏠 Modalità CASA (stessa WiFi)${NC}"
 fi
+
+NODE_BIN=$(command -v node)
+cat > "$ROOT/app-mobile/ios/.xcode.env.local" <<EOF
+export NODE_BINARY=$NODE_BIN
+export REACT_NATIVE_PACKAGER_HOSTNAME=$IP
+export RCT_METRO_PORT=8081
+EOF
+printf 'EXPO_PUBLIC_API_URL=http://%s:8000\n' "$IP" > "$ROOT/app-mobile/.env"
 
 API_URL="http://${IP}:8000"
 EXPO_URL="exp://${IP}:8081"

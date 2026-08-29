@@ -1,5 +1,15 @@
-import { calcolaSemaforo, type PiattoAllergeni } from '../engine/semaforo';
+import { calcolaSemaforo, type AllergyCriterio, type PiattoAllergeni } from '../engine/semaforo';
 import { OFF_ALLERGEN_MAP } from '../engine/offAllergens';
+import { api, type BarcodeResolveResult } from '../api/client';
+
+export type ProductSourceType =
+  | 'off'
+  | 'openfoodfacts'
+  | 'openbeautyfacts'
+  | 'ai_label'
+  | 'community_cache'
+  | 'allertgy_verified'
+  | 'upcitemdb';
 
 export interface ScannedProduct {
   barcode: string;
@@ -11,9 +21,81 @@ export interface ScannedProduct {
   match_contenuti: string[];
   match_tracce: string[];
   match_esclusi: string[];
+  match_criterio?: string[];
   date: string;
-  source?: 'off' | 'ai_label' | 'community_cache';
+  source?: ProductSourceType;
+  sourceLabel?: string;
+  confidenceScore?: number;
+  verificationCount?: number;
+  isCosmetic?: boolean;
+  lastVerified?: string;
+  disclaimer?: string;
   aiNote?: string;
+}
+
+/** Helper per mappare le etichette delle fonti in italiano */
+export function getSourceBadgeInfo(source?: string, isCosmetic?: boolean): { label: string; icon: string; color: string } {
+  if (isCosmetic || source === 'openbeautyfacts') {
+    return { label: 'Cura Personale / Cosmetico', icon: 'sparkles', color: '#8B5CF6' };
+  }
+  switch (source) {
+    case 'allertgy_verified':
+      return { label: 'Certificato AllerTgy', icon: 'shield-checkmark', color: '#10B981' };
+    case 'community_cache':
+    case 'ai_label':
+      return { label: 'Analisi Etichetta Community', icon: 'camera', color: '#F59E0B' };
+    case 'openfoodfacts':
+    case 'off':
+      return { label: 'Open Food Facts', icon: 'globe-outline', color: '#0EA5E9' };
+    case 'upcitemdb':
+      return { label: 'Catalogo Commerciale UPC', icon: 'barcode-outline', color: '#64748B' };
+    default:
+      return { label: 'Database AllerTgy', icon: 'checkmark-circle-outline', color: '#10B981' };
+  }
+}
+
+/** Converte il risultato del resolver backend multi-database in ScannedProduct. */
+export function analyzeResolvedProduct(
+  data: BarcodeResolveResult,
+  allergie: readonly string[],
+  ingredientiEsclusi: readonly string[] = [],
+  criteri: Readonly<Record<string, AllergyCriterio>> = {},
+): ScannedProduct {
+  const activeAllergies = [...allergie];
+  if (allergie.includes('senza_glutine') && !activeAllergies.includes('glutine')) activeAllergies.push('glutine');
+  if (allergie.includes('senza_lattosio') && !activeAllergies.includes('latte')) activeAllergies.push('latte');
+
+  const piatto: PiattoAllergeni = {
+    nome_piatto: data.product_name || 'Prodotto sconosciuto',
+    descrizione: data.ingredients,
+    allergeni_contenuti: data.allergeni_contenuti || [],
+    allergeni_tracce: data.allergeni_tracce || [],
+  };
+
+  const esito = calcolaSemaforo(activeAllergies, piatto, ingredientiEsclusi, criteri);
+
+  return {
+    barcode: data.barcode,
+    name: data.product_name || 'Prodotto sconosciuto',
+    brand: data.brand || 'Marca non specificata',
+    image: data.image_url || null,
+    status: esito.stato,
+    ingredients: data.ingredients || 'Lista ingredienti non disponibile',
+    match_contenuti: esito.match_contenuti || [],
+    match_tracce: esito.match_tracce || [],
+    match_esclusi: esito.match_esclusi || [],
+    match_criterio: esito.match_criterio || [],
+    date: new Date().toISOString(),
+    source: (data.source as ProductSourceType) || 'allertgy_verified',
+    sourceLabel: data.source_label,
+    confidenceScore: data.confidence_score,
+    verificationCount: data.verification_count,
+    isCosmetic: data.is_cosmetic,
+    lastVerified: data.last_verified_at || undefined,
+    aiNote: data.note || undefined,
+    disclaimer:
+      'Le ricette possono subire modifiche nel tempo. Verifica sempre la confezione fisica prima del consumo.',
+  };
 }
 
 /** Analizza un prodotto Open Food Facts e calcola il semaforo per il profilo utente. */
@@ -22,6 +104,7 @@ export function analyzeOffProduct(
   product: Record<string, unknown>,
   allergie: readonly string[],
   ingredientiEsclusi: readonly string[] = [],
+  criteri: Readonly<Record<string, AllergyCriterio>> = {},
 ): ScannedProduct {
   const name = (product.product_name_it as string) || (product.product_name as string) || 'Prodotto sconosciuto';
   const brand = (product.brands as string) || 'Marca non specificata';
@@ -74,7 +157,7 @@ export function analyzeOffProduct(
     allergeni_tracce: Array.from(allergeniTracce),
   };
 
-  const esito = calcolaSemaforo(activeAllergies, piatto, ingredientiEsclusi);
+  const esito = calcolaSemaforo(activeAllergies, piatto, ingredientiEsclusi, criteri);
 
   return {
     barcode,
@@ -86,8 +169,12 @@ export function analyzeOffProduct(
     match_contenuti: esito.match_contenuti || [],
     match_tracce: esito.match_tracce || [],
     match_esclusi: esito.match_esclusi || [],
+    match_criterio: esito.match_criterio || [],
     date: new Date().toISOString(),
     source: 'off',
+    sourceLabel: 'Open Food Facts',
+    disclaimer:
+      'Le ricette possono subire modifiche nel tempo. Verifica sempre la confezione fisica prima del consumo.',
   };
 }
 
@@ -106,7 +193,8 @@ export function analyzeFromLabelAi(
   data: ProductLabelAiResult,
   allergie: readonly string[],
   ingredientiEsclusi: readonly string[] = [],
-  opts?: { source?: 'ai_label' | 'community_cache'; aiNote?: string },
+  opts?: { source?: ProductSourceType; aiNote?: string; sourceLabel?: string },
+  criteri: Readonly<Record<string, AllergyCriterio>> = {},
 ): ScannedProduct {
   const activeAllergies = [...allergie];
   if (allergie.includes('senza_glutine') && !activeAllergies.includes('glutine')) activeAllergies.push('glutine');
@@ -119,7 +207,7 @@ export function analyzeFromLabelAi(
     allergeni_tracce: data.allergeni_tracce,
   };
 
-  const esito = calcolaSemaforo(activeAllergies, piatto, ingredientiEsclusi);
+  const esito = calcolaSemaforo(activeAllergies, piatto, ingredientiEsclusi, criteri);
   const source = opts?.source ?? 'ai_label';
 
   return {
@@ -132,25 +220,44 @@ export function analyzeFromLabelAi(
     match_contenuti: esito.match_contenuti || [],
     match_tracce: esito.match_tracce || [],
     match_esclusi: esito.match_esclusi || [],
+    match_criterio: esito.match_criterio || [],
     date: new Date().toISOString(),
     source,
+    sourceLabel: opts?.sourceLabel ?? (source === 'community_cache' ? 'Archivio Community AllerTgy' : 'Analisi Etichetta AI'),
     aiNote: opts?.aiNote ?? data.note,
+    disclaimer:
+      'Analisi AI basata sull\'etichetta inquadrata. Verifica sempre la confezione prima del consumo.',
   };
 }
 
-/** Scarica e analizza un prodotto da Open Food Facts. */
+/** Risolve e analizza un barcode tramite la cascata Multi-Database (Cloud AllerTgy -> OFF -> OBF -> UPC). */
 export async function fetchAndAnalyzeBarcode(
   barcode: string,
   allergie: readonly string[],
   ingredientiEsclusi: readonly string[] = [],
+  criteri: Readonly<Record<string, AllergyCriterio>> = {},
 ): Promise<ScannedProduct> {
+  // 1. Prova prima il nostro resolver backend multi-database (cascata 5 livelli server-side)
+  try {
+    const resolved = await api.resolveBarcode(barcode);
+    if (resolved && resolved.product_name) {
+      return analyzeResolvedProduct(resolved, allergie, ingredientiEsclusi, criteri);
+    }
+  } catch (err: any) {
+    // Se è 404 (non trovato nei DB) o errore di rete, continuiamo con fallback client
+    if (err?.status === 404 || err?.message?.includes('404')) {
+      throw new Error('Prodotto non trovato nei database');
+    }
+  }
+
+  // 2. Fallback diretto client a Open Food Facts se il backend non è raggiungibile
   const candidates = barcodeCandidates(barcode);
   let lastError: Error | null = null;
 
   for (const candidate of candidates) {
     try {
       const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${candidate}.json`, {
-        headers: { 'User-Agent': 'AllerTgyApp/1.0 (contact@allertgy.com)' },
+        headers: { 'User-Agent': 'AllerTgyApp/2.0 (contact@allertgy.com)' },
       });
       if (!response.ok) {
         lastError = new Error(`HTTP ${response.status}`);
@@ -158,15 +265,15 @@ export async function fetchAndAnalyzeBarcode(
       }
       const data = await response.json();
       if (data.status === 1 && data.product) {
-        return analyzeOffProduct(candidate, data.product, allergie, ingredientiEsclusi);
+        return analyzeOffProduct(candidate, data.product, allergie, ingredientiEsclusi, criteri);
       }
-      lastError = new Error('Prodotto non trovato nel database di Open Food Facts');
+      lastError = new Error('Prodotto non trovato nei database');
     } catch (e: unknown) {
-      lastError = e instanceof Error ? e : new Error('Errore di rete');
+      lastError = e instanceof Error ? e : new Error('Errore di connessione');
     }
   }
 
-  throw lastError ?? new Error('Prodotto non trovato nel database di Open Food Facts');
+  throw lastError ?? new Error('Prodotto non trovato nei database');
 }
 
 /** Estrae un codice prodotto da stringa scanner (EAN, UPC, GS1 QR). */
@@ -195,3 +302,4 @@ function barcodeCandidates(barcode: string): string[] {
   if (digits.length === 13 && digits.startsWith('0')) out.add(digits.slice(1));
   return [...out];
 }
+

@@ -1,13 +1,19 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator,
+  Alert,
+  Linking,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { api } from '../../src/api/client';
-import { CollapseSection, Screen } from '../../src/components/ui';
+import { OwnerScreenHeader } from '../../src/components/owner/OwnerScreenHeader';
+import { AppText, CollapseSection, GlassCard, GlassScreenScroll, SurfaceButton } from '../../src/components/ui';
 import { useOwner } from '../../src/store/owner';
-import { TAB_BAR_CLEARANCE, colors, radius, shadow, spacing, typography } from '../../src/theme';
-import type { BusinessPlan, Plan, Restaurant } from '../../src/types';
+import { colors, radius, spacing } from '../../src/theme';
+import type { BusinessPlan, Plan } from '../../src/types';
 
 const STATUS_LABEL: Record<string, string> = {
   free: 'Nessun piano attivo',
@@ -29,6 +35,7 @@ function trialDaysLeft(iso?: string | null): number | null {
   return diff <= 0 ? 0 : Math.ceil(diff / 86400000);
 }
 
+/** Piano & Fatturazione Ristoratore — Dimensioni ed elementi bilanciati. */
 export default function OwnerPiano() {
   const { restaurants, current, setRestaurants, setCurrent } = useOwner();
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -48,63 +55,42 @@ export default function OwnerPiano() {
         setPlans(p);
         if (rs.length && restaurants.length === 0) {
           setRestaurants(rs);
-          if (!current) setCurrent(rs[0]);
+          setCurrent(rs[0]);
         }
       })
+      .catch((e) => Alert.alert('Errore', (e as Error).message))
       .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!locale?.id) return;
-    api.billingInvoices(locale.id).then(setInvoices).catch(() => setInvoices([]));
-  }, [locale?.id]);
+    if (locale) {
+      api.billingInvoices(locale.id).then(setInvoices).catch(() => setInvoices([]));
+    }
+  }, [locale]);
 
-  const applyUpdated = (updated: Restaurant) => {
-    setRestaurants(restaurants.map((r) => (r.id === updated.id ? updated : r)));
-    setCurrent(updated);
-  };
-
-  const status = locale?.subscription_status ?? 'free';
   const currentPlan = locale?.business_plan ?? 'free';
+  const status = locale?.subscription_status ?? 'free';
+  const trialEnd = locale?.trial_ends_at;
+  const daysLeft = trialDaysLeft(trialEnd);
   const isTrialing = status === 'trialing';
   const isActive = status === 'active' || status === 'comped';
-  const canTrial = status === 'free'; // il backend blocca comunque una seconda prova
-  const daysLeft = trialDaysLeft(locale?.trial_ends_at);
 
-  const startTrial = async (plan: BusinessPlan) => {
+  const selectPlan = async (code: BusinessPlan) => {
     if (!locale) return;
-    setBusy(plan);
+    if (code === 'free' && currentPlan === 'free') return;
+    setBusy(code);
     try {
-      const updated = await api.startTrial(locale.id, plan);
-      applyUpdated(updated);
-      Alert.alert(
-        '🎉 Prova attivata!',
-        `Hai 14 giorni gratis del piano ${plan === 'base' ? 'Base' : plan === 'pro_notify' ? 'Pro' : plan}. Ora puoi creare il menù digitale con gli allergeni.`,
-        [{ text: 'Crea il menù', onPress: () => router.push('/(owner)/menu') }, { text: 'Ok' }],
-      );
-    } catch (e) {
-      Alert.alert('Ops', (e as Error).message);
-    }
-    setBusy(null);
-  };
-
-  const activatePaid = async (plan: BusinessPlan) => {
-    if (!locale) return;
-    setBusy(plan);
-    try {
-      const { checkout_url } = await api.billingCheckout(locale.id, plan);
-      Linking.openURL(checkout_url);
-    } catch (e) {
-      const msg = (e as Error).message;
-      if (/STRIPE|Pagamenti non ancora attivi|non installato/i.test(msg)) {
-        Alert.alert(
-          'Pagamenti non ancora attivi',
-          'Il pagamento con carta sarà disponibile a breve. Nel frattempo puoi usare la prova gratuita o scrivere a supporto@allertgy.it.',
-        );
+      const res = await api.billingCheckout(locale.id, code);
+      if (res.checkout_url) {
+        await Linking.openURL(res.checkout_url);
       } else {
-        Alert.alert('Ops', msg);
+        const updated = await api.myRestaurants();
+        setRestaurants(updated);
+        const match = updated.find((r) => r.id === locale.id);
+        if (match) setCurrent(match);
       }
+    } catch (e) {
+      Alert.alert('Abbonamento', (e as Error).message);
     }
     setBusy(null);
   };
@@ -116,13 +102,7 @@ export default function OwnerPiano() {
       const { portal_url } = await api.billingPortal(locale.id);
       Linking.openURL(portal_url);
     } catch (e) {
-      const msg = (e as Error).message;
-      Alert.alert(
-        'Gestione abbonamento',
-        /STRIPE|Pagamenti|abbonamento attivo|non installato/i.test(msg)
-          ? 'La gestione online sarà disponibile con l\'attivazione dei pagamenti. Per modifiche scrivi a supporto@allertgy.it.'
-          : msg,
-      );
+      Alert.alert('Gestione abbonamento', (e as Error).message);
     }
     setBusy(null);
   };
@@ -130,158 +110,124 @@ export default function OwnerPiano() {
   if (loading) return <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.brand} />;
 
   if (!locale) {
-    const hasRestaurants = restaurants.length > 0;
     return (
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyEmoji}>🏪</Text>
-          <Text style={styles.emptyTitle}>
-            {hasRestaurants ? 'Seleziona un locale' : 'Prima crea il tuo locale'}
-          </Text>
-          <Text style={styles.emptyText}>
-            {hasRestaurants
-              ? 'Seleziona uno dei tuoi locali nella scheda "Locale" per gestirne il piano e l\'abbonamento.'
-              : 'Registra il ristorante dalla scheda "Locale", poi torna qui per attivare la prova gratuita.'}
-          </Text>
-          <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/(owner)/locali')}>
-            <Text style={styles.emptyBtnText}>Vai a "Locale"</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+      <GlassScreenScroll headerFloat>
+        <GlassCard style={styles.centerCard}>
+          <AppText variant="h2" style={{ fontSize: 16 }}>Nessun locale selezionato</AppText>
+          <AppText variant="caption" style={{ textAlign: 'center', marginTop: 2, marginBottom: spacing.sm, fontSize: 12 }}>
+            Seleziona o crea la tua attività prima di attivare un piano.
+          </AppText>
+          <SurfaceButton label="Vai ad Attività" onPress={() => router.push('/(owner)/locali')} />
+        </GlassCard>
+      </GlassScreenScroll>
     );
   }
 
   return (
-    <Screen edges={false}>
-    <ScrollView contentContainerStyle={[styles.container, { paddingBottom: TAB_BAR_CLEARANCE }]}>
-      <View style={styles.blockHead}>
-        <Text style={styles.blockTitle}>Piano attuale</Text>
-        <Text style={styles.blockSub}>Stato abbonamento e gestione pagamenti</Text>
-      </View>
-      <View style={[styles.statusCard, isTrialing && styles.statusTrial, isActive && styles.statusActive]}>
-        <Text style={styles.statusFor}>{locale.name}</Text>
+    <GlassScreenScroll headerFloat>
+      <OwnerScreenHeader
+        title="Piano e fatturazione"
+        subtitle="Abbonamento e ricevute"
+      />
+
+      {/* Piano Attuale */}
+      <GlassCard style={styles.currentPlanCard}>
+        <AppText variant="eyebrow" color={colors.onSurfaceMuted} style={{ fontSize: 9 }}>STABILE ATTIVO</AppText>
+        <AppText variant="h2" color={colors.brandInk} style={{ fontSize: 18, marginVertical: 2 }}>{locale.name}</AppText>
+
         <View style={styles.statusRow}>
-          <Text style={styles.statusPlan}>
+          <AppText variant="title" style={{ fontSize: 14 }}>
             {currentPlan === 'free' ? 'Piano Gratis' : `Piano ${plans.find((p) => p.code === currentPlan)?.name ?? currentPlan}`}
-          </Text>
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusBadgeText}>{STATUS_LABEL[status] ?? status}</Text>
+          </AppText>
+          <View style={styles.statusBadgeViolet}>
+            <AppText variant="caption" color={colors.brandInk} style={{ fontWeight: '800', fontSize: 10 }}>
+              {STATUS_LABEL[status] ?? status}
+            </AppText>
           </View>
         </View>
+
         {isTrialing && daysLeft != null && (
-          <Text style={styles.trialCountdown}>
-            ⏳ {daysLeft === 0 ? 'Ultimo giorno di prova' : `${daysLeft} ${daysLeft === 1 ? 'giorno rimanente' : 'giorni rimanenti'}`}
-          </Text>
+          <AppText variant="caption" color={colors.onYellow} style={{ fontWeight: '700', marginTop: 4, fontSize: 10 }}>
+            ⏳ {daysLeft === 0 ? 'Ultimo giorno di prova' : `${daysLeft} giorni di prova rimanenti`}
+          </AppText>
         )}
+
         {(isActive || isTrialing || status === 'past_due') && (
-          <TouchableOpacity onPress={openPortal} disabled={busy === 'portal'} style={styles.manageBtn}>
-            <Text style={styles.manageBtnText}>
-              {busy === 'portal' ? 'Apro…' : 'Gestisci abbonamento'}
-            </Text>
-          </TouchableOpacity>
+          <View style={{ marginTop: spacing.sm }}>
+            <SurfaceButton
+              label={busy === 'portal' ? 'Apro...' : '⚙️ Gestisci Abbonamento & Fatture'}
+              onPress={openPortal}
+              disabled={busy === 'portal'}
+            />
+          </View>
         )}
+      </GlassCard>
+
+      {/* Griglia Piani */}
+      <View style={styles.plansSectionHead}>
+        <AppText variant="title" style={{ fontSize: 15 }}>Scegli un Piano</AppText>
       </View>
 
-      {canTrial && (
-        <>
-        <View style={styles.blockHead}>
-          <Text style={styles.blockTitle}>Prova gratuita</Text>
-          <Text style={styles.blockSub}>14 giorni Base senza carta</Text>
-        </View>
-        <View style={styles.trialHero}>
-          <Text style={styles.trialHeroEmoji}>🎁</Text>
-          <Text style={styles.trialHeroTitle}>14 giorni di Base, gratis</Text>
-          <Text style={styles.trialHeroText}>
-            Sblocca semaforo clienti, QR al tavolo e registro allergeni PDF.
-            Nessuna carta richiesta, nessun addebito automatico.
-          </Text>
-          <TouchableOpacity
-            style={styles.trialHeroBtn}
-            onPress={() => startTrial('base')}
-            disabled={busy === 'base'}
-          >
-            {busy === 'base'
-              ? <ActivityIndicator color={colors.white} />
-              : <Text style={styles.trialHeroBtnText}>Inizia la prova gratuita</Text>}
-          </TouchableOpacity>
-        </View>
-        </>
-      )}
-
-      <View style={styles.blockHead}>
-        <Text style={styles.blockTitle}>Confronto piani</Text>
-        <Text style={styles.blockSub}>Cambia o disdici dal portale abbonamenti</Text>
-      </View>
-      {plans.map((plan) => {
-        const isCurrent = plan.code === currentPlan && status !== 'free';
-        const isFree = plan.code === 'free';
+      {plans.map((p) => {
+        const isCurrent = currentPlan === p.code;
         return (
-          <View key={plan.code} style={[styles.planCard, isCurrent && styles.planCardCurrent]}>
-            <View style={styles.planHead}>
+          <GlassCard key={p.code} style={[styles.planCard, isCurrent && styles.planCardCurrent]}>
+            {isCurrent && (
+              <View style={styles.currentBadgeTop}>
+                <AppText variant="caption" color="#FFFFFF" style={{ fontSize: 8, fontWeight: '800', letterSpacing: 0.6 }}>
+                  PIANO ATTIVATO
+                </AppText>
+              </View>
+            )}
+
+            <View style={styles.planCardHead}>
               <View style={{ flex: 1 }}>
-                <View style={styles.planNameRow}>
-                  <Text style={styles.planName}>{plan.name}</Text>
-                  {isCurrent && <View style={styles.currentPill}><Text style={styles.currentPillText}>Attuale</Text></View>}
-                  {plan.code === 'pro_notify' && !isCurrent && <View style={styles.popularPill}><Text style={styles.popularPillText}>Consigliato</Text></View>}
-                </View>
-                <Text style={styles.planTagline}>{plan.tagline}</Text>
+                <AppText variant="title" color={colors.brandInk} style={{ fontSize: 15 }}>{p.name}</AppText>
+                <AppText variant="caption" color={colors.onSurfaceMuted} style={{ fontSize: 11 }}>{p.tagline}</AppText>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.planPrice}>{euro(plan.price_cents)}</Text>
-                {plan.price_cents > 0 && <Text style={styles.planPer}>/ mese</Text>}
+                <AppText variant="h1" color={colors.brand} style={{ fontSize: 20, lineHeight: 24 }}>{euro(p.price_cents)}</AppText>
+                {p.price_cents > 0 ? <AppText variant="caption" color={colors.onSurfaceMuted} style={{ fontSize: 9 }}>/mese</AppText> : null}
               </View>
             </View>
 
-            {/* Specifiche chiave */}
-            <View style={styles.specs}>
-              <Spec ok={plan.photo_limit > 0} label={`Galleria foto: ${plan.photo_limit}`} />
-              <Spec ok={plan.has_menu} label="Menù digitale con allergeni per piatto" />
-              <Spec ok={plan.has_menu} label="QR code e registro allergeni PDF" />
-              <Spec ok={plan.has_review_reply} label="Rispondi alle recensioni" />
-              <Spec ok={plan.has_priority} label="Priorità nei risultati di ricerca" />
+            <View style={styles.featuresList}>
+              {p.features.map((feat, idx) => (
+                <AppText key={idx} variant="caption" color={colors.brandInk} style={{ fontSize: 11, fontWeight: '700' }}>✓ {feat}</AppText>
+              ))}
             </View>
 
-            {/* CTA per piano */}
-            {isCurrent ? (
-              <View style={styles.currentBanner}><Text style={styles.currentBannerText}>✓ È il tuo piano attuale</Text></View>
-            ) : isFree ? null : canTrial ? (
-              <TouchableOpacity style={styles.planBtn} onPress={() => startTrial(plan.code)} disabled={busy === plan.code}>
-                {busy === plan.code
-                  ? <ActivityIndicator color={colors.white} />
-                  : <Text style={styles.planBtnText}>Prova 14 giorni gratis</Text>}
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={[styles.planBtn, styles.planBtnAlt]} onPress={() => activatePaid(plan.code)} disabled={busy === plan.code}>
-                {busy === plan.code
-                  ? <ActivityIndicator color={colors.brandDark} />
-                  : <Text style={styles.planBtnAltText}>Attiva {plan.name}</Text>}
-              </TouchableOpacity>
-            )}
-          </View>
+            <View style={{ marginTop: spacing.sm }}>
+              <SurfaceButton
+                label={isCurrent ? 'Piano In Uso' : `Scegli ${p.name}`}
+                onPress={() => selectPlan(p.code as BusinessPlan)}
+                disabled={isCurrent || busy === p.code}
+              />
+            </View>
+          </GlassCard>
         );
       })}
 
+      {/* Storico Fatture */}
       {invoices.length > 0 && (
         <CollapseSection
           icon="receipt"
-          title="Storico fatture"
-          preview={`${invoices.length} fatture`}
+          title="Fatture & Ricevute"
+          preview={`${invoices.length} ricevute`}
           expanded={invoicesExpanded}
           onToggle={() => setInvoicesExpanded((v) => !v)}
         >
           {invoices.map((inv) => (
             <View key={inv.id} style={styles.invoiceRow}>
               <View>
-                <Text style={styles.invoiceAmount}>{euro(inv.amount_cents)}</Text>
-                <Text style={styles.invoiceDate}>
-                  {new Date(inv.created_at).toLocaleDateString('it-IT')}
-                </Text>
+                <AppText variant="bodyBold" style={{ fontSize: 12 }}>{euro(inv.amount_cents)}</AppText>
+                <AppText variant="caption" color={colors.onSurfaceMuted} style={{ fontSize: 10 }}>{new Date(inv.created_at).toLocaleDateString('it-IT')}</AppText>
               </View>
-              <View style={styles.invoiceRight}>
-                <Text style={styles.invoiceStatus}>{inv.status}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                <AppText variant="caption" style={{ fontWeight: '700', fontSize: 10 }}>{inv.status}</AppText>
                 {inv.pdf_url ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(inv.pdf_url!)}>
-                    <Text style={styles.invoicePdf}>PDF</Text>
+                  <TouchableOpacity onPress={() => Linking.openURL(inv.pdf_url!)} style={styles.pdfPillBtn}>
+                    <AppText variant="caption" color="#FFFFFF" style={{ fontWeight: '800', fontSize: 10 }}>PDF</AppText>
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -290,111 +236,95 @@ export default function OwnerPiano() {
         </CollapseSection>
       )}
 
-      <Text style={styles.footnote}>
-        La prova gratuita non richiede metodi di pagamento. I piani a pagamento sono mensili,
-        con fatturazione elettronica, disdicibili in qualsiasi momento.
-      </Text>
-    </ScrollView>
-    </Screen>
-  );
-}
-
-function Spec({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <View style={styles.specRow}>
-      <Text style={[styles.specMark, { color: ok ? colors.green : colors.textMuted }]}>{ok ? '✓' : '—'}</Text>
-      <Text style={[styles.specLabel, !ok && styles.specLabelOff]}>{label}</Text>
-    </View>
+      <AppText variant="caption" color={colors.onSurfaceMuted} style={styles.footnote}>
+        Tutti i piani a pagamento sono mensili, fatturati elettronicamente, disdicibili in qualsiasi momento senza penali.
+      </AppText>
+    </GlassScreenScroll>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.lg, paddingBottom: 48, backgroundColor: colors.bg, gap: spacing.lg },
-  blockHead: { gap: 2 },
-  blockTitle: { ...typography.h2, color: colors.ink },
-  blockSub: { color: colors.textSecondary, fontSize: 12 },
-
-  statusCard: {
-    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg,
-    borderWidth: 1, borderColor: colors.border, ...shadow.card,
+  headerHead: {
+    marginBottom: spacing.xs,
   },
-  statusTrial: { borderColor: colors.amberBorder, backgroundColor: colors.amberBg },
-  statusActive: { borderColor: colors.greenBorder, backgroundColor: colors.greenBg },
-  statusFor: { ...typography.caption, color: colors.textSecondary },
-  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
-  statusPlan: { ...typography.h2, color: colors.ink },
-  statusBadge: { backgroundColor: colors.surface, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.borderStrong, paddingHorizontal: spacing.md, paddingVertical: 4 },
-  statusBadgeText: { fontSize: 11, fontWeight: '800', color: colors.inkSoft },
-  trialCountdown: { marginTop: spacing.sm, fontWeight: '800', color: colors.amberText, fontSize: 13 },
-  manageBtn: { marginTop: spacing.md, alignSelf: 'flex-start' },
-  manageBtnText: { color: colors.brandDark, fontWeight: '800', fontSize: 13 },
-
-  trialHero: {
-    backgroundColor: colors.brand, borderRadius: radius.xl, padding: spacing.xl, ...shadow.raised,
+  centerCard: {
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: 20,
+    borderRadius: radius.md,
   },
-  trialHeroEmoji: { fontSize: 30 },
-  trialHeroTitle: { color: colors.white, fontWeight: '800', fontSize: 20, marginTop: spacing.sm },
-  trialHeroText: { color: colors.brand100, fontSize: 13.5, lineHeight: 20, marginTop: spacing.sm },
-  trialHeroBtn: {
-    backgroundColor: colors.white, borderRadius: radius.md, height: 50,
-    alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg,
+  currentPlanCard: {
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderRadius: radius.md,
   },
-  trialHeroBtnText: { color: colors.brandDarker, fontWeight: '800', fontSize: 15 },
-
-  sectionTitle: { ...typography.h2, color: colors.ink },
-  sectionSub: { color: colors.textSecondary, fontSize: 13, marginTop: -spacing.sm },
-
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  statusBadgeViolet: {
+    backgroundColor: colors.surfaceTertiary,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  plansSectionHead: {
+    marginTop: spacing.xs,
+    marginBottom: 4,
+  },
   planCard: {
-    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg,
-    borderWidth: 1, borderColor: colors.border, gap: spacing.md, ...shadow.card,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    position: 'relative',
+    borderRadius: radius.md,
   },
-  planCardCurrent: { borderColor: colors.brand, borderWidth: 2 },
-  planHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  planNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
-  planName: { ...typography.h2, color: colors.ink },
-  planTagline: { color: colors.textSecondary, fontSize: 13, marginTop: 2, lineHeight: 18 },
-  planPrice: { ...typography.h1, color: colors.brandDark },
-  planPer: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
-  currentPill: { backgroundColor: colors.brand50, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
-  currentPillText: { color: colors.brandDark, fontSize: 10, fontWeight: '800' },
-  popularPill: { backgroundColor: colors.ink, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
-  popularPillText: { color: colors.white, fontSize: 10, fontWeight: '800' },
-
-  specs: { gap: spacing.sm },
-  specRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  specMark: { fontSize: 14, fontWeight: '900', width: 16 },
-  specLabel: { flex: 1, color: colors.inkSoft, fontSize: 13.5 },
-  specLabelOff: { color: colors.textMuted },
-
-  planBtn: {
-    backgroundColor: colors.brand, borderRadius: radius.md, height: 48,
-    alignItems: 'center', justifyContent: 'center',
+  planCardCurrent: {
+    borderColor: colors.brand,
+    borderWidth: 2,
   },
-  planBtnText: { color: colors.white, fontWeight: '800', fontSize: 14.5 },
-  planBtnAlt: { backgroundColor: colors.brand50, borderWidth: 1, borderColor: colors.brand200 },
-  planBtnAltText: { color: colors.brandDark, fontWeight: '800', fontSize: 14.5 },
-  currentBanner: { backgroundColor: colors.greenBg, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center' },
-  currentBannerText: { color: colors.greenText, fontWeight: '800', fontSize: 13 },
-
-  footnote: { color: colors.textMuted, fontSize: 11.5, lineHeight: 17, marginTop: spacing.sm },
+  currentBadgeTop: {
+    position: 'absolute',
+    top: -9,
+    right: 16,
+    backgroundColor: colors.brand,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+  },
+  planCardHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  featuresList: {
+    marginTop: spacing.xs,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: 3,
+  },
   invoiceRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md,
-    borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  invoiceAmount: { fontWeight: '800', color: colors.ink, fontSize: 15 },
-  invoiceDate: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
-  invoiceRight: { alignItems: 'flex-end', gap: 4 },
-  invoiceStatus: { fontSize: 10, fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase' },
-  invoicePdf: { color: colors.brand, fontWeight: '800', fontSize: 12 },
-
-  emptyBox: {
-    alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border, padding: spacing.xxxl, gap: spacing.sm, marginTop: spacing.xl,
+  pdfPillBtn: {
+    backgroundColor: colors.brand,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
   },
-  emptyEmoji: { fontSize: 40 },
-  emptyTitle: { ...typography.h3, color: colors.ink },
-  emptyText: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, textAlign: 'center' },
-  emptyBtn: { marginTop: spacing.sm, backgroundColor: colors.brand, borderRadius: radius.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.md },
-  emptyBtnText: { color: colors.white, fontWeight: '800' },
+  footnote: {
+    textAlign: 'center',
+    marginVertical: spacing.md,
+    lineHeight: 14,
+    fontSize: 10,
+  },
 });

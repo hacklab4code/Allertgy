@@ -33,11 +33,13 @@ export const TRANSLATIONS = {
     close: "Chiudi",
 
     // Onboarding - Welcome screen
-    welcome_subtitle: "Scegli come desideri utilizzare l'applicazione per iniziare:",
+    welcome_subtitle: "Prima scegli il tipo di account. Poi ti spieghiamo come funziona AllerTgy.",
     role_customer: "Sono un Cliente / Utente",
     role_customer_desc: "Scansiona il QR al tavolo e scopri subito cosa puoi e non puoi mangiare, in base alle tue allergie.",
     role_owner: "Gestisco un Ristorante",
     role_owner_desc: "Permetti ai clienti con allergie di scoprire cosa possono mangiare da te — personalizzato sul profilo di ognuno.",
+    role_customer_short: "Cliente",
+    role_owner_short: "Ristoratore",
     already_have_account: "Ho già un account",
 
     // Onboarding - Welcome Slides
@@ -96,7 +98,7 @@ export const TRANSLATIONS = {
     forgot_subtitle: "Ti invieremo un link via email per scegliere una nuova password.",
     email_label: "Email",
     password_label: "Password",
-    name_label: "Nome completo",
+    name_label: "Nome",
     login_btn: "Accedi",
     register_btn: "Registrati",
     forgot_btn: "Invia email di recupero",
@@ -104,6 +106,13 @@ export const TRANSLATIONS = {
     have_account_prompt: "Hai già un account? Accedi",
     forgot_password_link: "Password dimenticata?",
     back_to_login_link: "Torna al login",
+    consent_legal_label: "Accetto Termini e Privacy",
+    consent_legal_sub: "Necessari per creare l’account. Puoi leggere i documenti completi qui sotto.",
+    consent_health_label: "Consenso al trattamento dei dati sulla salute",
+    consent_health_sub: "Serve per salvare il tuo profilo allergie. Revocabile in ogni momento dal profilo.",
+    consent_owner_label: "Responsabilità sui dati allergeni",
+    consent_owner_sub: "Dichiaro di essere autorizzato a gestire il locale e di pubblicare informazioni allergeni verificate.",
+    consent_both_required: "Entrambi i consensi sono necessari per usare il profilo allergie.",
 
     // Legal & Privacy Screen
     legal_title: "Termini, privacy e dati salute",
@@ -128,7 +137,7 @@ export const TRANSLATIONS = {
 
     // Allergie Select Screen
     select_allergies_title: "Seleziona le tue allergie e intolleranze",
-    select_allergies_subtitle: "Scegli tra oltre 100 allergeni e intolleranze organizzati per categoria. Tieni premuto un chip per impostare l'intensità. Puoi anche continuare senza selezioni.",
+    select_allergies_subtitle: "Scegli tra oltre 100 allergeni e intolleranze. Tieni premuto un chip per impostare intensità (lieve = giallo) e criterio di forma (assoluto / solo crudo / solo cotto).",
     search_allergen_placeholder: "Cerca allergene (es. latte, glutine…)",
     save_profile_btn: "Salva profilo",
     no_allergies_btn: "Non ho allergie / Continua",
@@ -243,11 +252,13 @@ export const TRANSLATIONS = {
     close: "Close",
 
     // Onboarding - Welcome screen
-    welcome_subtitle: "Choose how you want to start using the application:",
+    welcome_subtitle: "First choose your account type. Then we’ll explain how AllerTgy works.",
     role_customer: "I am a Customer / User",
     role_customer_desc: "Scan the table QR and instantly see what you can and cannot eat, based on your allergies.",
     role_owner: "I manage a Restaurant",
     role_owner_desc: "Let customers with allergies discover what they can eat at your place — personalized to each profile.",
+    role_customer_short: "Customer",
+    role_owner_short: "Restaurant owner",
     already_have_account: "I already have an account",
 
     // Onboarding - Welcome Slides
@@ -306,7 +317,7 @@ export const TRANSLATIONS = {
     forgot_subtitle: "We will send you an email link to choose a new password.",
     email_label: "Email",
     password_label: "Password",
-    name_label: "Full Name",
+    name_label: "Name",
     login_btn: "Log In",
     register_btn: "Sign Up",
     forgot_btn: "Send recovery email",
@@ -314,6 +325,13 @@ export const TRANSLATIONS = {
     have_account_prompt: "Already have an account? Log In",
     forgot_password_link: "Forgot password?",
     back_to_login_link: "Back to login",
+    consent_legal_label: "I accept Terms and Privacy",
+    consent_legal_sub: "Required to create an account. You can read the full documents below.",
+    consent_health_label: "Consent to process health-related data",
+    consent_health_sub: "Needed to save your allergy profile. You can revoke it anytime from your profile.",
+    consent_owner_label: "Allergen data responsibility",
+    consent_owner_sub: "I declare that I am authorized to manage the venue and to publish verified allergen information.",
+    consent_both_required: "Both consents are required to use the allergy profile.",
 
     // Legal & Privacy Screen
     legal_title: "Terms, privacy and health data",
@@ -338,7 +356,7 @@ export const TRANSLATIONS = {
 
     // Allergie Select Screen
     select_allergies_title: "Select your allergies and intolerances",
-    select_allergies_subtitle: "Choose from over 100 allergens and intolerances organized by category. Press and hold a chip to set intensity. You can also continue without selections.",
+    select_allergies_subtitle: "Choose from over 100 allergens and intolerances. Press and hold a chip to set severity (mild = yellow) and form criterion (absolute / raw only / cooked only).",
     search_allergen_placeholder: "Search allergen (e.g. milk, gluten...)",
     save_profile_btn: "Save profile",
     no_allergies_btn: "I have no allergies / Continue",

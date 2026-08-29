@@ -14,9 +14,11 @@ export default function NotificationBell() {
 
   return (
     <GlassIconButton
-      icon="notifications-outline"
+      image={require('../../assets/header_notifiche.png')}
       onPress={() => router.push('/notifiche')}
       accessibilityLabel="Notifiche"
+      size={42}
+      imageSize={36}
       badge={unread}
     />
   );

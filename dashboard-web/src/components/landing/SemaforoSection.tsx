@@ -41,13 +41,13 @@ export const SemaforoSection = () => (
   <section id="semaforo" className="py-24 md:py-32">
     <div className="max-w-7xl mx-auto px-6 md:px-12">
       <div className="max-w-2xl mx-auto text-center">
-        <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#16A34A]">
+        <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#36255C]">
           Il sistema
         </span>
-        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-[#1C221F] mt-3 font-heading">
+        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-[#36255C] mt-3 font-heading">
           Verde, giallo, rosso: la risposta per te
         </h2>
-        <p className="text-[#4A524D] mt-4 text-base lg:text-lg leading-relaxed">
+        <p className="text-[#6B6575] mt-4 text-base lg:text-lg leading-relaxed">
           Non un menù da sfogliare — un semaforo costruito sul tuo profilo
           allergico, piatto per piatto.
         </p>
@@ -67,10 +67,10 @@ export const SemaforoSection = () => (
             <div className="grid place-items-center w-16 h-16 rounded-2xl bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
               <c.Icon className={`w-8 h-8 ${c.ic}`} strokeWidth={1.75} />
             </div>
-            <h3 className="text-xl font-extrabold mt-5 text-[#1C221F] font-heading">
+            <h3 className="text-xl font-extrabold mt-5 text-[#36255C] font-heading">
               {c.title}
             </h3>
-            <p className="text-sm text-[#4A524D] mt-2 leading-relaxed">{c.desc}</p>
+            <p className="text-sm text-[#6B6575] mt-2 leading-relaxed">{c.desc}</p>
           </motion.div>
         ))}
       </div>

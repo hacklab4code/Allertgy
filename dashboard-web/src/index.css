@@ -107,69 +107,58 @@ body {
 
 /* Claymorphic & 3D styling classes */
 .btn-clay-green {
-  background: linear-gradient(135deg, #16A34A 0%, #15803D 100%);
+  /* Alias storico — CTA primarie landing = Violet Precision */
+  background: #36255C;
   color: white;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 10px 25px -5px rgba(22, 163, 74, 0.35),
-              inset 0 -4px 6px rgba(0, 0, 0, 0.15),
-              inset 0 4px 6px rgba(255, 255, 255, 0.35);
-  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 1px solid #36255C;
+  box-shadow: 0 8px 20px -6px rgba(54, 37, 92, 0.28);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 .btn-clay-green:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 28px -4px rgba(22, 163, 74, 0.45),
-              inset 0 -5px 8px rgba(0, 0, 0, 0.2),
-              inset 0 5px 8px rgba(255, 255, 255, 0.45);
+  opacity: 0.92;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px -6px rgba(54, 37, 92, 0.34);
 }
 .btn-clay-green:active {
-  transform: translateY(1px);
-  box-shadow: 0 4px 8px -2px rgba(22, 163, 74, 0.25),
-              inset 0 -2px 4px rgba(0, 0, 0, 0.1),
-              inset 0 2px 4px rgba(255, 255, 255, 0.25);
+  opacity: 0.88;
+  transform: translateY(0);
+  box-shadow: 0 4px 10px -4px rgba(54, 37, 92, 0.22);
 }
 
 .btn-clay-dark {
-  background: linear-gradient(135deg, #2D3732 0%, #1C221F 100%);
+  background: #2A1C48;
   color: white;
-  border: 2px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 10px 25px -5px rgba(28, 34, 31, 0.35),
-              inset 0 -4px 6px rgba(0, 0, 0, 0.35),
-              inset 0 4px 6px rgba(255, 255, 255, 0.15);
-  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 1px solid #2A1C48;
+  box-shadow: 0 8px 20px -6px rgba(42, 28, 72, 0.28);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 .btn-clay-dark:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 28px -4px rgba(28, 34, 31, 0.45),
-              inset 0 -5px 8px rgba(0, 0, 0, 0.4),
-              inset 0 5px 8px rgba(255, 255, 255, 0.22);
+  opacity: 0.92;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px -6px rgba(42, 28, 72, 0.34);
 }
 .btn-clay-dark:active {
-  transform: translateY(1px);
-  box-shadow: 0 4px 8px -2px rgba(28, 34, 31, 0.25),
-              inset 0 -2px 4px rgba(0, 0, 0, 0.25),
-              inset 0 2px 4px rgba(255, 255, 255, 0.1);
+  opacity: 0.88;
+  transform: translateY(0);
+  box-shadow: 0 4px 10px -4px rgba(42, 28, 72, 0.22);
 }
 
 .btn-clay-white {
-  background: linear-gradient(135deg, #FFFFFF 0%, #F5F7F6 100%);
-  color: #1C221F;
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06),
-              inset 0 -4px 6px rgba(0, 0, 0, 0.05),
-              inset 0 4px 6px rgba(255, 255, 255, 0.95);
-  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  background: #FFFFFF;
+  color: #36255C;
+  border: 1px solid #E6DFF5;
+  box-shadow: 0 6px 16px -6px rgba(54, 37, 92, 0.08);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 .btn-clay-white:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 28px -4px rgba(0, 0, 0, 0.09),
-              inset 0 -5px 8px rgba(0, 0, 0, 0.07),
-              inset 0 5px 8px rgba(255, 255, 255, 1);
+  opacity: 0.94;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px -6px rgba(54, 37, 92, 0.12);
 }
 .btn-clay-white:active {
-  transform: translateY(1px);
-  box-shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.03),
-              inset 0 -2px 4px rgba(0, 0, 0, 0.03),
-              inset 0 2px 4px rgba(255, 255, 255, 0.8);
+  opacity: 0.88;
+  transform: translateY(0);
+  box-shadow: 0 4px 10px -4px rgba(54, 37, 92, 0.08);
 }
 
 .card-clay-white {
@@ -182,7 +171,7 @@ body {
 }
 
 .card-clay-container {
-  background: #FAF8F5;
+  background: #F6F2FC;
   border: 3px solid rgba(255, 255, 255, 0.7);
   border-radius: 32px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06),

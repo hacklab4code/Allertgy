@@ -25,8 +25,8 @@ type Props = {
 
 const palettes = {
   primary: { bg: colors.brand, text: colors.onBrand, border: colors.brandDark },
-  secondary: { bg: colors.brandInk, text: colors.onSurfaceInverse, border: colors.brandDarker },
-  soft: { bg: colors.surfaceSecondary, text: colors.brandInk, border: colors.borderStrong },
+  secondary: { bg: colors.surfaceInverse, text: colors.onSurfaceInverse, border: colors.surfaceInverse },
+  soft: { bg: colors.surfaceSecondary, text: colors.onSurface, border: colors.border },
   danger: { bg: colors.red, text: '#FFFFFF', border: colors.redText },
 };
 
@@ -99,5 +99,5 @@ export function PuffyButton({
 const styles = StyleSheet.create({
   btn: { borderRadius: radius.pill, borderWidth: 2, overflow: 'hidden', minHeight: 54, justifyContent: 'center' },
   btnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: 16, paddingHorizontal: spacing.lg, zIndex: 2 },
-  text: { fontFamily: font.displaySemibold, fontSize: 16, letterSpacing: -0.2 },
+  text: { fontFamily: font.displaySemibold, fontSize: 16 },
 });

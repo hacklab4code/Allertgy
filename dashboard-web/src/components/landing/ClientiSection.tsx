@@ -39,14 +39,14 @@ interface ClientiSectionProps {
 }
 
 export const ClientiSection = ({ scrollTo, onEnterApp }: ClientiSectionProps) => (
-  <section id="clienti" className="py-24 md:py-32 bg-[#EFEBE1]/50 border-y border-[#EFEBE1]">
+  <section id="clienti" className="py-24 md:py-32 bg-[#E6DFF5]/50 border-y border-[#E6DFF5]">
     <div className="max-w-7xl mx-auto px-6 md:px-12">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-14">
         <div className="max-w-xl">
-          <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#16A34A]">
+          <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#36255C]">
             Per chi mangia fuori
           </span>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-[#1C221F] mt-3 font-heading">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-[#36255C] mt-3 font-heading">
             Scopri cosa puoi mangiare, in 3 passi
           </h2>
         </div>
@@ -82,17 +82,17 @@ export const ClientiSection = ({ scrollTo, onEnterApp }: ClientiSectionProps) =>
             className={`${s.span} card-clay-white p-8 hover:-translate-y-1 transition-transform`}
           >
             <div className="flex items-start justify-between">
-              <div className="grid place-items-center w-14 h-14 rounded-2xl badge-clay-green text-white">
+              <div className="grid place-items-center w-14 h-14 rounded-2xl bg-[#36255C] text-white">
                 <s.Icon className="w-7 h-7" strokeWidth={1.75} />
               </div>
-              <span className="text-4xl font-extrabold text-[#EFEBE1] font-heading">
+              <span className="text-4xl font-extrabold text-[#E6DFF5] font-heading">
                 {s.n}
               </span>
             </div>
-            <h3 className="text-xl font-extrabold mt-6 text-[#1C221F] font-heading">
+            <h3 className="text-xl font-extrabold mt-6 text-[#36255C] font-heading">
               {s.title}
             </h3>
-            <p className="text-sm text-[#4A524D] mt-2 leading-relaxed max-w-md">
+            <p className="text-sm text-[#6B6575] mt-2 leading-relaxed max-w-md">
               {s.desc}
             </p>
           </motion.div>

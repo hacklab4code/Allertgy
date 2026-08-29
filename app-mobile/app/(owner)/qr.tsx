@@ -1,132 +1,235 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Linking, Alert } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useOwner } from '../../src/store/owner';
-import { WEB_URL, API } from '../../src/api/client';
-import { useSession } from '../../src/store/session';
-import { CollapseSection, Screen } from '../../src/components/ui';
-import { TAB_BAR_CLEARANCE, spacing } from '../../src/theme';
+import { WEB_URL } from '../../src/api/client';
+import {
+  AppText,
+  CollapseSection,
+  GlassCard,
+  GlassScreenScroll,
+  SurfaceButton,
+} from '../../src/components/ui';
+import { colors, radius, spacing } from '../../src/theme';
+import { registryNeedsReprint } from '../../src/utils/registryPrint';
 
-/** Scheda QR: codice del locale e QR da mostrare/stampare. */
+/** QR tavoli — codice e locandina. Registro PDF in schermata dedicata. */
 export default function QR() {
   const { current, published } = useOwner();
-  const [legalExpanded, setLegalExpanded] = useState(false);
   const [howToExpanded, setHowToExpanded] = useState(false);
+  const [pdfReprintNeeded, setPdfReprintNeeded] = useState(false);
+
+  useEffect(() => {
+    if (!current?.id) {
+      setPdfReprintNeeded(false);
+      return;
+    }
+    registryNeedsReprint(current.id, current.menu_version).then(setPdfReprintNeeded);
+  }, [current?.id, current?.menu_version]);
 
   if (!current) {
     return (
-      <Screen style={styles.center}>
-        <Text style={styles.muted}>Prima seleziona o crea il tuo locale.</Text>
-        <TouchableOpacity style={styles.button} onPress={() => router.push('/(owner)/locali')}>
-          <Text style={styles.buttonText}>Vai ad Attività</Text>
-        </TouchableOpacity>
-      </Screen>
+      <GlassScreenScroll headerFloat>
+        <GlassCard style={styles.centerCard}>
+          <AppText variant="h2" color={colors.onSurfaceMuted} style={{ fontSize: 16 }}>
+            Nessun locale selezionato
+          </AppText>
+          <AppText variant="subtitle" style={styles.emptySub}>
+            Seleziona o crea la tua attività per sbloccare il codice QR.
+          </AppText>
+          <SurfaceButton label="Vai ad Attività" onPress={() => router.push('/(owner)/locali')} />
+        </GlassCard>
+      </GlassScreenScroll>
     );
   }
 
   const hasMenu = published || !!current.menu_updated_at;
-  const legalOk = !!(current as any).vat_number && !!(current as any).allergen_manager;
 
   return (
-    <Screen edges={false}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.block}>
-          <Text style={styles.blockTitle}>Codice e QR tavolo</Text>
-          <Text style={styles.blockSub}>Stampa o condividi — i clienti vedono il menù filtrato sulle allergie.</Text>
-          <Text style={styles.title}>{current.name}</Text>
-          {hasMenu
-            ? <Text style={styles.ok}>Menù pubblicato ✓</Text>
-            : <Text style={styles.warn}>Menù non pubblicato — vai alla scheda Menù</Text>}
+    <GlassScreenScroll headerFloat>
+      <GlassCard style={styles.qrBlockCard}>
+        <AppText variant="eyebrow" color={colors.onSurfaceMuted} style={{ fontSize: 9 }}>
+          CODICE & QR AL TAVOLO
+        </AppText>
+        <AppText variant="caption" style={styles.blockSub}>
+          Stampa o esponi il QR: ogni cliente scopre subito i piatti idonei sul suo profilo.
+        </AppText>
 
-          <Text style={styles.label}>CODICE DEL LOCALE</Text>
-          <Text style={styles.code}>{current.public_code}</Text>
+        <AppText variant="h2" style={styles.titleText}>
+          {current.name}
+        </AppText>
+        {hasMenu ? (
+          <View style={styles.okBadge}>
+            <AppText variant="caption" color={colors.onGreen} style={{ fontWeight: '800', fontSize: 10 }}>
+              Menù pubblicato
+            </AppText>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.warnBadge} onPress={() => router.push('/(owner)/menu')}>
+            <AppText variant="caption" color={colors.onYellow} style={{ fontWeight: '800', fontSize: 10 }}>
+              Menù in bozza — apri editor
+            </AppText>
+          </TouchableOpacity>
+        )}
 
-          <Image
-            style={styles.qr}
-            source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=440x440&data=${encodeURIComponent(WEB_URL + '/r/' + current.public_code)}` }}
-          />
-          <Text style={styles.hint}>
-            I clienti inquadrano il QR con la fotocamera per vedere cosa possono mangiare. Funziona nel browser e nell'app AllerTgy.
-          </Text>
+        <View style={styles.codeContainer}>
+          <AppText variant="eyebrow" color={colors.brandInk} style={{ fontSize: 8 }}>
+            CODICE UNIVOCO LOCALE
+          </AppText>
+          <AppText variant="h1" color={colors.brand} style={styles.codeText}>
+            #{current.public_code}
+          </AppText>
         </View>
 
-        <CollapseSection
-          icon="document-text"
-          title="Validità legale"
-          preview={legalOk ? 'Dati completi' : 'Dati da completare'}
-          expanded={legalExpanded}
-          onToggle={() => setLegalExpanded((v) => !v)}
-          tint={legalOk ? undefined : 'yellow'}
-        >
-          <Text style={styles.stepDescription}>
-            Il menù digitale funge da Registro degli Allergeni conforme al Reg. UE 1169/2011.
-          </Text>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Partita IVA:</Text>
-            <Text style={styles.metaValue}>{(current as any).vat_number || 'Non inserita'}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Referente allergeni:</Text>
-            <Text style={styles.metaValue}>{(current as any).allergen_manager || 'Non inserito'}</Text>
-          </View>
-          {!legalOk && (
-            <Text style={styles.warningHint}>
-              Completa P.IVA e referente in Attività per la validità legale del registro.
-            </Text>
-          )}
-          <TouchableOpacity
-            style={styles.pdfBtn}
-            onPress={() => {
-              const token = useSession.getState().token;
-              if (!token) return;
-              const pdfUrl = `${API}/admin/restaurants/${current.id}/registry.pdf?token=${token}`;
-              Linking.openURL(pdfUrl).catch(() => {
-                Alert.alert('Errore', 'Impossibile aprire il link del registro PDF.');
-              });
+        <View style={styles.qrWrapper}>
+          <Image
+            style={styles.qrImage}
+            source={{
+              uri: `https://api.qrserver.com/v1/create-qr-code/?size=340x340&data=${encodeURIComponent(WEB_URL + '/r/' + current.public_code)}`,
             }}
-          >
-            <Text style={styles.pdfBtnText}>Scarica registro PDF ufficiale</Text>
-          </TouchableOpacity>
-        </CollapseSection>
+          />
+        </View>
 
-        <CollapseSection
-          icon="help-circle"
-          title="Come usarlo"
-          preview="3 passaggi in sala"
-          expanded={howToExpanded}
-          onToggle={() => setHowToExpanded((v) => !v)}
-        >
-          <Text style={styles.step}>1 · Screenshot o stampa del QR (o PDF dalla dashboard web).</Text>
-          <Text style={styles.step}>2 · Posiziona il QR sui tavoli e alla cassa.</Text>
-          <Text style={styles.step}>3 · Aggiorna il menù in Menù quando cambi piatti — il QR resta uguale.</Text>
-        </CollapseSection>
-      </ScrollView>
-    </Screen>
+        <AppText variant="caption" style={styles.hintText}>
+          I clienti inquadrano il QR con lo smartphone. Funziona anche nel browser.
+        </AppText>
+      </GlassCard>
+
+      <GlassCard style={[styles.registryCard, pdfReprintNeeded && styles.registryCardWarn]}>
+        <AppText variant="eyebrow" color={colors.onSurfaceMuted} style={{ fontSize: 9 }}>
+          MODULO LEGALE
+        </AppText>
+        <AppText variant="bodyBold" style={{ fontSize: 15, marginTop: 4 }}>
+          Registro Allergeni UE 1169/2011
+        </AppText>
+        <AppText variant="caption" style={{ marginTop: 4, marginBottom: spacing.sm, lineHeight: 17 }}>
+          {pdfReprintNeeded
+            ? `Menù v${current.menu_version ?? 0} più recente della copia stampata — ristampa il modulo.`
+            : 'Scarica e stampa il PDF ufficiale da tenere in sala.'}
+        </AppText>
+        <SurfaceButton
+          label={pdfReprintNeeded ? 'Ristampa Registro' : 'Apri Registro Allergeni'}
+          icon="print-outline"
+          onPress={() => router.push('/(owner)/registro')}
+        />
+      </GlassCard>
+
+      <CollapseSection
+        icon="help-circle"
+        title="Come usarlo in sala"
+        preview="3 passaggi semplici"
+        expanded={howToExpanded}
+        onToggle={() => setHowToExpanded((v) => !v)}
+      >
+        <AppText variant="caption" style={styles.stepItem}>
+          1 · Dopo ogni modifica menù, ristampa il Registro Allergeni (schermata dedicata).
+        </AppText>
+        <AppText variant="caption" style={styles.stepItem}>
+          2 · Posiziona i segnatavolo col QR sui tavoli e al banco cassa.
+        </AppText>
+        <AppText variant="caption" style={styles.stepItem}>
+          3 · L’ospite inquadra il QR: menù filtrato sulle sue allergie.
+        </AppText>
+      </CollapseSection>
+    </GlassScreenScroll>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.lg, paddingBottom: TAB_BAR_CLEARANCE, gap: spacing.md },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl, gap: spacing.md },
-  muted: { color: '#666', fontSize: 15, textAlign: 'center' },
-  block: { gap: 6, alignItems: 'center' },
-  blockTitle: { fontSize: 16, fontWeight: '800', alignSelf: 'flex-start' },
-  blockSub: { fontSize: 12, color: '#666', alignSelf: 'flex-start', marginBottom: 8 },
-  title: { fontSize: 18, fontWeight: '800' },
-  ok: { fontWeight: '700', marginTop: 4 },
-  warn: { fontWeight: '700', marginTop: 4, textAlign: 'center' },
-  label: { fontSize: 11, fontWeight: '800', color: '#666', letterSpacing: 1, marginTop: 16, alignSelf: 'flex-start' },
-  code: { fontSize: 36, fontWeight: '800', letterSpacing: 4 },
-  qr: { width: 220, height: 220, marginTop: 12, borderWidth: 1, borderColor: '#000' },
-  hint: { color: '#666', fontSize: 13, textAlign: 'center', marginTop: 12, lineHeight: 19 },
-  stepDescription: { fontSize: 13, lineHeight: 19, marginBottom: 8 },
-  metaRow: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
-  metaLabel: { fontWeight: '700', fontSize: 12, width: 130 },
-  metaValue: { flex: 1, fontSize: 12 },
-  warningHint: { fontSize: 12, color: '#666', marginTop: 4 },
-  pdfBtn: { borderWidth: 1, borderColor: '#000', padding: 12, alignItems: 'center', marginTop: 8 },
-  pdfBtnText: { fontWeight: '800', fontSize: 13 },
-  step: { fontSize: 13, lineHeight: 20, paddingVertical: 4 },
-  button: { borderWidth: 1, borderColor: '#000', padding: 14, paddingHorizontal: 24 },
-  buttonText: { fontWeight: '700' },
+  centerCard: {
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: 20,
+    borderRadius: radius.md,
+  },
+  emptySub: {
+    textAlign: 'center',
+    marginTop: 2,
+    marginBottom: spacing.sm,
+    fontSize: 12,
+  },
+  qrBlockCard: {
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    alignItems: 'center',
+    borderRadius: radius.md,
+  },
+  registryCard: {
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  registryCardWarn: {
+    backgroundColor: colors.yellowSoft,
+    borderColor: colors.amberBorder,
+  },
+  blockSub: {
+    textAlign: 'center',
+    marginTop: 2,
+    marginBottom: spacing.sm,
+    fontSize: 11,
+  },
+  titleText: {
+    textAlign: 'center',
+    fontSize: 18,
+  },
+  okBadge: {
+    backgroundColor: colors.greenSoft,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: colors.greenBorder,
+  },
+  warnBadge: {
+    backgroundColor: colors.yellowSoft,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: colors.amberBorder,
+  },
+  codeContainer: {
+    marginTop: spacing.sm,
+    alignItems: 'center',
+    backgroundColor: colors.surfaceTertiary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  codeText: {
+    fontSize: 22,
+    lineHeight: 26,
+  },
+  qrWrapper: {
+    marginTop: spacing.sm,
+    padding: spacing.xs,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  qrImage: {
+    width: 160,
+    height: 160,
+  },
+  hintText: {
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    lineHeight: 15,
+    fontSize: 11,
+  },
+  stepItem: {
+    marginBottom: 4,
+    lineHeight: 16,
+    fontSize: 11,
+  },
 });

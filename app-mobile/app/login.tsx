@@ -1,10 +1,11 @@
-import { Stack, router } from 'expo-router';
-import { useState } from 'react';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView, Platform, Pressable, StyleSheet,
-  TextInput, TouchableOpacity, View, InteractionManager,
+  TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { api } from '../src/api/client';
 import { useSession, type Role } from '../src/store/session';
 import { useNotifStore } from '../src/store/notifications';
@@ -12,48 +13,69 @@ import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
 import { useTranslation } from '../src/constants/translations';
 import { syncFavoritesFromServer } from '../src/services/favorites';
 import { resolveAuthenticatedRoute } from '../src/hooks/onboardingGuard';
-import { AppText, DebossedInput, GlassCard, GlassScreenScroll, PuffyButton, Screen } from '../src/components/ui';
-import { colors, spacing, radius, puffyShadow, MIN_TOUCH_TARGET } from '../src/theme';
+import { AppText, DebossedInput, GlassScreenScroll, SurfaceButton, Screen } from '../src/components/ui';
+import { colors, spacing, radius, softShadow, MIN_TOUCH_TARGET } from '../src/theme';
+import { useAdaptiveMeshInk } from '../src/hooks/useMeshInk';
 
 async function loadCustomerSessionData() {
   await syncFavoritesFromServer();
-  const profiles = await api.getSubProfiles().catch(() => []);
-  useSession.getState().setSubProfiles(profiles);
 }
 
-function navigateAfterLogin(href: string) {
-  InteractionManager.runAfterInteractions(() => {
-    router.replace(href as '/');
-  });
+function navigateAfterLogin(route: string) {
+  router.replace(route as any);
+}
+
+function humanizeError(errMsg: string, isIt: boolean): string {
+  const msg = errMsg.toLowerCase();
+  if (msg.includes('email_exists') || msg.includes('già registrat')) {
+    return isIt
+      ? 'Questa email è già registrata. Prova ad accedere.'
+      : 'This email is already registered. Try logging in.';
+  }
+  if (msg.includes('invalid credentials') || msg.includes('credenziali') || msg.includes('401')) {
+    return isIt
+      ? 'Email o password non corrette. Riprova.'
+      : 'Incorrect email or password. Try again.';
+  }
+  if (msg.includes('server non raggiungibile') || msg.includes('fetch')) {
+    return isIt
+      ? 'Impossibile connettersi al server. Verifica la tua connessione.'
+      : 'Unable to connect to server. Please check your connection.';
+  }
+  return errMsg;
 }
 
 export default function Login() {
   const session = useSession();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ mode?: 'login' | 'register' | 'forgot'; role?: Role }>();
   const isIt = (session.language || 'it').toLowerCase() === 'it';
+  const role = params.role || session.role || 'customer';
 
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+  useEffect(() => {
+    // Legacy deep-link: /login?mode=register → schermata dedicata
+    if (params.mode === 'register') {
+      router.replace(`/register?role=${role}` as any);
+    }
+  }, [params.mode, role]);
+
+  const [mode, setMode] = useState<'login' | 'forgot'>(
+    params.mode === 'forgot' ? 'forgot' : 'login',
+  );
   const [forgotSent, setForgotSent] = useState(false);
-  const [role, setRole] = useState<Role>(session.role || 'customer');
-  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [acceptTerms, setAcceptTerms] = useState(false);
-  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
-  const [acceptHealthData, setAcceptHealthData] = useState(false);
-  const [acceptOwnerResponsibility, setAcceptOwnerResponsibility] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const legalOk = mode !== 'register' || (
-    acceptTerms &&
-    acceptPrivacy &&
-    (role === 'customer' ? acceptHealthData : acceptOwnerResponsibility)
-  );
+  const { ref: headerRef, ink: headerInk, onLayout: onHeaderLayout } = useAdaptiveMeshInk(true);
+  const { ref: headingRef, ink: headingInk, onLayout: onHeadingLayout } = useAdaptiveMeshInk(true);
+
   const formOk = mode === 'forgot'
     ? !!email.trim()
-    : !!email.trim() && password.length >= 8 && legalOk && (mode === 'login' || !!displayName.trim());
+    : !!email.trim() && password.length >= 8;
 
   const submit = async () => {
     setBusy(true);
@@ -63,56 +85,40 @@ export default function Login() {
         await api.forgotPassword(email.trim());
         setForgotSent(true);
       } catch (e) {
-        setError((e as Error).message);
+        setError(humanizeError((e as Error).message, isIt));
       }
       setBusy(false);
       return;
     }
     try {
-      const res = mode === 'login'
-        ? await api.login(email.trim(), password)
-        : await api.register(email.trim(), password, role, displayName.trim(), {
-            accept_terms: acceptTerms,
-            accept_privacy: acceptPrivacy,
-            accept_health_data: role === 'customer' ? acceptHealthData : false,
-            accept_owner_responsibility: role === 'owner' ? acceptOwnerResponsibility : false,
-          });
+      const res = await api.login(email.trim(), password);
       session.setToken(res.access_token);
       session.setEmail(email.trim());
       session.setRole(res.role === 'owner' ? 'owner' : 'customer');
-      session.setTourCompleted(mode === 'login');
-      if (mode === 'login') session.setRegisterAllergieStep(false);
+      session.setTourCompleted(true);
+      session.setRegisterAllergieStep(false);
       if (!useSession.getState().languageSelected) {
         session.setLanguage(useSession.getState().language || 'it');
       }
       if (res.role !== 'owner') {
-        if (mode === 'register') {
-          session.setLegalStatus(true, true);
-          session.setProfileCompleted(false);
-          session.setRegisterAllergieStep(true);
-          session.setDisclaimer(false);
-          session.setEmergencyMedicines(null);
-          await loadCustomerSessionData();
-          useNotifStore.getState().refresh();
-          navigateAfterLogin('/register-allergies');
-          setBusy(false);
-          return;
-        } else {
-          const profile = await api.getProfile();
-          session.setLegalStatus(profile.legal_consents_ok, !!profile.health_data_consent_at);
-          session.setProfileCompleted(profile.onboarding_completed);
-          session.setDisclaimer(profile.disclaimer_accepted);
-          session.setEmergencyMedicines(profile.emergency_medicines);
-          session.setEmergencyContact(profile.emergency_contact_name ?? null, profile.emergency_contact_phone ?? null);
-          const mine = await api.myAllergens().catch(() => []);
-          const intensitiesMap: Record<string, 'lieve' | 'moderata' | 'grave'> = {};
-          mine.forEach((a) => {
-            if (a.intensity) {
-              intensitiesMap[a.code] = a.intensity as 'lieve' | 'moderata' | 'grave';
-            }
-          });
-          session.setAllergie(mine.map((a) => a.code), intensitiesMap);
-        }
+        const profile = await api.getProfile();
+        session.setLegalStatus(profile.legal_consents_ok, !!profile.health_data_consent_at);
+        session.setProfileCompleted(profile.onboarding_completed);
+        session.setDisclaimer(profile.disclaimer_accepted);
+        session.setEmergencyMedicines(profile.emergency_medicines);
+        session.setEmergencyContact(profile.emergency_contact_name ?? null, profile.emergency_contact_phone ?? null);
+        const mine = await api.myAllergens().catch(() => []);
+        const intensitiesMap: Record<string, 'lieve' | 'moderata' | 'grave'> = {};
+        const criteriaMap: Record<string, 'assoluto' | 'crudo' | 'cotto'> = {};
+        mine.forEach((a) => {
+          if (a.intensity) {
+            intensitiesMap[a.code] = a.intensity as 'lieve' | 'moderata' | 'grave';
+          }
+          if (a.criterio) {
+            criteriaMap[a.code] = a.criterio as 'assoluto' | 'crudo' | 'cotto';
+          }
+        });
+        session.setAllergie(mine.map((a) => a.code), intensitiesMap, criteriaMap);
         await loadCustomerSessionData();
         useNotifStore.getState().refresh();
       } else {
@@ -120,7 +126,7 @@ export default function Login() {
       }
       navigateAfterLogin(resolveAuthenticatedRoute(useSession.getState()));
     } catch (e) {
-      setError((e as Error).message);
+      setError(humanizeError((e as Error).message, isIt));
     }
     setBusy(false);
   };
@@ -131,157 +137,126 @@ export default function Login() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
-        <Stack.Screen options={{ headerRight: () => <LanguageFlagsRow inHeader /> }} />
+        <Stack.Screen options={{ headerShown: false }} />
+
+        <View
+          ref={headerRef}
+          onLayout={onHeaderLayout}
+          style={[styles.topHeaderBar, { paddingTop: Math.max(insets.top, 12) }]}
+        >
+          <TouchableOpacity
+            onPress={() => {
+              if (router.canGoBack()) router.back();
+              else router.replace('/welcome');
+            }}
+            style={styles.backBtn}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
+          </TouchableOpacity>
+
+          <AppText variant="h2" color={headerInk.ink} style={styles.brandTitle}>
+            AllerTgy
+          </AppText>
+
+          <LanguageFlagsRow />
+        </View>
 
         <GlassScreenScroll
+          headerFloat={false}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
         >
-        <AppText variant="h2" color={colors.brand}>AllerTgy</AppText>
-        <View style={styles.heading}>
-          <AppText variant="h1">
-            {mode === 'login' ? t('login_title')
-              : mode === 'forgot' ? t('forgot_title')
-              : t('register_title')}
-          </AppText>
-          <AppText variant="subtitle">
-            {mode === 'login'
-              ? t('login_subtitle')
-              : mode === 'forgot'
-              ? t('forgot_subtitle')
-              : role === 'customer'
-              ? (isIt ? 'Passo 1 di 2: account. Nel passo successivo imposterai le allergie.' : 'Step 1 of 2: account. Next you will set up your allergies.')
-              : t('register_subtitle')}
-          </AppText>
-        </View>
-
-        {mode === 'register' && (
-          <View style={styles.roles}>
-            <GlassCard
-              onPress={() => setRole('customer')}
-              style={[styles.roleCard, role === 'customer' && styles.roleOn]}
-            >
-              <AppText style={{ fontSize: 24 }}>🙋</AppText>
-              <AppText variant="bodyBold" color={role === 'customer' ? colors.brand : colors.onSurface}>
-                {isIt ? 'Sono un cliente' : 'I am a customer'}
-              </AppText>
-            </GlassCard>
-            <GlassCard
-              onPress={() => setRole('owner')}
-              style={[styles.roleCard, role === 'owner' && styles.roleOn]}
-            >
-              <AppText style={{ fontSize: 24 }}>👨‍🍳</AppText>
-              <AppText variant="bodyBold" color={role === 'owner' ? colors.brand : colors.onSurface}>
-                {isIt ? 'Ho un ristorante' : 'I own a restaurant'}
-              </AppText>
-            </GlassCard>
+          <View ref={headingRef} onLayout={onHeadingLayout} style={styles.heading}>
+            <AppText variant="h1" color={headingInk.ink}>
+              {mode === 'login' ? t('login_title') : t('forgot_title')}
+            </AppText>
+            <AppText variant="subtitle" color={headingInk.inkMuted} style={styles.subtitleText}>
+              {mode === 'login' ? t('login_subtitle') : t('forgot_subtitle')}
+            </AppText>
           </View>
-        )}
 
-        {mode === 'register' && (
+          {error ? (
+            <View style={styles.errorBanner}>
+              <AppText variant="bodyBold" color={colors.red}>
+                {error}
+              </AppText>
+            </View>
+          ) : null}
+
           <View style={styles.field}>
-            <AppText variant="caption">{t('name_label')}</AppText>
+            <AppText variant="caption">{t('email_label')}</AppText>
             <DebossedInput
-              placeholder={isIt ? 'Il tuo nome' : 'Your name'}
-              autoCapitalize="words"
-              value={displayName}
-              onChangeText={setDisplayName}
-              style={{ letterSpacing: 0 }}
+              placeholder="nome@email.it"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
             />
           </View>
-        )}
 
-        <View style={styles.field}>
-          <AppText variant="caption">{t('email_label')}</AppText>
-          <DebossedInput
-            placeholder="nome@email.it"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-            style={{ letterSpacing: 0 }}
-          />
-        </View>
-        {mode !== 'forgot' && (
-          <View style={styles.field}>
-            <AppText variant="caption">{t('password_label')}</AppText>
-            <DebossedInput
-              placeholder={isIt ? 'Minimo 8 caratteri' : 'Minimum 8 characters'}
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              style={{ letterSpacing: 0 }}
-            />
-            {mode === 'login' && (
+          {mode !== 'forgot' && (
+            <View style={styles.field}>
+              <AppText variant="caption">{t('password_label')}</AppText>
+              <DebossedInput
+                placeholder={isIt ? 'La tua password' : 'Your password'}
+                secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={setPassword}
+                rightIcon={
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={22}
+                      color={colors.onSurfaceMuted}
+                    />
+                  </TouchableOpacity>
+                }
+              />
               <TouchableOpacity onPress={() => { setMode('forgot'); setError(''); setForgotSent(false); }}>
                 <AppText variant="caption" color={colors.brand} style={{ textAlign: 'right', marginTop: 4 }}>
                   {t('forgot_password_link')}
                 </AppText>
               </TouchableOpacity>
-            )}
-          </View>
-        )}
+            </View>
+          )}
 
-        {mode === 'forgot' && forgotSent && (
-          <View style={[styles.legalBox, puffyShadow(4)]}>
-            <AppText variant="body">
-              📧 {isIt
-                ? "Se l'indirizzo esiste, riceverai un'email con il link per reimpostare la password. Il link scade tra 30 minuti."
-                : 'If the email exists, you will receive a link to reset your password. The link expires in 30 minutes.'}
-            </AppText>
-          </View>
-        )}
-
-        {mode === 'register' && (
-          <View style={styles.legalBox}>
-            <CheckRow
-              checked={acceptTerms}
-              onPress={() => setAcceptTerms(!acceptTerms)}
-              text={isIt ? "Accetto i Termini di servizio di AllerTgy." : "I accept the AllerTgy Terms of Service."}
-            />
-            <CheckRow
-              checked={acceptPrivacy}
-              onPress={() => setAcceptPrivacy(!acceptPrivacy)}
-              text={isIt ? "Ho letto l'Informativa Privacy." : "I have read the Privacy Policy."}
-            />
-            {role === 'customer' ? (
-              <CheckRow
-                checked={acceptHealthData}
-                onPress={() => setAcceptHealthData(!acceptHealthData)}
-                text={isIt 
-                  ? "Acconsento al trattamento dei dati su allergie, intolleranze e preferenze alimentari per personalizzare il menù." 
-                  : "I consent to the processing of data on allergies, intolerances and dietary preferences to customize the menu."}
-              />
-            ) : (
-              <CheckRow
-                checked={acceptOwnerResponsibility}
-                onPress={() => setAcceptOwnerResponsibility(!acceptOwnerResponsibility)}
-                text={isIt 
-                  ? "Dichiaro di essere autorizzato a gestire il locale e di pubblicare informazioni allergeni verificate." 
-                  : "I declare that I am authorized to manage the venue and to publish verified allergen info."}
-              />
-            )}
-          </View>
-        )}
-
-        {error ? <AppText variant="caption" color={colors.red} style={{ marginTop: spacing.sm }}>{error}</AppText> : null}
+          {mode === 'forgot' && forgotSent && (
+            <View style={[styles.infoBox, softShadow(4)]}>
+              <AppText variant="body">
+                {isIt
+                  ? "Se l'indirizzo esiste, riceverai un'email con il link per reimpostare la password. Il link scade tra 30 minuti."
+                  : 'If the email exists, you will receive a link to reset your password. The link expires in 30 minutes.'}
+              </AppText>
+            </View>
+          )}
         </GlassScreenScroll>
 
         <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-          <PuffyButton
-            label={mode === 'login' ? t('login_btn') : mode === 'forgot' ? t('forgot_btn') : t('register_btn')}
+          <SurfaceButton
+            label={mode === 'login' ? t('login_btn') : t('forgot_btn')}
             onPress={submit}
             disabled={busy || !formOk}
             loading={busy}
           />
           <Pressable
             style={styles.switchButton}
-            onPress={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setForgotSent(false); }}
+            onPress={() => {
+              if (mode === 'forgot') {
+                setMode('login');
+                setError('');
+                setForgotSent(false);
+              } else {
+                router.push(`/register?role=${role}` as any);
+              }
+            }}
           >
             <AppText variant="bodyBold" color={colors.brand} style={{ textAlign: 'center' }}>
-              {mode === 'login' ? t('no_account_prompt')
-                : mode === 'forgot' ? t('back_to_login_link')
-                : t('have_account_prompt')}
+              {mode === 'forgot' ? t('back_to_login_link') : t('no_account_prompt')}
             </AppText>
           </Pressable>
         </View>
@@ -290,20 +265,33 @@ export default function Login() {
   );
 }
 
-function CheckRow({ checked, onPress, text }: { checked: boolean; onPress: () => void; text: string }) {
-  return (
-    <TouchableOpacity style={styles.checkRow} onPress={onPress}>
-      <View style={[styles.checkbox, checked && styles.checkboxOn]}>
-        {checked ? <AppText style={styles.checkboxMark}>✓</AppText> : null}
-      </View>
-      <AppText variant="caption" style={{ flex: 1 }}>{text}</AppText>
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface },
-  container: { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.md },
+  topHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xs,
+    backgroundColor: 'transparent',
+    zIndex: 10,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  brandTitle: { fontWeight: '800' },
+  scrollContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+  },
   bottomBar: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
@@ -312,26 +300,24 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
-  heading: { gap: spacing.xs, marginBottom: spacing.lg, marginTop: spacing.md },
-  roles: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-  roleCard: { flex: 1, alignItems: 'center', gap: spacing.xs, padding: spacing.md },
-  roleOn: { borderColor: colors.brand, backgroundColor: colors.brand50 },
+  heading: { gap: spacing.xs, marginBottom: spacing.lg },
+  subtitleText: { lineHeight: 20 },
   field: { gap: spacing.xs, marginBottom: spacing.md },
   switchButton: { minHeight: MIN_TOUCH_TARGET, alignItems: 'center', justifyContent: 'center' },
-  legalBox: {
+  errorBanner: {
+    backgroundColor: colors.redSoft ?? '#fee2e2',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.red,
+  },
+  infoBox: {
     backgroundColor: colors.surfaceSecondary,
     borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
-    gap: spacing.sm,
   },
-  checkRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
-  checkbox: {
-    width: 22, height: 22, borderRadius: 8, borderWidth: 1.5,
-    borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center', marginTop: 1,
-  },
-  checkboxOn: { backgroundColor: colors.brand, borderColor: colors.brand },
-  checkboxMark: { color: colors.onBrand, fontWeight: '900', fontSize: 14 },
 });

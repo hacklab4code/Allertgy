@@ -5,8 +5,6 @@ import * as Haptics from 'expo-haptics';
 import { colors, radius, font, WIREFRAME_MODE } from '../../theme';
 import { wireBox } from '../../wireframe';
 import { AppText } from './AppText';
-import { LiquidGlassView } from './LiquidGlassView';
-import { GlassGlossPill, glassShellBorder } from './glassFallback';
 
 type Option<T extends string> = { value: T; label: string };
 
@@ -60,16 +58,7 @@ export function PillToggle<T extends string>({ options, value, onChange }: Props
 
   return (
     <View style={styles.wrap} onLayout={onTrackLayout}>
-      <LiquidGlassView
-        glassStyle="regular"
-        tintColor="rgba(210, 195, 246, 0.20)"
-        fallbackIntensity={68}
-        style={StyleSheet.absoluteFill}
-      />
-
-      <Animated.View style={[styles.slidingPill, pillStyle]}>
-        <GlassGlossPill />
-      </Animated.View>
+      <Animated.View style={[styles.slidingPill, pillStyle]} />
 
       {options.map((opt) => {
         const active = opt.value === value;
@@ -98,13 +87,9 @@ const styles = StyleSheet.create({
     padding: TRACK_PAD,
     borderRadius: radius.pill,
     overflow: 'hidden',
-    backgroundColor: 'transparent',
-    ...glassShellBorder,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 4,
+    backgroundColor: colors.surfaceTertiary,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   slidingPill: {
     position: 'absolute',
@@ -112,6 +97,9 @@ const styles = StyleSheet.create({
     bottom: TRACK_PAD,
     left: TRACK_PAD,
     borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   btn: {
     flex: 1,

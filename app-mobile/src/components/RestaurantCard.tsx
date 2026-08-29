@@ -1,419 +1,564 @@
 /**
- * RestaurantCard — Card premium con indicatore circolare di compatibilità %,
- * rating, preferiti animati e badge semaforo.
+ * RestaurantCard — foto stondata + cutout semaforo + gradiente sfumato verso il basso sul testo.
+ * Il colore del semaforo sfuma fluidamente sia nello scavo sia verso il basso nella parte delle scritte.
  */
 import { router } from 'expo-router';
-import React, { useRef } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View, Linking, Platform } from 'react-native';
+import React from 'react';
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle } from 'react-native-svg';
+import * as Haptics from 'expo-haptics';
 import { compatibilitaColor, type CompatibilitaResult } from '../engine/compatibility';
-import { colors, font, radius, spacing, typography, WIREFRAME_MODE } from '../theme';
+import { API } from '../api/client';
+import { colors, font, softShadow, spacing, WIREFRAME_MODE } from '../theme';
 import { wireBox } from '../wireframe';
-import { GlassCard } from './ui/GlassCard';
-import { StatoVerdictPill } from './ui/Traffic';
+import { CutoutOverlay } from './ui';
+import { useSession } from '../store/session';
 
-interface Props {
+const FALLBACK =
+  'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=900&q=80';
+
+const PHOTO_RADIUS = 24;
+
+type Outline = 'white' | 'none' | 'glass';
+
+export interface RestaurantCardProps {
   code: string;
   name: string;
   city?: string | null;
   imageUrl?: string | null;
+  images?: string[];
   compatibility: CompatibilitaResult | null;
   ratingAvg?: number | null;
   ratingCount?: number;
   isFavorite: boolean;
   onToggleFavorite: () => void;
   compact?: boolean;
+  outline?: Outline;
   distanceLabel?: string | null;
+  deliveryTime?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   boostActive?: boolean;
+  menuAvailable?: boolean;
+  horizontalScroll?: boolean;
+  grid?: boolean;
+  square?: boolean;
+  offerText?: string | null;
+  topBadgeText?: string | null;
+  safetyTag?: string | null;
+  allergyTags?: string[];
+  adBadge?: boolean;
+  appBgColor?: string;
+  onHide?: () => void;
 }
 
-function CompatibilityRing({
-  percentage,
-  color,
-  trackColor,
-  hasMenu,
-  compact,
-}: {
-  percentage: number;
-  color: string;
-  trackColor: string;
-  hasMenu: boolean;
-  compact: boolean;
-}) {
-  const size = compact ? 62 : 70;
-  const strokeWidth = compact ? 5 : 6;
-  const circleRadius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * circleRadius;
-  const normalizedPercentage = Math.max(0, Math.min(100, percentage));
-  const dashOffset = circumference * (1 - normalizedPercentage / 100);
-
-  return (
-    <View
-      style={[styles.ringWrap, { width: size, height: size, backgroundColor: trackColor }]}
-      accessibilityLabel={hasMenu ? `Compatibilità ${normalizedPercentage} percento` : 'Compatibilità non disponibile'}
-    >
-      <Svg width={size} height={size} style={styles.ringSvg}>
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={circleRadius}
-          fill="none"
-          stroke={trackColor}
-          strokeWidth={strokeWidth}
-        />
-        {hasMenu ? (
-          <Circle
-            cx={size / 2}
-            cy={size / 2}
-            r={circleRadius}
-            fill="none"
-            stroke={color}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={`${circumference} ${circumference}`}
-            strokeDashoffset={dashOffset}
-            rotation="-90"
-            origin={`${size / 2}, ${size / 2}`}
-          />
-        ) : null}
-      </Svg>
-      <View style={styles.ringCenter}>
-        <View style={styles.percentageRow}>
-          <Text
-            style={[
-              styles.percentageValue,
-              compact && styles.percentageValueCompact,
-              { color: hasMenu ? color : colors.textMuted },
-            ]}
-          >
-            {hasMenu ? normalizedPercentage : '—'}
-          </Text>
-          {hasMenu ? <Text style={[styles.percentageSymbol, { color }]}>%</Text> : null}
-        </View>
-        <Text style={styles.percentageLabel}>{hasMenu ? 'MATCH' : 'N/D'}</Text>
-      </View>
-    </View>
-  );
+function resolveImage(url?: string | null): string {
+  if (!url) return FALLBACK;
+  if (url.startsWith('http')) return url;
+  return `${API}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
-export default function RestaurantCard({
+/** Palette testo semaforo ad alto contrasto e massima leggibilità */
+function compatPalette(hasMenu: boolean, dominant: 'verde' | 'giallo' | 'rosso' | null) {
+  if (!hasMenu || !dominant) {
+    return {
+      dot: '#948E9C',
+      text: '#475569',
+    };
+  }
+  if (dominant === 'verde') {
+    return {
+      dot: '#16A34A',
+      text: '#15803D',
+    };
+  }
+  if (dominant === 'giallo') {
+    return {
+      dot: '#EAB308',
+      text: '#B45309',
+    };
+  }
+  return {
+    dot: '#EF4444',
+    text: '#B91C1C',
+  };
+}
+
+function getRatingBgColor(avg: number): string {
+  if (avg >= 4.0) return '#16a34a';
+  if (avg >= 3.0) return '#eab308';
+  return '#ef4444';
+}
+
+export default React.memo(function RestaurantCard({
   code,
   name,
   city,
+  imageUrl,
+  images,
   compatibility,
   ratingAvg,
   ratingCount,
   isFavorite,
   onToggleFavorite,
   compact = false,
+  outline = 'none',
   distanceLabel,
-  latitude,
-  longitude,
+  deliveryTime,
   boostActive = false,
-}: Props) {
+  menuAvailable,
+  horizontalScroll = false,
+  grid = false,
+  square = false,
+  offerText,
+  topBadgeText,
+  safetyTag,
+  allergyTags,
+  adBadge,
+  appBgColor,
+  onHide,
+}: RestaurantCardProps) {
+  const language = useSession((s) => s.language);
+  const isIt = (language || 'it').toLowerCase().startsWith('it');
+
+  const isWhiteCard = outline === 'white';
+  const cardBg = isWhiteCard ? '#FFFFFF' : (appBgColor || colors.surface || '#F6F2FC');
+
+  const hasMenu =
+    menuAvailable !== false &&
+    compatibility !== null &&
+    compatibility.totaleDishes > 0;
   const pct = compatibility?.percentuale ?? 0;
-  const hasMenu = compatibility !== null && compatibility.totaleDishes > 0;
-  const dominantColor = hasMenu ? compatibilitaColor(pct) : ('grigio' as const);
-  const favScale = useRef(new Animated.Value(1)).current;
-
-  const animateFav = () => {
-    Animated.sequence([
-      Animated.timing(favScale, { toValue: 1.4, duration: 120, useNativeDriver: true }),
-      Animated.spring(favScale, { toValue: 1, friction: 3, useNativeDriver: true }),
-    ]).start();
-    onToggleFavorite();
-  };
-
-  const ringColor = dominantColor === 'verde' ? colors.green
-    : dominantColor === 'giallo' ? colors.amber
-    : dominantColor === 'rosso' ? colors.red
-    : colors.textMuted;
-
-  const ringBg = dominantColor === 'verde' ? colors.greenBg
-    : dominantColor === 'giallo' ? colors.amberBg
-    : dominantColor === 'rosso' ? colors.redBg
-    : colors.surfaceAlt;
-
-  const statusLabel = dominantColor === 'verde' ? 'Alta compatibilità'
-    : dominantColor === 'giallo' ? 'Compatibilità parziale'
-    : dominantColor === 'rosso' ? 'Bassa compatibilità'
-    : 'Non calcolata';
-
-  const cardTint = dominantColor === 'verde' ? 'green'
-    : dominantColor === 'giallo' ? 'yellow'
-    : dominantColor === 'rosso' ? 'red'
-    : 'none';
+  const dominant = hasMenu ? compatibilitaColor(pct) : null;
+  const verdictLabel = hasMenu ? `${pct}%` : 'N/D';
+  const palette = compatPalette(hasMenu, dominant);
+  const hasRating = ratingAvg != null && ratingAvg > 0;
+  const ratingValue = hasRating ? ratingAvg!.toFixed(1) : null;
+  const small = horizontalScroll || grid || compact;
 
   if (WIREFRAME_MODE) {
     return (
-      <TouchableOpacity
-        style={[wireBox(), styles.wfCard]}
-        onPress={() => router.push(`/menu/${code}`)}
-        activeOpacity={0.7}
-      >
+      <Pressable style={[wireBox(), styles.wfCard]} onPress={() => router.push(`/menu/${code}`)}>
         <Text style={styles.wfTitle}>{name}</Text>
-        <Text style={styles.wfMeta}>
-          {city ? `${city} · ` : ''}#{code}
-          {distanceLabel ? ` · ${distanceLabel}` : ''}
-          {hasMenu ? ` · ${pct}%` : ''}
-        </Text>
-        <TouchableOpacity onPress={animateFav}>
-          <Text style={styles.wfMeta}>{isFavorite ? '[★ fav]' : '[☆]'}</Text>
-        </TouchableOpacity>
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 
-  const openDirections = () => {
-    if (!latitude || !longitude) return;
-    const scheme = Platform.select({ ios: 'maps://0,0?q=', android: 'geo:0,0?q=' });
-    const latLng = `${latitude},${longitude}`;
-    const url = Platform.select({
-      ios: `${scheme}${encodeURIComponent(name)}@${latLng}`,
-      android: `${scheme}${latLng}(${encodeURIComponent(name)})`,
-    });
-    if (url) Linking.openURL(url).catch(() => {});
+  const reviewsLabel =
+    ratingCount && ratingCount > 0
+      ? isIt
+        ? `${ratingCount} recensioni`
+        : `${ratingCount} reviews`
+      : null;
+
+  const uri = resolveImage(imageUrl);
+
+  const displaySafetyTag = safetyTag || (allergyTags && allergyTags.length > 0 ? allergyTags[0] : null);
+
+  const openMenu = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(`/menu/${code}`);
+  };
+
+  const toggleFav = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onToggleFavorite();
   };
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.92}
-      onPress={() => router.push(`/menu/${code}`)}
+    <Pressable
+      onPress={openMenu}
+      accessibilityRole="button"
+      accessibilityLabel={`${name}${city ? `, ${city}` : ''}, ${verdictLabel}`}
+      style={({ pressed }) => [
+        styles.card,
+        horizontalScroll && styles.cardHorizontalScroll,
+        grid && styles.cardGrid,
+        pressed && styles.pressed,
+      ]}
     >
-      <GlassCard
-        padded={false}
-        tint={cardTint}
-        accentColor={hasMenu ? ringColor : undefined}
-        cardRadius={radius.lg}
-        style={[styles.card, compact && styles.cardCompact]}
+      <View
+        style={[
+          styles.cardContainer,
+          { backgroundColor: cardBg },
+          isWhiteCard && styles.cardContainerWhite,
+          square && styles.cardContainerSquare,
+        ]}
       >
-      <View style={styles.cardInner}>
-        <CompatibilityRing
-          percentage={pct}
-          color={ringColor}
-          trackColor={ringBg}
-          hasMenu={hasMenu}
-          compact={compact}
-        />
+        {/* FOTO & CUTOUT COMPATTO */}
+        <View
+          style={[
+            styles.imageContainer,
+            compact && !grid && !square && styles.imageContainerCompact,
+            horizontalScroll && !square && styles.imageContainerHorizontal,
+            grid && !square && styles.imageContainerGrid,
+            square && styles.imageContainerInSquareCard,
+          ]}
+        >
+          <View style={styles.imageShell}>
+            <Image source={{ uri }} style={styles.cardImage} resizeMode="cover" />
 
-        <View style={styles.info}>
-          <View style={styles.titleRow}>
-            <Text style={styles.name} numberOfLines={1}>{name}</Text>
-            {boostActive ? (
-              <View style={styles.featuredBadge}>
-                <Text style={styles.featuredText}>✨ In evidenza</Text>
+            {/* Top Left Badge */}
+            {(topBadgeText || (boostActive && !small)) ? (
+              <View style={styles.topBadge}>
+                <Text style={styles.topBadgeText}>
+                  {topBadgeText || (isIt ? 'IN EVIDENZA' : 'FEATURED')}
+                </Text>
               </View>
             ) : null}
-          </View>
-          <View style={styles.locationRow}>
-            <Ionicons name="location-outline" size={14} color={colors.onSurfaceMuted} />
-            <Text style={styles.meta} numberOfLines={1}>
-              {[city, distanceLabel].filter(Boolean).join(' · ') || `Codice ${code}`}
-            </Text>
-          </View>
-          <View style={styles.statusRow}>
-            <StatoVerdictPill
-              stato={dominantColor}
-              label={statusLabel}
-              size="sm"
-            />
-            {hasMenu ? (
-              <Text style={styles.menuMeta}>
-                {compatibility!.totaleDishes} {compatibility!.totaleDishes === 1 ? 'piatto' : 'piatti'} analizzati
-              </Text>
-            ) : (
-              <Text style={styles.menuMeta}>Menù non disponibile</Text>
-            )}
-            {ratingAvg != null && ratingCount != null && ratingCount > 0 ? (
-              <View style={styles.ratingRow}>
-                <Text style={styles.ratingStar}>⭐</Text>
-                <Text style={styles.ratingText}>{ratingAvg.toFixed(1)}</Text>
+
+            {/* Top Right Actions (Cuore preferiti) */}
+            <View style={styles.topRightActions}>
+              {onHide ? (
+                <Pressable
+                  onPress={onHide}
+                  style={styles.actionButton}
+                  hitSlop={6}
+                >
+                  <Ionicons name="eye-off-outline" size={14} color="#FFFFFF" />
+                </Pressable>
+              ) : null}
+
+              <Pressable
+                onPress={toggleFav}
+                style={[styles.actionButton, styles.favoriteButton]}
+                hitSlop={6}
+                accessibilityLabel="Preferito"
+              >
+                <Ionicons
+                  name={isFavorite ? 'heart' : 'heart-outline'}
+                  size={small ? 15 : 17}
+                  color={isFavorite ? '#FF5252' : '#FFFFFF'}
+                />
+              </Pressable>
+            </View>
+
+            <View style={[styles.cutoutWrapper, small && styles.cutoutWrapperSmall]} pointerEvents="none">
+              <CutoutOverlay
+                color={cardBg}
+                width={small ? 92 : 106}
+                height={small ? 32 : 38}
+              />
+              <View
+                style={[styles.cutoutTextWrapper, small && styles.cutoutTextWrapperSmall]}
+                accessibilityLabel={hasMenu ? `${pct}% idoneità` : 'Dati non disponibili'}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={[styles.compatPct, small && styles.compatPctSmall, { color: palette.text }]}
+                >
+                  {verdictLabel}
+                </Text>
               </View>
-            ) : null}
+            </View>
           </View>
         </View>
 
-        <View style={styles.actions}>
-          {!compact && latitude && longitude ? (
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation();
-                openDirections();
-              }}
-              style={styles.iconButton}
-              hitSlop={8}
-            >
-              <Ionicons name="navigate" size={18} color={colors.onSurface} />
-            </TouchableOpacity>
+        {/* DETTAGLI TIPOGRAFICI PULITI SOTTO LA FOTO */}
+        <View
+          style={[
+            styles.infoContainer,
+            { backgroundColor: cardBg },
+            small && styles.infoContainerSmall,
+            square && styles.infoContainerSquare,
+            isWhiteCard && styles.infoContainerWhite,
+          ]}
+        >
+          {/* Nome Locale (fino a 2 righe per massima leggibilità senza troncamenti) */}
+          <Text
+            style={[
+              styles.name,
+              small && styles.nameSmall,
+            ]}
+            numberOfLines={2}
+          >
+            {name}
+          </Text>
+
+          {/* Rating & Recensioni (Stelle a destra, recensioni a sinistra) */}
+          {(hasRating || reviewsLabel || deliveryTime) ? (
+            <View style={styles.metaRow}>
+              {reviewsLabel || deliveryTime ? (
+                <Text style={styles.meta} numberOfLines={1}>
+                  {[deliveryTime, reviewsLabel].filter(Boolean).join(' • ')}
+                </Text>
+              ) : <View />}
+
+              {hasRating && ratingAvg != null ? (
+                <View style={styles.ratingInline}>
+                  <Ionicons name="star" size={12} color="#F59E0B" />
+                  <Text style={styles.ratingText}>{ratingValue}</Text>
+                </View>
+              ) : null}
+            </View>
           ) : null}
-          <Animated.View style={{ transform: [{ scale: favScale }] }}>
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation();
-                animateFav();
-              }}
-              hitSlop={8}
-              style={styles.iconButton}
-            >
-              <Ionicons
-                name={isFavorite ? 'heart' : 'heart-outline'}
-                size={18}
-                color={isFavorite ? colors.red : colors.onSurface}
-              />
-            </TouchableOpacity>
-          </Animated.View>
-          <Ionicons name="chevron-forward" size={16} color={colors.onSurfaceMuted} />
+
+          {/* Offerta o Tag Sicurezza Minimale */}
+          {offerText ? (
+            <View style={styles.offerTag}>
+              <Ionicons name="pricetag" size={10} color="#2563EB" />
+              <Text style={styles.offerTagText} numberOfLines={1}>
+                {offerText}
+              </Text>
+            </View>
+          ) : displaySafetyTag ? (
+            <View style={styles.safetyTag}>
+              <Ionicons name="shield-checkmark" size={10} color="#059669" />
+              <Text style={styles.safetyTagText} numberOfLines={1}>
+                {displaySafetyTag}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
-      </GlassCard>
-    </TouchableOpacity>
+    </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  wfCard: { padding: spacing.md, gap: 4, marginBottom: spacing.sm },
+  wfCard: { padding: spacing.md, marginBottom: spacing.sm },
   wfTitle: { fontSize: 14, fontWeight: '700', color: '#000' },
-  wfMeta: { fontSize: 12, color: '#444' },
+
   card: {
-    marginBottom: spacing.sm,
+    alignSelf: 'stretch',
+    width: '100%',
+    backgroundColor: 'transparent',
   },
-  cardInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
+  cardHorizontalScroll: {
+    width: 160,
+    alignSelf: 'auto',
   },
-  cardCompact: {
-    paddingVertical: 0,
+  cardGrid: {
+    width: '100%',
+    alignSelf: 'stretch',
   },
-  ringWrap: {
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
+  pressed: { opacity: 0.94 },
+
+  cardContainer: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    borderRadius: PHOTO_RADIUS,
     overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    ...softShadow(4),
   },
-  ringSvg: {
+  cardContainerSquare: {
+    aspectRatio: 1,
+    justifyContent: 'space-between',
+  },
+  cardContainerWhite: {
+    borderRadius: PHOTO_RADIUS,
+    paddingBottom: 10,
+    ...softShadow(6),
+  },
+
+  imageContainer: {
+    position: 'relative',
+    width: '100%',
+    aspectRatio: 16 / 10,
+  },
+  imageContainerInSquareCard: {
+    width: '100%',
+    flex: 1,
+    height: '62%',
+    aspectRatio: undefined,
+  },
+  imageContainerCompact: {
+    aspectRatio: 16 / 11,
+  },
+  imageContainerHorizontal: {
+    aspectRatio: 4 / 3,
+  },
+  imageContainerGrid: {
+    aspectRatio: 1,
+  },
+  imageShell: {
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceTertiary,
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  topBadge: {
     position: 'absolute',
-    left: 0,
-    top: 0,
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(26, 26, 26, 0.75)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    zIndex: 10,
   },
-  ringCenter: {
+  topBadgeText: {
+    fontFamily: font.displayBold,
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+
+  topRightActions: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    zIndex: 10,
+  },
+  actionButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  percentageRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+  favoriteButton: {},
+
+  cutoutWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    width: 106,
+    height: 38,
+  },
+  cutoutWrapperSmall: {
+    width: 92,
+    height: 32,
+  },
+
+  cutoutTextWrapper: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 8,
+    width: 64,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  percentageValue: {
+  cutoutTextWrapperSmall: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 4,
+    width: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compatPct: {
     fontFamily: font.displayBold,
-    fontSize: 22,
-    lineHeight: 24,
+    fontSize: 16,
+    lineHeight: 19,
+    letterSpacing: -0.4,
     fontWeight: '900',
-    letterSpacing: -1,
+    textAlign: 'center',
+    includeFontPadding: false,
   },
-  percentageValueCompact: {
-    fontSize: 19,
-    lineHeight: 21,
+  compatPctSmall: {
+    fontSize: 13,
+    lineHeight: 16,
+    letterSpacing: -0.3,
   },
-  percentageSymbol: {
-    fontFamily: font.bold,
-    fontSize: 10,
-    lineHeight: 13,
-    fontWeight: '900',
-    marginLeft: 1,
+
+  infoContainer: {
+    paddingTop: 7,
+    paddingHorizontal: 6,
+    paddingBottom: 4,
+    gap: 2,
   },
-  percentageLabel: {
-    fontFamily: font.bold,
-    fontSize: 7,
-    lineHeight: 9,
+  infoContainerSmall: {
+    paddingTop: 5,
+    paddingHorizontal: 4,
+    paddingBottom: 4,
+    gap: 2,
+  },
+  infoContainerSquare: {
+    paddingTop: 4,
+    paddingBottom: 6,
+    paddingHorizontal: 8,
+    gap: 2,
+  },
+  infoContainerWhite: {
+    paddingHorizontal: 10,
+  },
+
+  name: {
+    fontFamily: font.displayBold,
+    fontSize: 15,
+    lineHeight: 19,
+    letterSpacing: -0.3,
+    color: colors.brandInk,
     fontWeight: '800',
-    letterSpacing: 0.8,
-    color: colors.onSurfaceMuted,
+  },
+  nameSmall: {
+    fontSize: 13.5,
+    lineHeight: 17,
+  },
+
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: 1,
   },
-  info: {
-    flex: 1,
-    gap: 5,
-    minWidth: 0,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  name: {
-    ...typography.h3,
-    color: colors.ink,
-    flexShrink: 1,
-  },
-  featuredBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-    backgroundColor: colors.brand50,
-    borderWidth: 1,
-    borderColor: colors.brand200,
-  },
-  featuredText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: colors.onSurface,
-  },
-  locationRow: {
+  ratingInline: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
   },
-  meta: {
-    color: colors.onSurfaceMuted,
-    fontSize: 12,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    minWidth: 0,
-    flexWrap: 'wrap',
-  },
-  menuMeta: {
-    fontSize: 10.5,
-    color: colors.onSurfaceMuted,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    marginLeft: 'auto',
-  },
-  ratingStar: { fontSize: 11 },
   ratingText: {
-    fontSize: 11,
+    fontFamily: font.displayBold,
+    fontSize: 12.5,
+    lineHeight: 15,
+    color: colors.brandInk,
     fontWeight: '800',
-    color: colors.ink,
   },
-  actions: {
-    alignItems: 'center',
-    gap: 6,
+  metaDot: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginHorizontal: 1,
   },
-  iconButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  meta: {
+    fontSize: 11.5,
+    color: colors.textSecondary,
+    fontFamily: font.semibold,
+    fontWeight: '600',
+  },
+
+  offerTag: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceTertiary,
-    borderWidth: 1,
-    borderColor: colors.border,
+    gap: 4,
+    marginTop: 2,
+  },
+  offerTagText: {
+    fontFamily: font.bold,
+    fontSize: 11,
+    color: '#2563EB',
+    fontWeight: '700',
+  },
+
+  safetyTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  safetyTagText: {
+    fontFamily: font.semibold,
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '600',
   },
 });

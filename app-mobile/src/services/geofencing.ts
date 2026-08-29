@@ -145,7 +145,10 @@ export async function avviaGeofencing(restaurants: RestaurantSummary[]) {
             continue;
           }
 
-          const compat = r.piatti.length > 0 ? calcolaCompatibilita(activeAllergies, r.piatti, ingredientiEsclusi) : null;
+          const published = r.menu_available ?? r.piatti.length > 0;
+          const compat = published && r.piatti.length > 0
+            ? calcolaCompatibilita(activeAllergies, r.piatti, ingredientiEsclusi)
+            : null;
 
           if (compat && compat.percentuale >= 70) {
             notificheInviate[key] = ora;

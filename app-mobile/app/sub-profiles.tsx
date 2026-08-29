@@ -7,9 +7,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { api } from '../src/api/client';
 import { useSession } from '../src/store/session';
-import type { Allergen, SubProfile } from '../src/types';
+import type { Allergen, AllergyCriterio, AllergyIntensity, SubProfile } from '../src/types';
 import { colors, radius, spacing } from '../src/theme';
 import { toggleAllergieSelectionWithIntensities } from '../src/engine/allergyLinks';
+import { criterioShortLabel } from '../src/engine/allergyConfig';
+
+type AllergenSel = { intensity: AllergyIntensity; criterio: AllergyCriterio };
 import {
   AppText,
   AvatarBubble,
@@ -19,7 +22,7 @@ import {
   GlassCard,
   GlassScreenScroll,
   HeaderAddButton,
-  PuffyButton,
+  SurfaceButton,
   Screen,
   Section,
 } from '../src/components/ui';
@@ -41,7 +44,7 @@ export default function SubProfilesScreen() {
   const [editingProfile, setEditingProfile] = useState<SubProfile | null>(null);
   const [name, setName] = useState('');
   const [relationship, setRelationship] = useState('figlio');
-  const [selectedAllergens, setSelectedAllergens] = useState<Record<string, 'lieve' | 'moderata' | 'grave'>>({});
+  const [selectedAllergens, setSelectedAllergens] = useState<Record<string, AllergenSel>>({});
 
   const isIt = language === 'it';
   const familyProfiles = subProfiles.filter((p) => p.relationship !== 'io');
@@ -76,9 +79,12 @@ export default function SubProfilesScreen() {
     setEditingProfile(p);
     setName(p.name);
     setRelationship(p.relationship);
-    const mapped: Record<string, 'lieve' | 'moderata' | 'grave'> = {};
+    const mapped: Record<string, AllergenSel> = {};
     p.allergens.forEach((a) => {
-      mapped[a.code] = a.intensity;
+      mapped[a.code] = {
+        intensity: a.intensity,
+        criterio: a.criterio || 'assoluto',
+      };
     });
     setSelectedAllergens(mapped);
     setModalVisible(true);
@@ -100,12 +106,21 @@ export default function SubProfilesScreen() {
   const toggleAllergen = (code: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const selected = new Set(Object.keys(selectedAllergens));
+    const intensityMap: Record<string, AllergyIntensity> = {};
+    for (const [k, v] of Object.entries(selectedAllergens)) intensityMap[k] = v.intensity;
     const { intensities } = toggleAllergieSelectionWithIntensities(
       selected,
-      selectedAllergens,
+      intensityMap,
       code,
     );
-    setSelectedAllergens(intensities);
+    const next: Record<string, AllergenSel> = {};
+    for (const [k, intensity] of Object.entries(intensities)) {
+      next[k] = {
+        intensity,
+        criterio: selectedAllergens[k]?.criterio || 'assoluto',
+      };
+    }
+    setSelectedAllergens(next);
   };
 
   const cycleIntensity = (code: string) => {
@@ -113,10 +128,23 @@ export default function SubProfilesScreen() {
     setSelectedAllergens((prev) => {
       const copy = { ...prev };
       if (!copy[code]) return prev;
-      const current = copy[code];
-      if (current === 'lieve') copy[code] = 'moderata';
-      else if (current === 'moderata') copy[code] = 'grave';
-      else copy[code] = 'lieve';
+      const current = copy[code].intensity;
+      const next: AllergyIntensity =
+        current === 'lieve' ? 'moderata' : current === 'moderata' ? 'grave' : 'lieve';
+      copy[code] = { ...copy[code], intensity: next };
+      return copy;
+    });
+  };
+
+  const cycleCriterio = (code: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedAllergens((prev) => {
+      const copy = { ...prev };
+      if (!copy[code]) return prev;
+      const current = copy[code].criterio;
+      const next: AllergyCriterio =
+        current === 'assoluto' ? 'crudo' : current === 'crudo' ? 'cotto' : 'assoluto';
+      copy[code] = { ...copy[code], criterio: next };
       return copy;
     });
   };
@@ -130,7 +158,8 @@ export default function SubProfilesScreen() {
     try {
       const payloadAllergens = Object.keys(selectedAllergens).map((code) => ({
         code,
-        intensity: selectedAllergens[code],
+        intensity: selectedAllergens[code].intensity,
+        criterio: selectedAllergens[code].criterio,
       }));
       const body = {
         name: name.trim(),
@@ -197,123 +226,128 @@ export default function SubProfilesScreen() {
   };
 
   return (
-    <Screen ambient>
+    <Screen edges={false} ambient>
       <Stack.Screen
         options={{
+          title: isIt ? 'Sottoprofili Famiglia' : 'Family Sub-Profiles',
           headerRight: () => (
             <HeaderAddButton onPress={openAddModal} accessibilityLabel="Aggiungi persona" />
           ),
         }}
       />
-      <GlassScreenScroll showsVerticalScrollIndicator={false}>
-        <AppText variant="subtitle" style={styles.intro}>
-          {isIt
-            ? 'Ogni persona ha allergie separate per scansioni e semaforo.'
-            : 'Each person has separate allergies for scans and traffic light.'}
-        </AppText>
+      <GlassScreenScroll headerFloat={false} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <Section
+          title={isIt ? 'Gestione Famiglia' : 'Family Management'}
+          subtitle={isIt
+            ? 'Ogni profilo ha allergie separate per le scansioni del menu e del semaforo.'
+            : 'Each profile has separate allergies for menu scans and traffic light.'}
+        >
+          {loading && <ActivityIndicator color={colors.brand} style={{ marginVertical: spacing.md }} />}
 
-        {loading && <ActivityIndicator color={colors.brand} style={{ marginVertical: spacing.md }} />}
-
-        {primaryProfile && (
-          <GlassCard style={styles.primaryCard}>
-            <View style={styles.cardRow}>
-              <AvatarBubble {...avatarForIndex(0)} active size={52} />
-              <View style={{ flex: 1 }}>
-                <AppText variant="title">{primaryProfile.name}</AppText>
-                <AppText variant="caption" color={colors.brand}>{getRelationLabel('io')}</AppText>
+          {primaryProfile && (
+            <GlassCard style={styles.primaryCard}>
+              <View style={styles.cardRow}>
+                <AvatarBubble {...avatarForIndex(0)} active size={48} />
+                <View style={{ flex: 1 }}>
+                  <AppText variant="bodyBold">{primaryProfile.name}</AppText>
+                  <AppText variant="caption" color={colors.brand}>{getRelationLabel('io')}</AppText>
+                </View>
+                <Pressable
+                  style={styles.iconBtn}
+                  onPress={() => router.push('/allergie')}
+                >
+                  <Ionicons name="create-outline" size={18} color={colors.brand} />
+                </Pressable>
               </View>
-              <Pressable
-                style={styles.iconBtn}
-                onPress={() => router.push('/allergie')}
-              >
-                <Ionicons name="create-outline" size={20} color={colors.brand} />
-              </Pressable>
-            </View>
-            <View style={styles.chips}>
-              {primaryProfile.allergens.length === 0 ? (
-                <AppText variant="caption" color={colors.onSurfaceMuted}>
-                  {isIt ? 'Nessun allergene — modifica dal profilo principale' : 'No allergens — edit from primary profile'}
-                </AppText>
-              ) : (
-                primaryProfile.allergens.map((a) => (
-                  <View key={a.code} style={[styles.chip, intensityStyle(a.intensity)]}>
-                    <AppText variant="caption">{a.emoji} {a.name_it}</AppText>
-                  </View>
-                ))
-              )}
-            </View>
-          </GlassCard>
-        )}
+              <View style={styles.chips}>
+                {primaryProfile.allergens.length === 0 ? (
+                  <AppText variant="caption" color={colors.onSurfaceMuted}>
+                    {isIt ? 'Nessun allergene selezionato' : 'No allergens selected'}
+                  </AppText>
+                ) : (
+                  primaryProfile.allergens.map((a) => (
+                    <View key={a.code} style={[styles.chip, intensityStyle(a.intensity)]}>
+                      <AppText variant="caption">
+                        {a.emoji} {a.name_it}
+                        {a.criterio && a.criterio !== 'assoluto' ? ` · ${criterioShortLabel(a.criterio, isIt)}` : ''}
+                      </AppText>
+                    </View>
+                  ))
+                )}
+              </View>
+            </GlassCard>
+          )}
+        </Section>
 
         <Section
-          title={isIt ? 'Altri profili' : 'Other profiles'}
+          title={isIt ? 'Membri della famiglia' : 'Family Members'}
           subtitle={familyProfiles.length > 0
-            ? `${familyProfiles.length} ${isIt ? 'persone' : 'people'}`
-            : (isIt ? 'Tocca + in alto per aggiungere una persona' : 'Tap + above to add a person')}
+            ? `${familyProfiles.length} ${isIt ? 'profili attivi' : 'active profiles'}`
+            : (isIt ? 'Tocca + in alto a destra per aggiungere' : 'Tap + on top right to add')}
         >
-        {!loading && familyProfiles.length === 0 ? (
-          <EmptyStateCard
-            icon="people"
-            title={isIt ? 'Nessun profilo famiglia' : 'No family profiles'}
-            description={isIt
-              ? 'Aggiungi figli, partner o altri familiari per scansionare con allergie separate.'
-              : 'Add children, partners or others to scan with separate allergies.'}
-          />
-        ) : (
-          <View style={styles.list}>
-            {familyProfiles.map((p, i) => {
-              const av = avatarForIndex(i + 1);
-              return (
-                <GlassCard key={p.id}>
-                  <View style={styles.cardRow}>
-                    <AvatarBubble emoji={av.emoji} color={av.color} size={48} />
-                    <View style={{ flex: 1 }}>
-                      <AppText variant="bodyBold">{p.name}</AppText>
-                      <AppText variant="caption" color={colors.brand}>{getRelationLabel(p.relationship)}</AppText>
+          {!loading && familyProfiles.length === 0 ? (
+            <EmptyStateCard
+              icon="people"
+              title={isIt ? 'Nessun sottoprofilo' : 'No sub-profiles'}
+              description={isIt
+                ? 'Aggiungi figli o familiari per effettuare scansioni con le loro allergie.'
+                : 'Add children or family members to scan menus with their allergies.'}
+            />
+          ) : (
+            <View style={styles.list}>
+              {familyProfiles.map((p, i) => {
+                const av = avatarForIndex(i + 1);
+                return (
+                  <GlassCard key={p.id}>
+                    <View style={styles.cardRow}>
+                      <AvatarBubble emoji={av.emoji} color={av.color} size={44} />
+                      <View style={{ flex: 1 }}>
+                        <AppText variant="bodyBold">{p.name}</AppText>
+                        <AppText variant="caption" color={colors.brand}>{getRelationLabel(p.relationship)}</AppText>
+                      </View>
+                      <View style={styles.cardActions}>
+                        <Pressable style={styles.iconBtn} onPress={() => openEditModal(p)}>
+                          <Ionicons name="create-outline" size={18} color={colors.brand} />
+                        </Pressable>
+                        <Pressable style={[styles.iconBtn, styles.iconBtnDanger]} onPress={() => handleDelete(p)}>
+                          <Ionicons name="trash-outline" size={18} color={colors.red} />
+                        </Pressable>
+                      </View>
                     </View>
-                    <View style={styles.cardActions}>
-                      <Pressable style={styles.iconBtn} onPress={() => openEditModal(p)}>
-                        <Ionicons name="create-outline" size={20} color={colors.brand} />
-                      </Pressable>
-                      <Pressable style={[styles.iconBtn, styles.iconBtnDanger]} onPress={() => handleDelete(p)}>
-                        <Ionicons name="trash-outline" size={20} color={colors.red} />
-                      </Pressable>
+                    <View style={styles.chips}>
+                      {p.allergens.length === 0 ? (
+                        <AppText variant="caption" color={colors.onSurfaceMuted}>
+                          {isIt ? 'Nessun allergene impostato' : 'No allergens set'}
+                        </AppText>
+                      ) : (
+                        p.allergens.map((a) => (
+                          <View key={a.code} style={[styles.chip, intensityStyle(a.intensity)]}>
+                            <AppText variant="caption">
+                              {a.emoji} {a.name_it} ({a.intensity}
+                              {a.criterio && a.criterio !== 'assoluto' ? ` · ${criterioShortLabel(a.criterio, isIt)}` : ''})
+                            </AppText>
+                          </View>
+                        ))
+                      )}
                     </View>
-                  </View>
-                  <View style={styles.chips}>
-                    {p.allergens.length === 0 ? (
-                      <AppText variant="caption" color={colors.onSurfaceMuted}>
-                        {isIt ? 'Nessun allergene impostato' : 'No allergens set'}
-                      </AppText>
-                    ) : (
-                      p.allergens.map((a) => (
-                        <View key={a.code} style={[styles.chip, intensityStyle(a.intensity)]}>
-                          <AppText variant="caption">
-                            {a.emoji} {a.name_it} ({a.intensity})
-                          </AppText>
-                        </View>
-                      ))
-                    )}
-                  </View>
-                </GlassCard>
-              );
-            })}
-          </View>
-        )}
-
+                  </GlassCard>
+                );
+              })}
+            </View>
+          )}
         </Section>
       </GlassScreenScroll>
 
       <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <Screen>
+        <Screen edges={false} ambient>
           <View style={styles.modalHead}>
-            <AppText variant="h2">
+            <AppText variant="title">
               {editingProfile
-                ? (isIt ? 'Modifica profilo' : 'Edit profile')
-                : (isIt ? 'Nuovo profilo' : 'New profile')}
+                ? (isIt ? 'Modifica Profilo' : 'Edit Profile')
+                : (isIt ? 'Nuovo Profilo Famiglia' : 'New Family Profile')}
             </AppText>
             <Pressable onPress={() => setModalVisible(false)} hitSlop={12}>
-              <AppText variant="bodyBold" color={colors.brand}>{isIt ? 'Chiudi' : 'Close'}</AppText>
+              <Ionicons name="close" size={24} color={colors.brandInk} />
             </Pressable>
           </View>
 
@@ -323,7 +357,7 @@ export default function SubProfilesScreen() {
               <DebossedInput
                 value={name}
                 onChangeText={setName}
-                placeholder={isIt ? 'es. Sofia, Marco' : 'e.g. Sofia, Marco'}
+                placeholder={isIt ? 'es. Marco, Beatrice' : 'e.g. Marco, Beatrice'}
               />
             </View>
 
@@ -342,7 +376,7 @@ export default function SubProfilesScreen() {
                           setRelationship(rel.value);
                         }}
                       >
-                        <AppText variant="caption" color={on ? colors.brand : colors.onSurfaceMuted}>
+                        <AppText variant="caption" color={on ? colors.brand : colors.onSurfaceMuted} style={{ fontWeight: on ? '700' : '500' }}>
                           {isIt ? rel.label : rel.labelEn}
                         </AppText>
                       </Pressable>
@@ -353,16 +387,17 @@ export default function SubProfilesScreen() {
             )}
 
             <View style={styles.field}>
-              <AppText variant="bodyBold">{isIt ? 'Allergie e intolleranze' : 'Allergies & intolerances'}</AppText>
-              <AppText variant="caption">
+              <AppText variant="bodyBold">{isIt ? 'Allergie e intolleranze' : 'Allergies & Intolerances'}</AppText>
+              <AppText variant="caption" color={colors.onSurfaceMuted}>
                 {isIt
-                  ? 'Seleziona gli allergeni. Tocca l\'intensità per cambiarla.'
-                  : 'Select allergens. Tap intensity to change it.'}
+                  ? 'Seleziona le allergie. Tocca le etichette per cambiare intensità (lieve = giallo) e criterio (assoluto / crudo / cotto).'
+                  : 'Select allergies. Tap labels to change severity (mild = yellow) and form criterion (absolute / raw / cooked).'}
               </AppText>
               <View style={styles.allergenList}>
                 {allergens.map((a) => {
                   const isSelected = !!selectedAllergens[a.code];
-                  const intensity = selectedAllergens[a.code] || 'moderata';
+                  const intensity = selectedAllergens[a.code]?.intensity || 'moderata';
+                  const criterio = selectedAllergens[a.code]?.criterio || 'assoluto';
                   return (
                     <Pressable
                       key={a.code}
@@ -376,12 +411,22 @@ export default function SubProfilesScreen() {
                         {a.emoji} {a.name_it}
                       </AppText>
                       {isSelected && (
-                        <Pressable
-                          style={[styles.intensityBadge, intensityStyle(intensity)]}
-                          onPress={() => cycleIntensity(a.code)}
-                        >
-                          <AppText variant="caption">{intensity.toUpperCase()}</AppText>
-                        </Pressable>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          <Pressable
+                            style={[styles.intensityBadge, intensityStyle(intensity)]}
+                            onPress={() => cycleIntensity(a.code)}
+                          >
+                            <AppText variant="caption" style={{ fontWeight: '800' }}>{intensity.toUpperCase()}</AppText>
+                          </Pressable>
+                          <Pressable
+                            style={[styles.intensityBadge, styles.criterioBadge]}
+                            onPress={() => cycleCriterio(a.code)}
+                          >
+                            <AppText variant="caption" style={{ fontWeight: '800' }}>
+                              {criterioShortLabel(criterio, isIt).toUpperCase()}
+                            </AppText>
+                          </Pressable>
+                        </View>
                       )}
                     </Pressable>
                   );
@@ -389,10 +434,11 @@ export default function SubProfilesScreen() {
               </View>
             </View>
 
-            <PuffyButton
+            <SurfaceButton
               label={isIt ? 'Salva profilo' : 'Save profile'}
               onPress={handleSave}
-              loading={loading}
+              disabled={loading}
+              fullWidth
             />
           </ScrollView>
         </Screen>
@@ -402,23 +448,24 @@ export default function SubProfilesScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: { padding: spacing.xl, paddingBottom: 48, gap: spacing.lg },
-  intro: { marginBottom: spacing.xs },
+  scroll: {
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
+  },
   primaryCard: { gap: spacing.md },
-  sectionHead: { gap: 4, paddingHorizontal: 2 },
   list: { gap: spacing.md },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  cardActions: { flexDirection: 'row', gap: spacing.sm },
+  cardActions: { flexDirection: 'row', gap: spacing.xs },
   iconBtn: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: radius.sm,
     backgroundColor: colors.brand50,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconBtnDanger: { backgroundColor: colors.redSoft },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: spacing.sm },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: spacing.xs },
   chip: {
     borderRadius: radius.pill,
     paddingVertical: 4,
@@ -427,25 +474,28 @@ const styles = StyleSheet.create({
   },
   chipLieve: { backgroundColor: colors.yellowSoft, borderColor: colors.yellow },
   chipModerata: { backgroundColor: colors.amberBg, borderColor: colors.amber },
-  chipGrave: { backgroundColor: colors.redSoft, borderColor: colors.red },
-  addBtn: { marginTop: spacing.sm },
+  chipGrave: { backgroundColor: colors.redSoft, borderColor: colors.redBorder },
+  criterioBadge: {
+    backgroundColor: colors.surfaceSecondary,
+    borderColor: colors.borderStrong,
+  },
   modalHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  modalScroll: { padding: spacing.xl, gap: spacing.lg, paddingBottom: 48 },
-  field: { gap: spacing.sm },
-  relationsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  modalScroll: { padding: spacing.lg, gap: spacing.lg, paddingBottom: 48 },
+  field: { gap: spacing.xs },
+  relationsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   relationChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
     borderRadius: radius.pill,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
@@ -453,14 +503,14 @@ const styles = StyleSheet.create({
     borderColor: colors.brand,
     backgroundColor: colors.brand50,
   },
-  allergenList: { gap: spacing.sm },
+  allergenList: { gap: 8, marginTop: 4 },
   allergenRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
+    gap: 12,
+    padding: 12,
     borderRadius: radius.md,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
@@ -469,9 +519,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.brand50,
   },
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 6,
     borderWidth: 1.5,
     borderColor: colors.borderStrong,
     alignItems: 'center',
@@ -482,8 +532,8 @@ const styles = StyleSheet.create({
     borderColor: colors.brand,
   },
   intensityBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
     borderRadius: radius.sm,
     borderWidth: 1,
   },

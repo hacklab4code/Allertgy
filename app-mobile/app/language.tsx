@@ -1,10 +1,12 @@
 import { Stack, router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { LANGUAGES } from '../src/constants/languages';
 import { useSession } from '../src/store/session';
 import { AppText, DebossedInput, Screen, Section } from '../src/components/ui';
-import { colors, spacing, MIN_TOUCH_TARGET } from '../src/theme';
+import { colors, radius, spacing, MIN_TOUCH_TARGET } from '../src/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function LanguageScreen() {
   const { language, setLanguage, token } = useSession();
@@ -23,6 +25,7 @@ export default function LanguageScreen() {
   }, [query]);
 
   const handleSelect = (code: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setLanguage(code);
     if (token) {
       router.replace('/');
@@ -36,7 +39,7 @@ export default function LanguageScreen() {
   };
 
   return (
-    <Screen edges={false}>
+    <Screen edges={false} ambient>
       <Stack.Screen options={{ title: 'Lingua / Language' }} />
       <Section
         title="Language / Lingua"
@@ -67,7 +70,11 @@ export default function LanguageScreen() {
           const selected = item.code === current;
           return (
             <Pressable
-              style={[styles.langButton, selected && styles.langButtonSelected]}
+              style={({ pressed }) => [
+                styles.langButton,
+                selected && styles.langButtonSelected,
+                pressed && styles.pressed,
+              ]}
               onPress={() => handleSelect(item.code)}
             >
               <AppText variant="title">{item.flag}</AppText>
@@ -77,7 +84,11 @@ export default function LanguageScreen() {
                   <AppText variant="caption" color={colors.onSurfaceMuted}>{item.label}</AppText>
                 ) : null}
               </View>
-              {selected ? <AppText variant="bodyBold" color={colors.brand}>✓</AppText> : null}
+              {selected ? (
+                <View style={styles.checkBadge}>
+                  <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                </View>
+              ) : null}
             </Pressable>
           );
         }}
@@ -87,20 +98,47 @@ export default function LanguageScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerSection: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.sm },
+  headerSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  pressed: { opacity: 0.85 },
+  list: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: 8,
+  },
+  empty: {
+    textAlign: 'center',
+    marginTop: spacing.xl,
+    color: colors.onSurfaceMuted,
+  },
   langButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    paddingVertical: 14,
+    backgroundColor: colors.surfaceSecondary,
+    paddingVertical: 12,
     paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     minHeight: MIN_TOUCH_TARGET,
-    gap: spacing.md,
+    gap: 14,
   },
-  langButtonSelected: { borderColor: colors.brand, backgroundColor: colors.brand50 },
-  langText: { flex: 1 },
-  empty: { textAlign: 'center', marginTop: spacing.xl },
+  langButtonSelected: {
+    borderColor: colors.brand,
+    backgroundColor: colors.brand50,
+  },
+  langText: {
+    flex: 1,
+  },
+  checkBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

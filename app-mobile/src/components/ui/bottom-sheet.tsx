@@ -66,11 +66,11 @@ export const AppBottomSheet = forwardRef<BottomSheet, AppBottomSheetProps>(
         handleIndicatorStyle={styles.handle}
         onChange={(i) => {
           if (i >= 0) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
           }
         }}
         onClose={() => {
-          Haptics.selectionAsync().catch(() => {});
+          Haptics.selectionAsync().catch(() => { });
           onClose?.();
         }}
         {...rest}

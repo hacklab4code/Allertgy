@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { SubProfile } from '../types';
+import type { AllergyCriterio, AllergyIntensity, SubProfile } from '../types';
 
 export interface RecentPlace {
   code: string;
@@ -19,7 +19,9 @@ interface SessionState {
   /** codici allergene selezionati (es. ['glutine','latte']) */
   allergie: string[];
   /** intensità per ogni allergia selezionata (es. { glutine: 'grave' }) */
-  allergyIntensities: Record<string, 'lieve' | 'moderata' | 'grave'>;
+  allergyIntensities: Record<string, AllergyIntensity>;
+  /** criterio forma per ogni allergia (es. { uova: 'crudo' }) */
+  allergyCriteria: Record<string, AllergyCriterio>;
   /** consensi minimi per usare un account cliente con dati allergie */
   legalAccepted: boolean;
   healthDataConsent: boolean;
@@ -48,10 +50,16 @@ interface SessionState {
   subProfiles: SubProfile[];
   /** id del profilo selezionato per la scansione (null = default utente) */
   activeProfileId: number | null;
+  /** URL firmato foto profilo principale (non persistito a lungo — refresh on load) */
+  profilePhotoUrl: string | null;
   setToken: (t: string | null) => void;
   setEmail: (e: string | null) => void;
   setRole: (r: Role) => void;
-  setAllergie: (a: string[], intensities?: Record<string, 'lieve' | 'moderata' | 'grave'>) => void;
+  setAllergie: (
+    a: string[],
+    intensities?: Record<string, AllergyIntensity>,
+    criteria?: Record<string, AllergyCriterio>,
+  ) => void;
   setLegalStatus: (legalAccepted: boolean, healthDataConsent: boolean) => void;
   setProfileCompleted: (v: boolean) => void;
   setDisclaimer: (v: boolean) => void;
@@ -67,6 +75,7 @@ interface SessionState {
   setIngredientiEsclusi: (ings: string[]) => void;
   setSubProfiles: (profiles: SubProfile[]) => void;
   setActiveProfileId: (id: number | null) => void;
+  setProfilePhotoUrl: (url: string | null) => void;
   logout: () => void;
 }
 
@@ -78,6 +87,7 @@ export const useSession = create<SessionState>()(
       role: 'customer',
       allergie: [],
       allergyIntensities: {},
+      allergyCriteria: {},
       legalAccepted: false,
       healthDataConsent: false,
       profileCompleted: false,
@@ -94,12 +104,14 @@ export const useSession = create<SessionState>()(
       ingredientiEsclusi: [],
       subProfiles: [],
       activeProfileId: null,
+      profilePhotoUrl: null,
       setToken: (token) => set({ token }),
       setEmail: (email) => set({ email }),
       setRole: (role) => set({ role }),
-      setAllergie: (allergie, allergyIntensities) => set((state) => ({ 
-        allergie, 
-        allergyIntensities: allergyIntensities || state.allergyIntensities 
+      setAllergie: (allergie, allergyIntensities, allergyCriteria) => set((state) => ({
+        allergie,
+        allergyIntensities: allergyIntensities || state.allergyIntensities,
+        allergyCriteria: allergyCriteria || state.allergyCriteria,
       })),
       setLegalStatus: (legalAccepted, healthDataConsent) => set({ legalAccepted, healthDataConsent }),
       setProfileCompleted: (profileCompleted) => set({ profileCompleted }),
@@ -128,18 +140,23 @@ export const useSession = create<SessionState>()(
       setIngredientiEsclusi: (ingredientiEsclusi) => set({ ingredientiEsclusi }),
       setSubProfiles: (subProfiles) => set({ subProfiles }),
       setActiveProfileId: (activeProfileId) => set({ activeProfileId }),
+      setProfilePhotoUrl: (profilePhotoUrl) => set({ profilePhotoUrl }),
       logout: () =>
         set({
-          token: null, email: null, role: 'customer', allergie: [], allergyIntensities: {},
+          token: null, email: null, role: 'customer', allergie: [], allergyIntensities: {}, allergyCriteria: {},
           legalAccepted: false, healthDataConsent: false, profileCompleted: false,
-          disclaimerAccepted: false, tourCompleted: false, registerAllergieStep: false, recents: [], favorites: [], language: 'it', languageSelected: false, 
+          disclaimerAccepted: false, tourCompleted: false, registerAllergieStep: false, recents: [], favorites: [], language: 'it', languageSelected: false,
           emergencyMedicines: null, emergencyContactName: null, emergencyContactPhone: null, ingredientiEsclusi: [],
-          subProfiles: [], activeProfileId: null,
+          subProfiles: [], activeProfileId: null, profilePhotoUrl: null,
         }),
     }),
     {
       name: 'allertgy-session',
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => {
+        const { profilePhotoUrl: _photo, ...rest } = state;
+        return rest;
+      },
     },
   ),
 );

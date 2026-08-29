@@ -37,6 +37,15 @@ class ResetPasswordIn(BaseModel):
     new_password: str = Field(min_length=8)
 
 
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
+
+
+class ProfileUpdateIn(BaseModel):
+    display_name: Optional[str] = Field(default=None, max_length=100)
+
+
 # ---------- Allergeni / profilo ----------
 class AllergenOut(BaseModel):
     id: int
@@ -46,6 +55,7 @@ class AllergenOut(BaseModel):
     is_diet: int
     category: str = "ue"
     intensity: Optional[str] = None
+    criterio: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -53,6 +63,7 @@ class AllergenOut(BaseModel):
 class ProfileAllergenItem(BaseModel):
     code: str
     intensity: str = "moderata"
+    criterio: str = "assoluto"
 
 
 class ProfileAllergensIn(BaseModel):
@@ -127,7 +138,13 @@ class RestaurantSummaryOut(BaseModel):
     citta: Optional[str]
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    image_url: Optional[str] = None
     boost_active: bool = False
+    menu_available: bool = False
+    is_verified: bool = False
+    cuisine: Optional[str] = None
+    google_rating: Optional[float] = None
+    google_reviews_count: Optional[int] = None
     piatti: list[DishSummaryOut]
 
 
@@ -162,7 +179,44 @@ class ProductLabelCacheOut(BaseModel):
     ingredients: str
     allergeni_contenuti: list[str] = []
     allergeni_tracce: list[str] = []
+    source: str = "ai_label"
+    image_url: Optional[str] = None
+    confidence_score: float = 1.0
+    verification_count: int = 1
+    report_count: int = 0
     cached_at: datetime
+    last_verified_at: Optional[datetime] = None
+
+
+class BarcodeProductResolveOut(BaseModel):
+    barcode: str
+    product_name: str
+    brand: str
+    ingredients: str
+    allergeni_contenuti: list[str] = []
+    allergeni_tracce: list[str] = []
+    dieta_flags: list[str] = []
+    source: str  # "allertgy_verified" | "openfoodfacts" | "openbeautyfacts" | "ai_label" | "upcitemdb"
+    source_label: str
+    image_url: Optional[str] = None
+    confidence_score: float = 1.0
+    verification_count: int = 1
+    is_cosmetic: bool = False
+    last_verified_at: Optional[datetime] = None
+    note: Optional[str] = None
+
+
+class BarcodeProductReportIn(BaseModel):
+    reason: str  # "wrong_ingredients" | "recipe_changed" | "missing_allergens" | "other"
+    note: Optional[str] = None
+    updated_ingredients: Optional[str] = None
+
+
+class BarcodeProductReportOut(BaseModel):
+    success: bool
+    message: str
+    report_count: int
+
 
 
 class MenuOut(BaseModel):
@@ -186,11 +240,13 @@ class MenuOut(BaseModel):
     tripadvisor_rating: Optional[float] = None
     tripadvisor_reviews_count: Optional[int] = None
     boost_active: bool = False
+    menu_available: bool = False
     safety_notice: str = (
         "Informazioni sugli allergeni dichiarate dal ristoratore. "
         "Comunica sempre allergie e intolleranze al personale prima di ordinare."
     )
     menus: list[MenuOutItem] = []
+    photos: list[PhotoOut] = []
     piatti: list[DishOut]
 
 
@@ -246,6 +302,7 @@ class RestaurantOut(BaseModel):
     website: Optional[str] = None
     menu_url: Optional[str] = None
     description: Optional[str] = None
+    cuisine: Optional[str] = None
     is_active: int = 1
     address: Optional[str]
     phone: Optional[str]
@@ -396,6 +453,23 @@ class DishIn(BaseModel):
     translations: list[DishTranslationIn] = []
 
 
+class DishSaveOut(BaseModel):
+    """Risposta salvataggio piatto singolo: menù live + registro PDF pronti."""
+    dish: DishOut
+    menu_version: int
+    menu_updated_at: Optional[datetime] = None
+    published: bool = False
+    registry_ready: bool = True
+
+
+class KitchenConfirmAllOut(BaseModel):
+    updated: int
+    menu_version: int
+    menu_updated_at: Optional[datetime] = None
+    published: bool = False
+    registry_ready: bool = True
+
+
 class MenuSaveIn(BaseModel):
     """Salvataggio in blocco del menù (da tabella AI corretta)."""
     piatti: list[DishIn]
@@ -404,6 +478,8 @@ class MenuSaveIn(BaseModel):
 
 class ApproveMenuIn(BaseModel):
     legal_acknowledged: bool = False
+    # Se True e la conferma legale è già alla versione corrente, ripubblica senza rioscrivere il testo.
+    republish_only: bool = False
 
 
 class AnalyzeUrlIn(BaseModel):
@@ -762,6 +838,7 @@ class CustomerAnnotationOut(BaseModel):
 class SubProfileAllergenItem(BaseModel):
     code: str
     intensity: str = "moderata"
+    criterio: str = "assoluto"
 
 
 class SubProfileIn(BaseModel):
@@ -775,6 +852,7 @@ class SubProfileAllergenOut(BaseModel):
     name_it: str
     emoji: Optional[str]
     intensity: str
+    criterio: str = "assoluto"
 
 
 class SubProfileOut(BaseModel):

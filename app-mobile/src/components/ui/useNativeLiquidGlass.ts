@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, Platform } from 'react-native';
 import { isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { useAppearance } from '../../store/appearance';
 
-export function canUseNativeLiquidGlass(reduceTransparency: boolean, liquidGlassEnabled = true) {
-  if (!liquidGlassEnabled || Platform.OS !== 'ios' || reduceTransparency) return false;
+export function canUseNativeLiquidGlass(reduceTransparency: boolean) {
+  if (Platform.OS !== 'ios' || reduceTransparency) return false;
   try {
     return isGlassEffectAPIAvailable() && isLiquidGlassAvailable();
   } catch {
@@ -13,35 +12,37 @@ export function canUseNativeLiquidGlass(reduceTransparency: boolean, liquidGlass
 }
 
 export function useNativeLiquidGlass() {
-  const liquidGlassEnabled = useAppearance((s) => s.liquidGlassEnabled);
   const [reduceTransparency, setReduceTransparency] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    AccessibilityInfo.isReduceTransparencyEnabled()
-      .then((enabled) => {
-        if (mounted) setReduceTransparency(enabled);
-      })
-      .catch(() => {});
+    if (typeof AccessibilityInfo?.isReduceTransparencyEnabled === 'function') {
+      AccessibilityInfo.isReduceTransparencyEnabled()
+        .then((enabled) => {
+          if (mounted) setReduceTransparency(enabled);
+        })
+        .catch(() => {});
+    }
 
-    const sub = AccessibilityInfo.addEventListener('reduceTransparencyChanged', setReduceTransparency);
+    const sub = typeof AccessibilityInfo?.addEventListener === 'function'
+      ? AccessibilityInfo.addEventListener('reduceTransparencyChanged', setReduceTransparency)
+      : null;
+
     return () => {
       mounted = false;
-      sub.remove();
+      sub?.remove?.();
     };
   }, []);
 
-  const glassOff = !liquidGlassEnabled || reduceTransparency;
-
   return {
-    /** Preferenza utente: effetto vetro attivo. */
-    enabled: liquidGlassEnabled,
-    /** Native iOS Liquid Glass (solo Apple, API disponibile, preferenza on, Reduce Transparency off). */
-    native: canUseNativeLiquidGlass(reduceTransparency, liquidGlassEnabled),
+    /** Effetto vetro sempre attivo (rispetta solo Reduce Transparency). */
+    enabled: !reduceTransparency,
+    /** Native iOS Liquid Glass (solo Apple, API disponibile, Reduce Transparency off). */
+    native: canUseNativeLiquidGlass(reduceTransparency),
     reduceTransparency,
-    /** Niente blur/vetro: superficie opaca (preferenza off o accessibilità). */
-    glassOff,
+    /** Niente blur/vetro: solo accessibilità Reduce Transparency. */
+    glassOff: reduceTransparency,
   };
 }
 

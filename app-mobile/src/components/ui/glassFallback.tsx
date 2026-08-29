@@ -136,7 +136,7 @@ export function GlassFallbackSurface({
   fallbackIntensity = 92,
   interactive = false,
   reduceTransparency = false,
-  animated = true,
+  animated = false,
 }: SurfaceProps) {
   if (reduceTransparency) {
     return (
@@ -181,20 +181,10 @@ export function GlassFallbackSurface({
       <SafeBlurView
         intensity={intensity}
         tint={isIOS ? preset.iosTint : preset.androidTint}
-        blurReductionFactor={isIOS ? undefined : 2.4}
-        experimentalBlurMethod={isIOS ? undefined : 'dimezisBlurView'}
+        blurReductionFactor={isIOS ? undefined : undefined}
+        experimentalBlurMethod={isIOS ? undefined : 'none'}
         style={StyleSheet.absoluteFill}
       />
-
-      {!isIOS ? (
-        <SafeBlurView
-          intensity={Math.min(100, Math.round(intensity * 0.55))}
-          tint={preset.androidTint}
-          blurReductionFactor={2.4}
-          experimentalBlurMethod="dimezisBlurView"
-          style={[StyleSheet.absoluteFill, styles.secondBlur]}
-        />
-      ) : null}
 
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: preset.frostTint }]} />
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: preset.brandTint }]} />
@@ -293,7 +283,6 @@ const styles = StyleSheet.create({
     backdropFilter: 'blur(28px) saturate(190%)',
     WebkitBackdropFilter: 'blur(28px) saturate(190%)',
   },
-  secondBlur: { opacity: 0.45 },
   content: { ...StyleSheet.absoluteFillObject, zIndex: 5 },
   topGloss: {
     position: 'absolute',

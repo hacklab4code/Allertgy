@@ -2,9 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from './AppText';
-import { PuffyButton } from './PuffyButton';
+import { SurfaceButton } from './SurfaceButton';
 import { Screen } from './Screen';
-import { colors, spacing, radius, puffyShadow } from '../../theme';
+import { colors, spacing, radius } from '../../theme';
 
 export type OnboardingSlide = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -52,7 +52,7 @@ export function OnboardingSlides({
         showsVerticalScrollIndicator={false}
       >
         {onSkip && skipLabel ? (
-          <PuffyButton
+          <SurfaceButton
             label={skipLabel}
             onPress={onSkip}
             variant="soft"
@@ -71,7 +71,7 @@ export function OnboardingSlides({
           {step + 1} / {slides.length}
         </AppText>
 
-        <View style={[styles.hero, puffyShadow(10), { backgroundColor: current.iconBg ?? colors.surfaceSecondary }]}>
+        <View style={[styles.hero, { backgroundColor: current.iconBg ?? colors.surfaceSecondary }]}>
           <Ionicons name={current.icon} size={64} color={current.iconColor ?? colors.brand} />
         </View>
 
@@ -88,7 +88,7 @@ export function OnboardingSlides({
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
         <View style={styles.navRow}>
           {step > 0 ? (
-            <PuffyButton
+            <SurfaceButton
               label={backLabel}
               onPress={() => onStepChange(step - 1)}
               variant="soft"
@@ -98,7 +98,7 @@ export function OnboardingSlides({
           ) : (
             <View style={{ flex: 1 }} />
           )}
-          <PuffyButton
+          <SurfaceButton
             label={isLast ? finishLabel : nextLabel}
             onPress={() => (isLast ? onComplete() : onStepChange(step + 1))}
             icon="arrow-forward"

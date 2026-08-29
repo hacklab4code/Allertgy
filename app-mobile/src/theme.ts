@@ -22,6 +22,12 @@ export {
   SECTION_GAP,
   SCREEN_PADDING_H,
 } from './layoutConstants';
+export {
+  SEMAFORO_TOKENS,
+  type SemaforoStatus,
+  normalizeSemaforoStatus,
+  BRAND_TOKENS,
+} from './designTokens';
 
 const WIREFRAME_COLORS = {
   ...puffyColors,
@@ -163,6 +169,8 @@ export const puffyShadow = (elevation = tokenShadow.defaultElevation): ViewStyle
     } as ViewStyle,
   }) as ViewStyle;
 };
+
+export const softShadow = puffyShadow;
 
 /** Glow semaforo — ombra colorata sul verdetto attivo. */
 export const verdictGlow = (verdict: Verdict): ViewStyle => {

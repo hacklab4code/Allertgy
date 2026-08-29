@@ -1,292 +1,185 @@
-import React, { useEffect, useState } from 'react';
-import { LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+/**
+ * Navigazione del locale: semaforo come controllo centrale,
+ * con recensioni e informazioni in azioni indipendenti.
+ */
+import React from 'react';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, font, radius, spacing, WIREFRAME_MODE } from '../../theme';
+import { colors, spacing, WIREFRAME_MODE } from '../../theme';
 import { wireBox } from '../../wireframe';
 import { AppText } from './AppText';
-import { LiquidGlassView } from './LiquidGlassView';
-import { LiquidGlassContainer } from './LiquidGlassContainer';
-import { LiquidGlassSlidingIndicator } from './LiquidGlassSlidingIndicator';
-import { glassShellBorder } from './glassFallback';
-import { IOS_TAB_SPRING } from './useNativeLiquidGlass';
+import { InteractiveSemaforoOrb } from './InteractiveSemaforoOrb';
 
-export type VenueTab = 'menu' | 'warning' | 'esperienza' | 'info';
+export type VenueTab = 'menu' | 'esperienza' | 'info';
 
-type TabDef = {
-  id: Exclude<VenueTab, 'menu'>;
-  labelIt: string;
-  labelEn: string;
-  icon: string;
+type SideTab = Exclude<VenueTab, 'menu'>;
+
+const ICONS: Record<SideTab, ReturnType<typeof require>> = {
+  esperienza: require('../../../assets/venue_esperienza.png'),
+  info: require('../../../assets/venue_info.png'),
 };
-
-const TABS: TabDef[] = [
-  { id: 'warning', labelIt: 'Warning', labelEn: 'Warnings', icon: 'warning' },
-  { id: 'esperienza', labelIt: 'Scrivi esperienza', labelEn: 'Write review', icon: 'create' },
-  { id: 'info', labelIt: 'Info', labelEn: 'Info', icon: 'information-circle' },
-];
-
-const BAR_H = 58;
-const BAR_RADIUS = 29;
-const BAR_MARGIN_H = 16;
-const BAR_MARGIN_BOTTOM = 8;
-const TRACK_PAD = 5;
-const ICON_SLOT_H = 30;
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
-function TabItem({
-  focused,
-  icon,
-  label,
-  badge,
-  onPress,
-}: {
-  focused: boolean;
-  icon: string;
-  label: string;
-  badge?: number;
-  onPress: () => void;
-}) {
-  const scale = useSharedValue(1);
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  const tint = focused ? colors.brand : colors.onSurfaceMuted;
-
-  if (WIREFRAME_MODE) {
-    return (
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onPress();
-        }}
-        style={[wireBox({ fill: focused ? '#000' : '#FFF' }), styles.wfTab]}
-      >
-        <AppText variant="caption" style={{ color: focused ? '#FFF' : '#000', textAlign: 'center', fontSize: 9 }}>
-          {label}
-        </AppText>
-      </Pressable>
-    );
-  }
-
-  return (
-    <AnimatedPressable
-      style={[styles.item, animatedStyle]}
-      onPressIn={() => (scale.value = withSpring(0.94, { damping: 16, stiffness: 380 }))}
-      onPressOut={() => (scale.value = withSpring(1, { damping: 12, stiffness: 280 }))}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }}
-    >
-      <View style={styles.iconSlot}>
-        <Ionicons
-          name={(focused ? icon : `${icon}-outline`) as keyof typeof Ionicons.glyphMap}
-          size={20}
-          color={tint}
-          style={styles.tabIcon}
-        />
-        {badge != null && badge > 0 ? (
-          <View style={[styles.badge, !focused && styles.badgeMuted]}>
-            <AppText variant="caption" style={styles.badgeText}>{badge > 9 ? '9+' : badge}</AppText>
-          </View>
-        ) : null}
-      </View>
-      <AppText
-        variant="caption"
-        style={[styles.label, { color: tint, fontFamily: focused ? font.semibold : font.displayMedium }]}
-      >
-        {label}
-      </AppText>
-    </AnimatedPressable>
-  );
-}
 
 type Props = {
   active: VenueTab;
   onChange: (tab: VenueTab) => void;
   language: string;
-  warningCount?: number;
+  activeStatus?: 'verde' | 'giallo' | 'rosso' | null;
+  onOrbPress?: () => void;
 };
 
-export function VenueBottomBar({ active, onChange, language, warningCount }: Props) {
+function SideAction({
+  tab,
+  active,
+  label,
+  onPress,
+}: {
+  tab: SideTab;
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
+      onPress={() => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      style={[styles.sideAction, active && styles.sideActionActive]}
+    >
+      <Image source={ICONS[tab]} style={[styles.sideIcon, active && styles.sideIconActive]} resizeMode="contain" />
+    </Pressable>
+  );
+}
+
+export function VenueBottomBar({ active, onChange, language, activeStatus, onOrbPress }: Props) {
   const insets = useSafeAreaInsets();
-  const isIt = (language || 'it').toLowerCase() === 'it';
-  const [barWidth, setBarWidth] = useState(0);
+  const isIt = (language || 'it').toLowerCase().startsWith('it');
+  const bottomSafe = Math.max(insets.bottom, spacing.sm);
 
-  const activeIndex = active === 'menu' ? -1 : Math.max(0, TABS.findIndex((t) => t.id === active));
-  const slide = useSharedValue(activeIndex >= 0 ? activeIndex : 0);
-
-  useEffect(() => {
-    if (activeIndex >= 0) {
-      slide.value = withSpring(activeIndex, IOS_TAB_SPRING);
-    }
-  }, [activeIndex, slide]);
-
-  const onBarLayout = (e: LayoutChangeEvent) => {
-    setBarWidth(e.nativeEvent.layout.width);
-  };
-
-  const tabWidth = barWidth > 0 ? (barWidth - TRACK_PAD * 2) / TABS.length : 0;
-
-  const handleTabPress = (tabId: Exclude<VenueTab, 'menu'>) => {
-    if (active === tabId) {
-      onChange('menu');
-    } else {
-      onChange(tabId);
-    }
-  };
+  const toggleTab = (tab: SideTab) => onChange(active === tab ? 'menu' : tab);
 
   if (WIREFRAME_MODE) {
     return (
-      <View style={[styles.wfBar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
-        {TABS.map((tab) => {
-          const focused = active === tab.id;
-          return (
-            <Pressable
-              key={tab.id}
-              style={[wireBox({ fill: focused ? '#000' : '#FFF' }), styles.wfTab]}
-              onPress={() => handleTabPress(tab.id)}
-            >
-              <AppText variant="caption" style={{ color: focused ? '#FFF' : '#000', textAlign: 'center', fontSize: 9 }}>
-                {isIt ? tab.labelIt : tab.labelEn}
-              </AppText>
-            </Pressable>
-          );
-        })}
+      <View style={[styles.wireframeRow, { paddingBottom: bottomSafe }]}>
+        <Pressable style={[wireBox(), styles.wireframeSide]} onPress={() => toggleTab('esperienza')}>
+          <AppText variant="caption">{isIt ? 'Recensioni' : 'Reviews'}</AppText>
+        </Pressable>
+        <Pressable style={[wireBox({ fill: '#000' }), styles.wireframeCenter]} onPress={onOrbPress}>
+          <AppText variant="caption" style={{ color: '#FFF' }}>Semaforo</AppText>
+        </Pressable>
+        <Pressable style={[wireBox(), styles.wireframeSide]} onPress={() => toggleTab('info')}>
+          <AppText variant="caption">Info</AppText>
+        </Pressable>
       </View>
     );
   }
 
   return (
-    <View
-      style={[
-        styles.container,
-        { paddingBottom: Math.max(insets.bottom, spacing.sm) + BAR_MARGIN_BOTTOM },
-      ]}
-    >
-      <View style={[styles.barShell, { height: BAR_H }]}>
-        <LiquidGlassContainer spacing={14} style={[styles.barBody, { height: BAR_H }]} onLayout={onBarLayout}>
-          <LiquidGlassView
-            glassStyle="clear"
-            tintColor="rgba(210, 195, 246, 0.14)"
-            fallbackIntensity={98}
-            style={StyleSheet.absoluteFill}
-          />
+    <View style={styles.container} pointerEvents="box-none">
+      <View style={[styles.row, { paddingBottom: bottomSafe }]}>
+        <SideAction
+          tab="esperienza"
+          active={active === 'esperienza'}
+          label={isIt ? 'Scrivi esperienza' : 'Write review'}
+          onPress={() => toggleTab('esperienza')}
+        />
 
-          {activeIndex >= 0 ? (
-            <LiquidGlassSlidingIndicator
-              slide={slide}
-              slotWidth={tabWidth}
-              inset={0}
-              top={TRACK_PAD}
-              left={TRACK_PAD}
-              height={BAR_H - TRACK_PAD * 2}
-              borderRadius={radius.pill}
-            />
-          ) : null}
+        <View style={styles.semaforoCard}>
+          <InteractiveSemaforoOrb compact size={60} activeStatus={activeStatus} onPress={onOrbPress} />
+        </View>
 
-          <View style={styles.barInner}>
-            {TABS.map((tab) => (
-              <TabItem
-                key={tab.id}
-                focused={active === tab.id}
-                icon={tab.icon}
-                label={isIt ? tab.labelIt : tab.labelEn}
-                badge={tab.id === 'warning' ? warningCount : undefined}
-                onPress={() => handleTabPress(tab.id)}
-              />
-            ))}
-          </View>
-        </LiquidGlassContainer>
+        <SideAction
+          tab="info"
+          active={active === 'info'}
+          label={isIt ? 'Informazioni del locale' : 'Venue information'}
+          onPress={() => toggleTab('info')}
+        />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wfBar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderColor: '#000',
-    backgroundColor: '#FFF',
-    paddingHorizontal: spacing.xs,
-    paddingTop: spacing.xs,
-    gap: spacing.xs,
-  },
-  wfTab: { flex: 1, paddingVertical: spacing.sm, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
   container: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: BAR_MARGIN_H,
-    backgroundColor: 'transparent',
-    overflow: 'visible',
     zIndex: 40,
     alignItems: 'center',
-  },
-  barShell: {
-    width: '100%',
-    position: 'relative',
     overflow: 'visible',
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 10,
   },
-  barBody: {
+  row: {
     width: '100%',
-    overflow: 'hidden',
-    borderRadius: BAR_RADIUS,
-    backgroundColor: 'transparent',
-    ...glassShellBorder,
-  },
-  barInner: {
-    flex: 1,
+    paddingHorizontal: 34,
     flexDirection: 'row',
-    alignItems: 'stretch',
-    paddingHorizontal: TRACK_PAD,
-    paddingBottom: 6,
-    paddingTop: 4,
-    zIndex: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
   },
-  item: {
+  sideAction: {
+    width: 62,
+    height: 58,
+    borderRadius: 22,
+    backgroundColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.15,
+    shadowRadius: 14,
+    elevation: 7,
+  },
+  sideActionActive: {
+    backgroundColor: colors.inkSoft,
+    borderWidth: 1.5,
+    borderColor: colors.brand,
+  },
+  sideIcon: {
+    width: 28,
+    height: 28,
+    opacity: 0.9,
+  },
+  sideIconActive: {
+    width: 32,
+    height: 32,
+    opacity: 1,
+  },
+  semaforoCard: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 2,
-    minHeight: 44,
-    paddingVertical: 2,
-  },
-  iconSlot: {
-    width: 40,
-    height: ICON_SLOT_H,
+    maxWidth: 220,
+    minWidth: 150,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: colors.green,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'visible',
+    shadowColor: colors.green,
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  tabIcon: { zIndex: 2 },
-  label: { fontSize: 9, textAlign: 'center' },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.red,
+  wireframeRow: {
+    flexDirection: 'row',
+    width: '100%',
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+  },
+  wireframeSide: {
+    width: 68,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
-    zIndex: 3,
   },
-  badgeMuted: { backgroundColor: colors.amber },
-  badgeText: { color: '#fff', fontSize: 9, fontWeight: '800', lineHeight: 12 },
+  wireframeCenter: {
+    flex: 1,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

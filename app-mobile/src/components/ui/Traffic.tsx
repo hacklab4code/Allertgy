@@ -1,12 +1,11 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import {
   colors,
   font,
   radius,
   spacing,
-  puffyShadow,
-  verdictGlow,
   Verdict,
   verdictColor,
   WIREFRAME_MODE,
@@ -14,7 +13,6 @@ import {
 import { verdictEmoji } from '../../designTokens';
 import { wireBox } from '../../wireframe';
 import { AppText } from './AppText';
-import { GlossSheen } from './puffSurface';
 
 type VerdictLike = Verdict | 'neutral';
 
@@ -38,16 +36,8 @@ export function VerdictBadge({ verdict }: { verdict: Verdict }) {
   }
   return (
     <View style={styles.heroWrap}>
-      <View
-        style={[
-          styles.hero,
-          { backgroundColor: v.bg },
-          puffyShadow(12),
-          verdictGlow(verdict),
-        ]}
-      >
-        <GlossSheen intensity={1} />
-        <AppText style={styles.heroEmoji}>{verdictEmoji[verdict]}</AppText>
+      <View style={[styles.hero, { backgroundColor: v.soft, borderColor: v.border }]}>
+        <Ionicons name={v.icon as any} size={48} color={v.bg} />
       </View>
       <AppText variant="h1" style={{ color: v.on, marginTop: spacing.md }}>{v.label}</AppText>
     </View>
@@ -257,16 +247,15 @@ const styles = StyleSheet.create({
   wfChip: { flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 10 },
   heroWrap: { alignItems: 'center' },
   hero: {
-    width: 132,
-    height: 132,
+    width: 120,
+    height: 120,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.65)',
+    borderWidth: 2,
     overflow: 'hidden',
   },
-  heroEmoji: { fontSize: 56, zIndex: 2 },
+  heroEmoji: { fontSize: 52 },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -294,6 +283,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderWidth: 1.5,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
   matchChipText: {
     fontFamily: font.bold,

@@ -1,8 +1,13 @@
-import { ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import React, { ReactNode } from 'react';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { colors, spacing } from '../../theme';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
+import { colors, font } from '../../theme';
 import { AppText } from './AppText';
 
 type Props = {
@@ -14,13 +19,17 @@ type Props = {
   onPress?: () => void;
   right?: ReactNode;
   children?: ReactNode;
+  danger?: boolean;
+  /** Colore titolo (es. logout arancio). `danger` ha priorità. */
+  titleColor?: string;
 };
 
 export function SettingsDivider() {
   return <View style={styles.divider} />;
 }
 
-/** Riga impostazioni/navigazione riutilizzabile. */
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export function SettingsRow({
   icon,
   iconColor = colors.brand,
@@ -30,61 +39,180 @@ export function SettingsRow({
   onPress,
   right,
   children,
+  danger = false,
+  titleColor,
 }: Props) {
+  const scale = useSharedValue(1);
+  const resolvedTitleColor = danger ? colors.red : (titleColor ?? colors.brandInk);
+
+  const containerAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   const body = (
-    <View style={[styles.row, children ? styles.rowExpanded : null]}>
-      <View style={[styles.rowIcon, { backgroundColor: iconBg }]}>
-        <Ionicons name={icon} size={20} color={iconColor} />
+    <View style={styles.innerRow}>
+      <View style={[styles.iconWell, { backgroundColor: iconBg }]}>
+        <Ionicons name={icon} size={18} color={danger ? colors.red : iconColor} />
       </View>
       <View style={styles.rowBody}>
-        <AppText variant="bodyBold">{title}</AppText>
-        {subtitle ? <AppText variant="caption" style={styles.rowSub}>{subtitle}</AppText> : null}
+        <AppText
+          numberOfLines={1}
+          color={resolvedTitleColor}
+          style={[styles.title, danger && styles.titleDanger]}
+        >
+          {title}
+        </AppText>
+        {subtitle ? (
+          <AppText
+            color={colors.textSecondary}
+            style={styles.subtitle}
+            numberOfLines={2}
+          >
+            {subtitle}
+          </AppText>
+        ) : null}
         {children}
       </View>
-      {right ?? (onPress ? (
-        <Ionicons name="chevron-forward" size={20} color={colors.onSurfaceMuted} />
-      ) : null)}
+      {right}
+      {onPress ? (
+        <Ionicons name="chevron-forward" size={18} color={colors.borderStrong} />
+      ) : null}
     </View>
   );
 
-  if (!onPress) return body;
+  if (!onPress) {
+    return (
+      <View style={[styles.tile, children ? styles.tileExpanded : null]}>
+        {body}
+      </View>
+    );
+  }
 
   return (
-    <Pressable
+    <AnimatedPressable
+        onPressIn={() => {
+          scale.value = withSpring(0.985, { damping: 18, stiffness: 420 });
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, { damping: 14, stiffness: 280 });
+        }}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
-      style={({ pressed }) => pressed && styles.rowPressed}
+      style={[styles.tile, children ? styles.tileExpanded : null, containerAnimStyle]}
+      accessibilityRole="button"
+      accessibilityLabel={title}
     >
       {body}
-    </Pressable>
+    </AnimatedPressable>
+  );
+}
+
+type SwitchRowProps = {
+  icon: keyof typeof Ionicons.glyphMap;
+  iconColor?: string;
+  iconBg?: string;
+  title: string;
+  subtitle?: string;
+  value: boolean;
+  onValueChange: (next: boolean) => void;
+};
+
+export function SettingsSwitchRow({
+  icon,
+  iconColor = colors.brand,
+  iconBg = colors.brand50,
+  title,
+  subtitle,
+  value,
+  onValueChange,
+}: SwitchRowProps) {
+  return (
+    <View style={styles.tile}>
+      <View style={[styles.iconWell, { backgroundColor: iconBg }]}>
+        <Ionicons name={icon} size={18} color={iconColor} />
+      </View>
+      <View style={styles.rowBody}>
+        <AppText numberOfLines={1} color={colors.brandInk} style={styles.title}>
+          {title}
+        </AppText>
+        {subtitle ? (
+          <AppText color={colors.textSecondary} style={styles.subtitle} numberOfLines={2}>
+            {subtitle}
+          </AppText>
+        ) : null}
+      </View>
+      <Switch
+        value={value}
+        onValueChange={(next) => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onValueChange(next);
+        }}
+        trackColor={{ false: colors.border, true: colors.brand200 }}
+        thumbColor={value ? colors.brand : '#FFFFFF'}
+        ios_backgroundColor={colors.border}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
+  tile: {
+    alignSelf: 'stretch',
+    width: '100%',
+    minHeight: 52,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    backgroundColor: 'transparent',
+  },
+  innerRow: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    minHeight: 52,
+    gap: 12,
   },
-  rowExpanded: { alignItems: 'flex-start' },
-  rowPressed: { opacity: 0.88 },
-  rowIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+  tileExpanded: {
+    alignItems: 'flex-start',
+    paddingVertical: 12,
   },
-  rowBody: { flex: 1, gap: 2 },
-  rowSub: { color: colors.onSurfaceMuted },
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
-    marginHorizontal: spacing.md,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+    marginLeft: 48,
+    marginVertical: 2,
+  },
+  iconWell: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  rowBody: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+    justifyContent: 'center',
+  },
+  title: {
+    fontFamily: font.displaySemibold,
+    color: colors.brandInk,
+    fontSize: 15,
+    lineHeight: 20,
+    letterSpacing: -0.2,
+    fontWeight: '600',
+  },
+  titleDanger: {
+    color: colors.red,
+    fontFamily: font.bold,
+    fontWeight: '700',
+  },
+  subtitle: {
+    fontFamily: font.regular,
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 16,
   },
 });

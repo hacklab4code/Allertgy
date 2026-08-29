@@ -10,7 +10,7 @@
  * Percentuale = (verde + giallo × 0.5) / totale × 100
  */
 
-import { calcolaSemaforo, type PiattoAllergeni } from './semaforo';
+import { calcolaSemaforo, type AllergyCriterio, type PiattoAllergeni } from './semaforo';
 
 export interface CompatibilitaResult {
   totaleDishes: number;
@@ -25,6 +25,7 @@ export function calcolaCompatibilita(
   allergieUtente: readonly string[],
   piatti: readonly PiattoAllergeni[],
   ingredientiEsclusi: readonly string[] = [],
+  criteri: Readonly<Record<string, AllergyCriterio>> = {},
 ): CompatibilitaResult {
   if (piatti.length === 0) {
     return { totaleDishes: 0, verde: 0, giallo: 0, rosso: 0, percentuale: 0 };
@@ -35,7 +36,7 @@ export function calcolaCompatibilita(
   let rosso = 0;
 
   for (const p of piatti) {
-    const esito = calcolaSemaforo(allergieUtente, p, ingredientiEsclusi);
+    const esito = calcolaSemaforo(allergieUtente, p, ingredientiEsclusi, criteri);
     switch (esito.stato) {
       case 'verde':
         verde++;

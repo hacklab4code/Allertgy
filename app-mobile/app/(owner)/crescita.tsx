@@ -4,20 +4,19 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
-  ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { api } from '../../src/api/client';
-import { CollapseSection, Screen } from '../../src/components/ui';
+import { OwnerScreenHeader } from '../../src/components/owner/OwnerScreenHeader';
+import { AppText, CollapseSection, GlassCard, GlassScreenScroll, SurfaceButton } from '../../src/components/ui';
 import { useOwner } from '../../src/store/owner';
-import { TAB_BAR_CLEARANCE, colors, radius, shadow, spacing, typography } from '../../src/theme';
-import type { Restaurant, VisibilityBoost } from '../../src/types';
+import { colors, font, radius, spacing } from '../../src/theme';
+import type { VisibilityBoost } from '../../src/types';
 
-function canPushNotify(locale: Restaurant | null) {
+function canPushNotify(locale: any) {
   if (!locale) return false;
   const plan = locale.business_plan ?? 'free';
   const status = locale.subscription_status ?? 'free';
@@ -30,7 +29,7 @@ function formatDate(iso?: string | null) {
 }
 
 export default function OwnerCrescita() {
-  const { restaurants, current, setRestaurants, setCurrent } = useOwner();
+  const { current } = useOwner();
   const locale = current;
   const [boosts, setBoosts] = useState<VisibilityBoost[]>([]);
   const [followers, setFollowers] = useState<number | null>(null);
@@ -48,33 +47,19 @@ export default function OwnerCrescita() {
     try {
       const [boostList, followerRes] = await Promise.all([
         api.listBoosts(locale.id),
-        api.billingFollowersCount(locale.id),
+        api.billingFollowersCount(locale.id).catch(() => ({ count: 0 })),
       ]);
       setBoosts(boostList);
       setFollowers(followerRes.count);
     } catch (e) {
-      console.log('Errore caricamento crescita:', e);
+      // Ignora errori
     }
     setLoading(false);
   }, [locale]);
 
   useEffect(() => {
-    if (restaurants.length === 0) {
-      api.myRestaurants().then((rs) => {
-        setRestaurants(rs);
-        if (!current && rs[0]) setCurrent(rs[0]);
-      }).catch(() => {});
-    }
-  }, [restaurants.length, current, setRestaurants, setCurrent]);
-
-  useEffect(() => {
     load();
   }, [load]);
-
-  const activeBoost = boosts.find((b) => {
-    if (!b.expires_at) return false;
-    return new Date(b.expires_at).getTime() > Date.now();
-  });
 
   const activateBoost = async () => {
     if (!locale) return;
@@ -88,15 +73,7 @@ export default function OwnerCrescita() {
         await Linking.openURL(res.checkout_url);
       }
     } catch (e) {
-      const msg = (e as Error).message;
-      if (/STRIPE|Pagamenti non ancora attivi/i.test(msg)) {
-        Alert.alert(
-          'Pagamenti in arrivo',
-          'I pagamenti online saranno disponibili a breve. In ambiente di test il Boost si attiva subito se Stripe non è configurato.',
-        );
-      } else {
-        Alert.alert('Errore', msg);
-      }
+      Alert.alert('Boost', (e as Error).message);
     }
     setBusyBoost(false);
   };
@@ -110,266 +87,240 @@ export default function OwnerCrescita() {
     setBusyPush(true);
     try {
       const res = await api.billingSendNotification(locale.id, title.trim(), body.trim());
-      Alert.alert('Inviato', res.message || `Notifica inviata a ${res.sent_count} dispositivi.`);
-      setTitle('');
-      setBody('');
+      Alert.alert('Inviata!', `Notifica push spedita a ${res.sent_count ?? 0} clienti.`);
+      setTitle(''); setBody('');
     } catch (e) {
-      Alert.alert('Errore', (e as Error).message);
+      Alert.alert('Errore notifica', (e as Error).message);
     }
     setBusyPush(false);
   };
 
   if (!locale) {
     return (
-      <Screen edges={false}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyEmoji}>🏪</Text>
-          <Text style={styles.emptyTitle}>Seleziona un locale</Text>
-          <Text style={styles.emptyText}>Vai alla scheda Attività e scegli il ristorante da promuovere.</Text>
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/(owner)/locali')}>
-            <Text style={styles.primaryBtnText}>Vai ad Attività</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-      </Screen>
+      <GlassScreenScroll headerFloat>
+        <GlassCard style={styles.centerCard}>
+          <AppText variant="h2" style={{ fontSize: 16 }}>Nessun locale selezionato</AppText>
+          <AppText variant="caption" style={{ textAlign: 'center', marginTop: 2, marginBottom: spacing.sm, fontSize: 12 }}>
+            Seleziona un'attività per gestire Boost e notifiche push.
+          </AppText>
+          <SurfaceButton label="Vai ad Attività" onPress={() => router.push('/(owner)/locali')} />
+        </GlassCard>
+      </GlassScreenScroll>
     );
   }
 
   const pushEnabled = canPushNotify(locale);
+  const activeBoost = boosts.find((b) => b.activated_at && (!b.expires_at || new Date(b.expires_at).getTime() > Date.now()));
 
   return (
-    <Screen edges={false}>
-    <ScrollView contentContainerStyle={[styles.container, { paddingBottom: TAB_BAR_CLEARANCE }]}>
-      {loading && <ActivityIndicator color={colors.brand} style={{ marginVertical: 12 }} />}
+    <GlassScreenScroll headerFloat>
+      <OwnerScreenHeader
+        title="Boost e notifiche"
+        subtitle={`${locale.name} · visibilità e push`}
+      />
 
-      <View style={styles.blockHead}>
-        <Text style={styles.blockTitle}>Boost visibilità</Text>
-        <Text style={styles.blockSub}>{locale.name} · €9,90 per 30 giorni in cima alla ricerca</Text>
-      </View>
-      <View style={styles.card}>
-        <Text style={styles.cardEmoji}>🚀</Text>
-        <Text style={styles.cardTitle}>Boost Visibilità · €9,90</Text>
-        <Text style={styles.cardSub}>
-          Metti il locale in cima alla ricerca clienti per 30 giorni. Pagamento una tantum, disponibile con qualsiasi piano.
-        </Text>
+      {loading && <ActivityIndicator color={colors.brand} style={{ marginVertical: spacing.sm }} />}
+
+      {/* Card Boost */}
+      <GlassCard style={styles.cardContainer}>
+        <View style={styles.cardHeaderRow}>
+          <AppText variant="h2" style={{ fontSize: 22 }}>🚀</AppText>
+          <View style={{ flex: 1 }}>
+            <AppText variant="title" style={{ fontSize: 15 }}>Boost Visibilità</AppText>
+            <AppText variant="caption" color={colors.onSurfaceMuted} style={{ fontSize: 11 }}>
+              Posiziona il locale in cima ai risultati di ricerca per 30 giorni
+            </AppText>
+          </View>
+        </View>
+
         {activeBoost ? (
-          <View style={styles.statusOk}>
-            <Text style={styles.statusOkText}>✓ Boost attivo fino al {formatDate(activeBoost.expires_at)}</Text>
+          <View style={styles.activeBoostBox}>
+            <AppText variant="bodyBold" color={colors.brandInk} style={{ fontSize: 13 }}>✨ Boost Attivo fino al {formatDate(activeBoost.expires_at)}</AppText>
+            <AppText variant="caption" style={{ marginTop: 2, fontSize: 11 }}>
+              Il tuo ristorante è in prima posizione per i clienti nella tua zona.
+            </AppText>
           </View>
         ) : (
-          <Text style={styles.muted}>Nessun boost attivo al momento.</Text>
+          <View style={styles.boostPricingBox}>
+            <View>
+              <AppText variant="h1" color={colors.brand} style={{ fontSize: 22, lineHeight: 26 }}>€9,90</AppText>
+              <AppText variant="caption" color={colors.onSurfaceMuted} style={{ fontSize: 9 }}>per 30 giorni</AppText>
+            </View>
+            <SurfaceButton
+              label={busyBoost ? 'Attivazione...' : 'Attiva Boost Now'}
+              onPress={activateBoost}
+              disabled={busyBoost}
+            />
+          </View>
         )}
-        <TouchableOpacity style={styles.primaryBtn} onPress={activateBoost} disabled={busyBoost}>
-          {busyBoost ? <ActivityIndicator color="#fff" /> : (
-            <Text style={styles.primaryBtnText}>{activeBoost ? 'Rinnova Boost (+30 gg)' : 'Attiva Boost 30 giorni'}</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      </GlassCard>
 
+      {/* Storico Boost */}
       {boosts.length > 0 && (
         <CollapseSection
           icon="time"
-          title="Storico boost"
-          preview={`${boosts.length} attivazioni`}
+          title="Storico Boost"
+          preview={`${boosts.length} attivati`}
           expanded={historyExpanded}
           onToggle={() => setHistoryExpanded((v) => !v)}
         >
-        <View style={styles.card}>
-          {boosts.map((b) => {
-            const active = b.expires_at && new Date(b.expires_at).getTime() > Date.now();
-            return (
-              <View key={b.id} style={styles.boostRow}>
-                <Text style={styles.muted}>
-                  {formatDate(b.activated_at)} → {formatDate(b.expires_at)}
-                </Text>
-                <Text style={[styles.boostBadge, active ? styles.boostActive : styles.boostExpired]}>
-                  {active ? 'Attivo' : 'Scaduto'}
-                </Text>
+          {boosts.map((b) => (
+            <View key={b.id} style={styles.historyRow}>
+              <View>
+                <AppText variant="bodyBold" style={{ fontSize: 12 }}>Dal {formatDate(b.activated_at)} al {formatDate(b.expires_at)}</AppText>
+                <AppText variant="caption" color={colors.onSurfaceMuted} style={{ fontSize: 10 }}>
+                  {b.expires_at && new Date(b.expires_at).getTime() > Date.now() ? 'Attivo' : 'Scaduto'}
+                </AppText>
               </View>
-            );
-          })}
-        </View>
+              <AppText variant="bodyBold" style={{ fontSize: 14 }}>€{(b.amount_cents / 100).toFixed(2)}</AppText>
+            </View>
+          ))}
         </CollapseSection>
       )}
 
-      <View style={styles.blockHead}>
-        <Text style={styles.blockTitle}>Strumenti collegati</Text>
-        <Text style={styles.blockSub}>Recensioni e statistiche sul menù digitale</Text>
-      </View>
-      <View style={styles.quickRow}>
-        <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(owner)/locali')}>
-          <Text style={styles.quickEmoji}>⭐</Text>
-          <Text style={styles.quickLabel}>Recensioni</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(owner)/statistiche')}>
-          <Text style={styles.quickEmoji}>📊</Text>
-          <Text style={styles.quickLabel}>Statistiche</Text>
-        </TouchableOpacity>
-      </View>
-
+      {/* Notifiche Push */}
       <CollapseSection
         icon="notifications"
-        title="Notifiche push"
-        preview={pushEnabled ? `${followers ?? 0} follower` : 'Richiede piano Pro'}
+        title="Notifiche push ai follower"
+        preview={pushEnabled ? `${followers ?? 0} follower` : 'Richiede Piano Pro'}
         expanded={pushExpanded}
         onToggle={() => setPushExpanded((v) => !v)}
       >
-      <View style={[styles.card, !pushEnabled && styles.cardLocked]}>
-        <Text style={styles.cardEmoji}>🔔</Text>
-        <Text style={styles.cardTitle}>Notifiche push · Piano Pro</Text>
-        <Text style={styles.cardSub}>
-          Invia promozioni e novità ai clienti che hanno salvato il locale nei preferiti.
-        </Text>
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Clienti fedeli</Text>
-          <Text style={styles.statValue}>{followers ?? '—'}</Text>
-        </View>
+        <View style={styles.pushCardInner}>
+          <AppText variant="title" style={{ fontSize: 14 }}>🔔 Notifiche Push dirette</AppText>
+          <AppText variant="caption" style={{ marginTop: 2, marginBottom: spacing.sm, fontSize: 11 }}>
+            Invia promozioni e novità ai clienti che hanno salvato il tuo locale nei preferiti.
+          </AppText>
 
-        {!pushEnabled ? (
-          <>
-            <Text style={styles.lockedText}>
-              Attiva il piano Pro (€19/mese) per inviare notifiche push ai tuoi follower.
-            </Text>
-            <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push('/(owner)/piano')}>
-              <Text style={styles.secondaryBtnText}>Passa a Pro</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <TextInput
-              style={styles.input}
-              placeholder="Titolo (es. Sconto 10% stasera)"
-              value={title}
-              onChangeText={setTitle}
-              maxLength={100}
-            />
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Messaggio per i clienti..."
-              value={body}
-              onChangeText={setBody}
-              maxLength={500}
-              multiline
-            />
-            <TouchableOpacity
-              style={[styles.primaryBtn, styles.pushBtn]}
-              onPress={sendPush}
-              disabled={busyPush || !followers}
-            >
-              {busyPush ? <ActivityIndicator color="#fff" /> : (
-                <Text style={styles.primaryBtnText}>
-                  {followers ? 'Invia notifica push' : 'Nessun follower ancora'}
-                </Text>
-              )}
-            </TouchableOpacity>
-            {!followers && (
-              <Text style={styles.muted}>
-                Quando un cliente salva il tuo locale nei preferiti, potrai contattarlo da qui.
-              </Text>
-            )}
-          </>
-        )}
-      </View>
+          <View style={styles.followerStatBox}>
+            <AppText variant="eyebrow" color={colors.onSurfaceMuted} style={{ fontSize: 8 }}>CLIENTI CHE TI SEGUONO</AppText>
+            <AppText variant="h1" color={colors.brand} style={{ marginTop: 2, fontSize: 24, lineHeight: 28 }}>{followers ?? '0'}</AppText>
+          </View>
+
+          {!pushEnabled ? (
+            <View style={styles.lockedPushBox}>
+              <AppText variant="bodyBold" color={colors.onYellow} style={{ textAlign: 'center', marginBottom: spacing.xs, fontSize: 11 }}>
+                Attiva il Piano Pro (€19/mese) per inviare notifiche push ai tuoi follower.
+              </AppText>
+              <SurfaceButton label="Passa a Pro" onPress={() => router.push('/(owner)/piano')} />
+            </View>
+          ) : (
+            <View style={{ marginTop: spacing.xs }}>
+              <AppText variant="eyebrow" color={colors.brandInk} style={styles.fieldLabel}>TITOLO NOTIFICA *</AppText>
+              <TextInput
+                style={styles.inputViolet}
+                placeholder="es. Sconto 10% stasera per i nostri follower!"
+                placeholderTextColor={colors.onSurfaceMuted}
+                value={title}
+                onChangeText={setTitle}
+                maxLength={100}
+              />
+
+              <AppText variant="eyebrow" color={colors.brandInk} style={styles.fieldLabel}>MESSAGGIO NOTIFICA *</AppText>
+              <TextInput
+                style={[styles.inputViolet, { height: 74, textAlignVertical: 'top' }]}
+                placeholder="es. Mostra questo messaggio al cameriere..."
+                placeholderTextColor={colors.onSurfaceMuted}
+                value={body}
+                onChangeText={setBody}
+                maxLength={500}
+                multiline
+              />
+
+              <View style={{ marginTop: spacing.sm }}>
+                <SurfaceButton
+                  label={busyPush ? 'Invio in corso...' : 'Spedisci Notifica Push'}
+                  onPress={sendPush}
+                  disabled={busyPush || !followers}
+                />
+              </View>
+            </View>
+          )}
+        </View>
       </CollapseSection>
-    </ScrollView>
-    </Screen>
+    </GlassScreenScroll>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.lg, paddingBottom: 48, backgroundColor: colors.bg, gap: spacing.lg },
-  blockHead: { gap: 2 },
-  blockTitle: { ...typography.h2, color: colors.ink },
-  blockSub: { color: colors.textSecondary, fontSize: 12 },
-  heroTitle: { ...typography.h1, color: colors.ink },
-  heroSub: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.sm,
-    ...shadow.card,
+  headerHead: {
+    marginBottom: spacing.xs,
   },
-  cardLocked: { opacity: 0.95 },
-  cardEmoji: { fontSize: 28 },
-  cardTitle: { ...typography.h2, color: colors.ink },
-  cardSub: { color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
-  muted: { color: colors.textMuted, fontSize: 12, lineHeight: 17 },
-  statusOk: {
-    backgroundColor: colors.greenBg,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.greenBorder,
-  },
-  statusOkText: { color: colors.greenText, fontWeight: '800', fontSize: 12 },
-  statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-  statLabel: { color: colors.textSecondary, fontWeight: '700', fontSize: 12 },
-  statValue: { color: colors.brandDark, fontWeight: '900', fontSize: 18 },
-  input: {
-    backgroundColor: colors.bg,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: colors.ink,
-    marginTop: spacing.sm,
-  },
-  textArea: { minHeight: 88, textAlignVertical: 'top' },
-  primaryBtn: {
-    backgroundColor: colors.brand,
-    borderRadius: radius.md,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.sm,
-  },
-  pushBtn: { backgroundColor: '#7c3aed' },
-  primaryBtnText: { color: colors.white, fontWeight: '800', fontSize: 14 },
-  secondaryBtn: {
-    backgroundColor: colors.brand50,
-    borderRadius: radius.md,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.brand200,
-    marginTop: spacing.sm,
-  },
-  secondaryBtnText: { color: colors.brandDark, fontWeight: '800', fontSize: 13 },
-  lockedText: { color: colors.amberText, fontSize: 12, lineHeight: 17, fontWeight: '600' },
-  boostRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
-  boostBadge: { fontSize: 10, fontWeight: '800', paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
-  boostActive: { backgroundColor: colors.greenBg, color: colors.greenText },
-  boostExpired: { backgroundColor: colors.border, color: colors.textMuted },
-  quickRow: { flexDirection: 'row', gap: spacing.md },
-  quickBtn: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+  centerCard: {
     padding: spacing.md,
     alignItems: 'center',
+    marginTop: 20,
+    borderRadius: radius.md,
+  },
+  cardContainer: {
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderRadius: radius.md,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  activeBoostBox: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.surfaceTertiary,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  boostPricingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  historyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  pushCardInner: {
+    paddingVertical: 2,
+  },
+  followerStatBox: {
+    backgroundColor: colors.surfaceTertiary,
+    padding: spacing.xs,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: 4,
-    ...shadow.card,
-  },
-  quickEmoji: { fontSize: 24 },
-  quickLabel: { fontWeight: '800', fontSize: 12, color: colors.ink },
-  emptyBox: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.xxxl,
-    marginTop: spacing.xl,
-    gap: spacing.sm,
   },
-  emptyEmoji: { fontSize: 40 },
-  emptyTitle: { ...typography.h3, color: colors.ink },
-  emptyText: { color: colors.textSecondary, textAlign: 'center', fontSize: 13 },
+  lockedPushBox: {
+    marginTop: spacing.sm,
+    alignItems: 'center',
+    backgroundColor: colors.yellowSoft,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.amberBorder,
+  },
+  fieldLabel: {
+    marginTop: spacing.xs,
+    marginBottom: 2,
+    fontSize: 9,
+  },
+  inputViolet: {
+    backgroundColor: colors.surfaceTertiary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontFamily: font.regular,
+    fontSize: 13,
+    color: colors.brandInk,
+  },
 });

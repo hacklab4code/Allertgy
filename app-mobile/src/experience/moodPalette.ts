@@ -22,11 +22,11 @@ export type MoodPalette = {
  */
 export const MOOD_PALETTES: Record<ExperienceMood, MoodPalette> = {
   brand: {
-    top: '#36255C',
-    mid: '#6B5499',
-    soft: '#D2C3F6',
+    top: '#23212C',
+    mid: '#3D384D',
+    soft: '#F1FEC8',
     bottom: '#F6F2FC',
-    glow: '#D2C3F6',
+    glow: '#F1FEC8',
   },
   green: {
     top: '#059669',

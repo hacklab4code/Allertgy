@@ -19,6 +19,7 @@ import type { CompatibilitaResult } from '../engine/compatibility';
 import { calcolaCompatibilita } from '../engine/compatibility';
 import type { RestaurantSummary } from '../types';
 import { colors, font, radius, spacing, type Verdict } from '../theme';
+import { SEARCH_BAR_HEIGHT } from '../layoutConstants';
 import { AppText, GlassCard, TrafficDot } from './ui';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -380,12 +381,12 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   searchBox: {
-    height: 52,
+    height: SEARCH_BAR_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     backgroundColor: colors.surfaceSecondary,
     borderWidth: 1,
     borderColor: colors.border,

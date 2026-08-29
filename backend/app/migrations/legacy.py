@@ -201,6 +201,8 @@ def run_migrations():
         _run_v14_migrations(db)
         _run_v15_migrations(db)
         _run_v16_migrations(db)
+        _run_v17_migrations(db)
+        _run_v18_migrations(db)
         _seed_allergens(db)
     finally:
         db.close()
@@ -252,6 +254,7 @@ def _run_v5_migrations(db) -> None:
     _add_column_if_missing(db, "restaurants", "slug", "VARCHAR(160) NULL UNIQUE")
     _add_column_if_missing(db, "restaurants", "website", "VARCHAR(255) NULL")
     _add_column_if_missing(db, "restaurants", "description", "TEXT NULL")
+    _add_column_if_missing(db, "restaurants", "cuisine", "VARCHAR(40) NULL")
     _add_column_if_missing(db, "restaurants", "stripe_customer_id", "VARCHAR(100) NULL")
     _add_column_if_missing(db, "restaurants", "stripe_subscription_id", "VARCHAR(100) NULL")
     _add_column_if_missing(db, "restaurants", "stripe_price_id", "VARCHAR(100) NULL")
@@ -605,6 +608,7 @@ def _run_v10_migrations(db) -> None:
           allergen_id   TINYINT UNSIGNED NOT NULL,
           source        VARCHAR(30) NOT NULL DEFAULT 'manual',
           intensity     VARCHAR(30) NOT NULL DEFAULT 'moderata',
+          criterio      VARCHAR(30) NOT NULL DEFAULT 'assoluto',
           PRIMARY KEY (profile_id, allergen_id),
           FOREIGN KEY (profile_id) REFERENCES user_profiles(id) ON DELETE CASCADE,
           FOREIGN KEY (allergen_id) REFERENCES allergens(id) ON DELETE CASCADE
@@ -623,16 +627,24 @@ def _run_v10_migrations(db) -> None:
             ).first()
 
             if not has_profile:
+                # Verifica se la colonna è kinship (v15) o relationship
+                try:
+                    db.execute(text("SELECT kinship FROM user_profiles LIMIT 1"))
+                    col = "kinship"
+                except Exception:
+                    db.rollback()
+                    col = "relationship"
+
                 # Crea il profilo primario "Io"
                 db.execute(
-                    text("INSERT INTO user_profiles (user_id, name, relationship) VALUES (:u_id, :name, 'io')"),
+                    text(f"INSERT INTO user_profiles (user_id, name, {col}) VALUES (:u_id, :name, 'io')"),
                     {"u_id": u_id, "name": display_name}
                 )
                 db.commit()
 
                 # Recupera l'ID del profilo inserito
                 profile_id = db.execute(
-                    text("SELECT id FROM user_profiles WHERE user_id = :u_id AND relationship = 'io' LIMIT 1"),
+                    text(f"SELECT id FROM user_profiles WHERE user_id = :u_id AND {col} = 'io' LIMIT 1"),
                     {"u_id": u_id}
                 ).first()[0]
 
@@ -810,4 +822,45 @@ def _run_v16_migrations(db) -> None:
           FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     """)
+
+
+def _run_v17_migrations(db) -> None:
+    """Migrazione v17: criterio allergene (assoluto / crudo / cotto) oltre all'intensità."""
+    _add_column_if_missing(
+        db, "user_allergens", "criterio",
+        "ENUM('assoluto','crudo','cotto') NOT NULL DEFAULT 'assoluto'",
+    )
+    _add_column_if_missing(
+        db, "profile_allergens", "criterio",
+        "VARCHAR(30) NOT NULL DEFAULT 'assoluto'",
+    )
+
+
+def _run_v18_migrations(db) -> None:
+    """Migrazione v18: multi-database resolver metadati per product_label_cache."""
+    _add_column_if_missing(
+        db, "product_label_cache", "source",
+        "VARCHAR(50) NOT NULL DEFAULT 'ai_label'",
+    )
+    _add_column_if_missing(
+        db, "product_label_cache", "image_url",
+        "VARCHAR(512) NULL",
+    )
+    _add_column_if_missing(
+        db, "product_label_cache", "confidence_score",
+        "FLOAT NOT NULL DEFAULT 1.0",
+    )
+    _add_column_if_missing(
+        db, "product_label_cache", "verification_count",
+        "INT UNSIGNED NOT NULL DEFAULT 1",
+    )
+    _add_column_if_missing(
+        db, "product_label_cache", "report_count",
+        "INT UNSIGNED NOT NULL DEFAULT 0",
+    )
+    _add_column_if_missing(
+        db, "product_label_cache", "last_verified_at",
+        "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    )
+
 

@@ -69,7 +69,13 @@ def dish_to_out(d: Dish, lang: str = "it") -> DishOut:
     )
 
 
+def _menu_available_for(r: Restaurant) -> bool:
+    has_menu_plan = restaurant_has_menu_access(r.business_plan, r.subscription_status)
+    return bool(has_menu_plan and (r.menu_version or 0) > 0)
+
+
 def restaurant_to_summary_out(r: Restaurant, *, boost_active: bool = False) -> RestaurantSummaryOut:
+    menu_available = _menu_available_for(r)
     return RestaurantSummaryOut(
         restaurant_id=r.id,
         public_code=r.public_code,
@@ -77,7 +83,13 @@ def restaurant_to_summary_out(r: Restaurant, *, boost_active: bool = False) -> R
         citta=r.city,
         latitude=r.latitude,
         longitude=r.longitude,
+        image_url=r.image_url,
         boost_active=boost_active,
+        menu_available=menu_available,
+        is_verified=bool(r.is_verified),
+        cuisine=r.cuisine,
+        google_rating=r.google_rating,
+        google_reviews_count=r.google_reviews_count,
         piatti=[
             DishSummaryOut(
                 id=d.id,
@@ -91,11 +103,12 @@ def restaurant_to_summary_out(r: Restaurant, *, boost_active: bool = False) -> R
                 ],
             )
             for d in r.dishes if d.is_available
-        ],
+        ] if menu_available else [],
     )
 
 
 def restaurant_to_menu_out(r: Restaurant, lang: str = "it", *, boost_active: bool = False) -> MenuOut:
+    menu_available = _menu_available_for(r)
     return MenuOut(
         restaurant_id=r.id,
         public_code=r.public_code,
@@ -117,6 +130,7 @@ def restaurant_to_menu_out(r: Restaurant, lang: str = "it", *, boost_active: boo
         tripadvisor_rating=r.tripadvisor_rating,
         tripadvisor_reviews_count=r.tripadvisor_reviews_count,
         boost_active=boost_active,
+        menu_available=menu_available,
         menus=[
             MenuOutItem(
                 id=m.id,
@@ -127,8 +141,17 @@ def restaurant_to_menu_out(r: Restaurant, lang: str = "it", *, boost_active: boo
                 created_at=m.created_at
             )
             for m in r.menus if m.is_active
+        ] if menu_available else [],
+        photos=[
+            PhotoOut(
+                id=p.id,
+                url=storage.signed_url(p.storage_key, 3600),
+                is_cover=bool(p.is_cover),
+                sort_order=p.sort_order,
+            )
+            for p in r.photos
         ],
-        piatti=[dish_to_out(d, lang) for d in r.dishes if d.is_available],
+        piatti=[dish_to_out(d, lang) for d in r.dishes if d.is_available] if menu_available else [],
     )
 
 
@@ -311,8 +334,7 @@ def public_restaurant_page(
         )
     ).one()
 
-    has_menu_plan = restaurant_has_menu_access(r.business_plan, r.subscription_status)
-    menu_available = bool(has_menu_plan and (r.menu_version or 0) > 0)
+    menu_available = _menu_available_for(r)
 
     ext_revs = get_external_reviews(r.name, r.google_place_id, r.tripadvisor_url)
 

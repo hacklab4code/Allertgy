@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
-import { colors, radius, puffyShadow, WIREFRAME_MODE } from '../../theme';
+import { colors, WIREFRAME_MODE } from '../../theme';
 import { wireBox } from '../../wireframe';
 
 type Props = {
@@ -8,9 +8,19 @@ type Props = {
   color: string;
   size?: number;
   active?: boolean;
+  showCheckmark?: boolean;
+  glow?: boolean;
 };
 
-export function AvatarBubble({ emoji, color, size = 64, active }: Props) {
+/** Avatar bubble con supporto glow e badge di selezione attivo. */
+export function AvatarBubble({
+  emoji,
+  color,
+  size = 64,
+  active,
+  showCheckmark = false,
+  glow = false,
+}: Props) {
   if (WIREFRAME_MODE) {
     return (
       <View
@@ -24,35 +34,73 @@ export function AvatarBubble({ emoji, color, size = 64, active }: Props) {
     );
   }
 
+  const checkmarkSize = Math.max(16, Math.round(size * 0.36));
+
   return (
-    <View
-      style={[
-        styles.bubble,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: color,
-          borderWidth: active ? 3 : 2,
-          borderColor: active ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
-        },
-        active ? puffyShadow(10) : puffyShadow(4),
-      ]}
-    >
-      <View style={[styles.gloss, { width: size * 0.4, height: size * 0.22, top: size * 0.12 }]} />
-      <Text style={{ fontSize: size * 0.44 }}>{emoji}</Text>
+    <View style={{ position: 'relative', width: size, height: size }}>
+      <View
+        style={[
+          styles.bubble,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: color,
+            borderWidth: active ? 3 : 1.5,
+            borderColor: active ? colors.brandInk : colors.border,
+          },
+          active && glow && styles.glowStyle,
+        ]}
+      >
+        <Text style={{ fontSize: size * 0.46, textAlign: 'center' }}>{emoji}</Text>
+      </View>
+      {active && showCheckmark && (
+        <View
+          style={[
+            styles.checkmarkBadge,
+            {
+              width: checkmarkSize,
+              height: checkmarkSize,
+              borderRadius: checkmarkSize / 2,
+              bottom: -2,
+              right: -2,
+            },
+          ]}
+        >
+          <Text style={{ color: '#FFF', fontSize: checkmarkSize * 0.6, fontWeight: '900', textAlign: 'center', lineHeight: checkmarkSize }}>
+            ✓
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bubble: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  gloss: {
+  bubble: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  glowStyle: {
+    shadowColor: colors.brand,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  checkmarkBadge: {
     position: 'absolute',
-    left: '22%',
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    transform: [{ rotate: '-18deg' }],
+    backgroundColor: '#10B981',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
 });
 

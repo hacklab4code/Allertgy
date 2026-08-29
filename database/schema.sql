@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS user_allergens (
   user_id     INT UNSIGNED NOT NULL,
   allergen_id TINYINT UNSIGNED NOT NULL,
   intensity   ENUM('lieve', 'moderata', 'grave') NOT NULL DEFAULT 'moderata',
+  criterio    ENUM('assoluto', 'crudo', 'cotto') NOT NULL DEFAULT 'assoluto',
   PRIMARY KEY (user_id, allergen_id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (allergen_id) REFERENCES allergens(id) ON DELETE CASCADE

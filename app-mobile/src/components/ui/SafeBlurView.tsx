@@ -1,18 +1,25 @@
+import React from 'react';
 import { BlurView, BlurViewProps } from 'expo-blur';
-import { Platform } from 'react-native';
+import { Platform, View, StyleSheet } from 'react-native';
 
-/** BlurView — prop sperimentale e blurReductionFactor solo su Android. */
+/** SafeBlurView — prevenzione crash Android "Software rendering doesn't support hardware bitmaps" */
 export function SafeBlurView(props: BlurViewProps) {
-  const { experimentalBlurMethod, blurReductionFactor, ...rest } = props;
-  return (
-    <BlurView
-      {...rest}
-      {...(Platform.OS === 'android'
-        ? {
-            ...(experimentalBlurMethod ? { experimentalBlurMethod } : null),
-            ...(blurReductionFactor != null ? { blurReductionFactor } : null),
-          }
-        : null)}
-    />
-  );
+  const { experimentalBlurMethod, blurReductionFactor, style, tint = 'light', intensity = 50, children, ...rest } = props;
+
+  if (Platform.OS === 'android') {
+    return (
+      <View style={[style, { backgroundColor: tint === 'dark' ? 'rgba(15, 12, 29, 0.75)' : 'rgba(255, 255, 255, 0.65)' }]}>
+        <BlurView
+          {...rest}
+          tint={tint}
+          intensity={Math.min(intensity, 40)}
+          experimentalBlurMethod="none"
+          style={StyleSheet.absoluteFill}
+        />
+        {children}
+      </View>
+    );
+  }
+
+  return <BlurView {...props} />;
 }

@@ -9,8 +9,15 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..database import get_db
 from ..models import PasswordResetToken, User
-from ..schemas import ForgotPasswordIn, LoginIn, RegisterIn, ResetPasswordIn, TokenOut
-from ..security import create_token, hash_password, verify_password
+from ..schemas import (
+    ChangePasswordIn,
+    ForgotPasswordIn,
+    LoginIn,
+    RegisterIn,
+    ResetPasswordIn,
+    TokenOut,
+)
+from ..security import create_token, get_current_user, hash_password, verify_password
 from ..rate_limit import rate_limiter
 from ..legal import LEGAL_TERMS_VERSION, PRIVACY_VERSION
 from ..services.emailer import send_password_reset
@@ -119,3 +126,20 @@ def reset_password(data: ResetPasswordIn, db: Session = Depends(get_db)):
     prt.used_at = now
     db.commit()
     return {"detail": "Password aggiornata. Ora puoi accedere con la nuova password."}
+
+
+@router.post("/change-password", dependencies=[Depends(rate_limiter(5, 300))])
+def change_password(
+    data: ChangePasswordIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cambio password da utente autenticato (richiede la password attuale)."""
+    if not verify_password(data.current_password, user.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Password attuale non corretta")
+    if data.current_password == data.new_password:
+        raise HTTPException(400, "La nuova password deve essere diversa da quella attuale")
+    _validate_password_strength(data.new_password)
+    user.password_hash = hash_password(data.new_password)
+    db.commit()
+    return {"detail": "Password aggiornata."}

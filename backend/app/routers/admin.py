@@ -33,6 +33,8 @@ from ..schemas import (
     ApproveMenuIn,
     DishIn,
     DishOut,
+    DishSaveOut,
+    KitchenConfirmAllOut,
     MenuAuditOut,
     MenuSaveIn,
     PhotoOut,
@@ -168,6 +170,62 @@ def _allergen_names(dish: Dish, kind: str) -> str:
         if da.kind == kind
     ]
     return ", ".join(sorted(names)) if names else "-"
+
+
+def _validate_allergen_codes(db: Session, codes: set[str]) -> dict[str, Allergen]:
+    by_code = {a.code: a for a in db.scalars(select(Allergen)).all()}
+    unknown = codes - set(by_code)
+    if unknown:
+        raise HTTPException(400, f"Codici allergene non validi: {sorted(unknown)}")
+    return by_code
+
+
+def _replace_dish_allergens(
+    db: Session,
+    dish: Dish,
+    by_code: dict[str, Allergen],
+    contenuti: list[str],
+    tracce: list[str],
+) -> None:
+    dish.dish_allergens.clear()
+    db.flush()
+    for c in set(contenuti):
+        db.add(DishAllergen(dish_id=dish.id, allergen_id=by_code[c].id, kind="contains"))
+    for c in set(tracce) - set(contenuti):
+        db.add(DishAllergen(dish_id=dish.id, allergen_id=by_code[c].id, kind="traces"))
+
+
+def _apply_dish_fields(dish: Dish, data: DishIn) -> None:
+    dish.name = data.nome_piatto.strip()
+    dish.description = data.descrizione
+    dish.category = data.categoria
+    dish.price_cents = data.prezzo_cents
+    dish.image_url = data.image_url
+    dish.menu_group = data.menu_group or "Principale"
+    dish.menu_id = data.menu_id
+    dish.kitchen_protocol_confirmed = 1 if data.kitchen_protocol_confirmed else 0
+    if dish.kitchen_protocol_confirmed:
+        dish.cross_contamination_checked_at = (
+            data.cross_contamination_checked_at
+            or datetime.now(timezone.utc)
+        )
+    else:
+        dish.cross_contamination_checked_at = None
+
+
+def _maybe_live_publish_menu(r: Restaurant, *, publish: bool) -> bool:
+    """Se il menù è già legalmente confermato, un edit piatto aggiorna subito QR/PDF."""
+    if not publish:
+        return False
+    if not r.menu_legal_confirmed_at:
+        return False
+    if (r.menu_legal_version or "") != MENU_CONFIRMATION_VERSION:
+        return False
+    now = datetime.now(timezone.utc)
+    r.menu_version = (r.menu_version or 0) + 1
+    r.menu_updated_at = now
+    r.is_active = 1
+    return True
 
 
 @router.get("/restaurants", response_model=list[RestaurantOut])
@@ -367,8 +425,183 @@ def save_menu(
         note="Bozza menù salvata dal ristoratore",
     )
     db.commit()
+    # Query esplicita: dopo replace la collection in sessione può non riflettere i nuovi id
+    saved = db.scalars(select(Dish).where(Dish.restaurant_id == r.id)).all()
+    return [dish_to_out(d) for d in saved]
+
+
+@router.post("/restaurants/{rid}/dishes", response_model=DishSaveOut, status_code=201)
+def create_dish(
+    rid: int,
+    data: DishIn,
+    publish: bool = True,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Crea un piatto singolo con allergeni (loop rapido ristoratore)."""
+    r = _my_restaurant(rid, user, db)
+    _ensure_menu_access(r)
+    name = (data.nome_piatto or "").strip()
+    if not name:
+        raise HTTPException(400, "Il nome del piatto è obbligatorio")
+    by_code = _validate_allergen_codes(
+        db, set(data.allergeni_contenuti) | set(data.allergeni_tracce)
+    )
+    dish = Dish(restaurant_id=r.id, name=name)
+    _apply_dish_fields(dish, data)
+    dish.name = name
+    db.add(dish)
+    db.flush()
+    _replace_dish_allergens(
+        db, dish, by_code, data.allergeni_contenuti, data.allergeni_tracce
+    )
+    if data.translations:
+        for tr in data.translations:
+            db.add(DishTranslation(
+                dish_id=dish.id,
+                lang=tr.lang,
+                name=tr.name,
+                description=tr.description,
+            ))
+    published = _maybe_live_publish_menu(r, publish=publish)
+    if not published:
+        r.menu_updated_at = datetime.now(timezone.utc)
+    _add_menu_audit(
+        db,
+        r,
+        user,
+        "menu_saved",
+        snapshot=_dish_codes_summary([data]),
+        note=f"Piatto creato: {name}",
+    )
+    db.commit()
+    db.refresh(dish)
     db.refresh(r)
-    return [dish_to_out(d) for d in r.dishes]
+    return DishSaveOut(
+        dish=dish_to_out(dish),
+        menu_version=r.menu_version or 0,
+        menu_updated_at=r.menu_updated_at,
+        published=published,
+        registry_ready=True,
+    )
+
+
+@router.put("/restaurants/{rid}/dishes/{dish_id}", response_model=DishSaveOut)
+def update_dish(
+    rid: int,
+    dish_id: int,
+    data: DishIn,
+    publish: bool = True,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Aggiorna un piatto e i suoi allergeni in pochi secondi senza riscrivere il menù."""
+    r = _my_restaurant(rid, user, db)
+    _ensure_menu_access(r)
+    dish = db.get(Dish, dish_id)
+    if not dish or dish.restaurant_id != r.id:
+        raise HTTPException(404, "Piatto non trovato")
+    name = (data.nome_piatto or "").strip()
+    if not name:
+        raise HTTPException(400, "Il nome del piatto è obbligatorio")
+    by_code = _validate_allergen_codes(
+        db, set(data.allergeni_contenuti) | set(data.allergeni_tracce)
+    )
+    _apply_dish_fields(dish, data)
+    dish.name = name
+    _replace_dish_allergens(
+        db, dish, by_code, data.allergeni_contenuti, data.allergeni_tracce
+    )
+    published = _maybe_live_publish_menu(r, publish=publish)
+    if not published:
+        r.menu_updated_at = datetime.now(timezone.utc)
+    _add_menu_audit(
+        db,
+        r,
+        user,
+        "menu_saved",
+        snapshot=_dish_codes_summary([data]),
+        note=f"Piatto aggiornato: {name}",
+    )
+    db.commit()
+    db.refresh(dish)
+    db.refresh(r)
+    return DishSaveOut(
+        dish=dish_to_out(dish),
+        menu_version=r.menu_version or 0,
+        menu_updated_at=r.menu_updated_at,
+        published=published,
+        registry_ready=True,
+    )
+
+
+@router.post(
+    "/restaurants/{rid}/dishes/confirm-kitchen-all",
+    response_model=KitchenConfirmAllOut,
+)
+def confirm_kitchen_all(
+    rid: int,
+    publish: bool = True,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Conferma protocollo cucina su tutti i piatti disponibili in un tap."""
+    r = _my_restaurant(rid, user, db)
+    _ensure_menu_access(r)
+    now = datetime.now(timezone.utc)
+    updated = 0
+    for dish in r.dishes:
+        if not dish.is_available:
+            continue
+        if (dish.kitchen_protocol_confirmed or 0) != 1:
+            updated += 1
+        dish.kitchen_protocol_confirmed = 1
+        dish.cross_contamination_checked_at = now
+    published = _maybe_live_publish_menu(r, publish=publish)
+    if not published:
+        r.menu_updated_at = now
+    _add_menu_audit(
+        db,
+        r,
+        user,
+        "menu_saved",
+        snapshot=_dish_model_summary(r.dishes),
+        note=f"Conferma cucina su {updated} piatti",
+    )
+    db.commit()
+    db.refresh(r)
+    return KitchenConfirmAllOut(
+        updated=updated,
+        menu_version=r.menu_version or 0,
+        menu_updated_at=r.menu_updated_at,
+        published=published,
+        registry_ready=True,
+    )
+
+
+@router.delete("/restaurants/{rid}/dishes/{dish_id}", status_code=204)
+def delete_dish(
+    rid: int,
+    dish_id: int,
+    user: User = Depends(require_owner),
+    db: Session = Depends(get_db),
+):
+    """Elimina un piatto singolo dal menù. Non richiede piano a pagamento."""
+    r = _my_restaurant(rid, user, db)
+    dish = db.get(Dish, dish_id)
+    if not dish or dish.restaurant_id != r.id:
+        raise HTTPException(404, "Piatto non trovato")
+    db.delete(dish)
+    db.flush()
+    # Rileggi i piatti rimasti (evita che la collection in sessione conti ancora il deleted)
+    remaining = db.scalars(select(Dish).where(Dish.restaurant_id == r.id)).all()
+    r.menu_updated_at = datetime.now(timezone.utc)
+    if remaining:
+        r.menu_version = (r.menu_version or 0) + 1
+    else:
+        # Menù ora vuoto: resetta stato pubblicazione
+        r.is_active = 0
+    db.commit()
 
 
 @router.post("/restaurants/{rid}/approve", response_model=RestaurantOut)
@@ -383,14 +616,28 @@ def approve_menu(
     _ensure_menu_access(r)
     if not r.dishes:
         raise HTTPException(400, "Il menù è vuoto: salva i piatti prima di approvare")
-    if not data.legal_acknowledged:
-        raise HTTPException(400, "Devi confermare di aver verificato allergeni, tracce e responsabilità del menù")
+    legal_current = (
+        bool(r.menu_legal_confirmed_at)
+        and (r.menu_legal_version or "") == MENU_CONFIRMATION_VERSION
+    )
+    if data.republish_only:
+        if not legal_current:
+            raise HTTPException(
+                400,
+                "Prima pubblicazione: conferma la responsabilità legale del menù",
+            )
+    elif not data.legal_acknowledged:
+        raise HTTPException(
+            400,
+            "Devi confermare di aver verificato allergeni, tracce e responsabilità del menù",
+        )
     now = datetime.now(timezone.utc)
     r.menu_version = (r.menu_version or 0) + 1
     r.menu_updated_at = now
-    r.menu_legal_confirmed_at = now
-    r.menu_legal_confirmed_by = user.id
-    r.menu_legal_version = MENU_CONFIRMATION_VERSION
+    if not data.republish_only or not legal_current:
+        r.menu_legal_confirmed_at = now
+        r.menu_legal_confirmed_by = user.id
+        r.menu_legal_version = MENU_CONFIRMATION_VERSION
     r.is_active = 1
     _add_menu_audit(
         db,
@@ -399,7 +646,11 @@ def approve_menu(
         "menu_approved",
         snapshot=_dish_model_summary(r.dishes),
         legal_version=MENU_CONFIRMATION_VERSION,
-        note="Menù approvato e pubblicato dal ristoratore",
+        note=(
+            "Menù ripubblicato (modifica rapida)"
+            if data.republish_only
+            else "Menù approvato e pubblicato dal ristoratore"
+        ),
     )
     # Push agli utenti che hanno il locale tra i preferiti
     fav_user_ids = list(db.scalars(
@@ -596,10 +847,18 @@ def export_allergen_registry(
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
-    """Esporta il registro allergeni del locale in PDF per stampa o archivio."""
+    """Esporta il Registro Allergeni (Reg. UE 1169/2011) in PDF stampabile per sala e controlli."""
     import jwt
+    from xml.sax.saxutils import escape
+
     from ..config import settings
-    
+    from ..legal import (
+        MENU_CONFIRMATION_VERSION,
+        OWNER_DECLARATION_MARKDOWN,
+        REGISTRY_PDF_CONSUMER_NOTICE,
+        REGISTRY_PDF_LEGAL_NOTICE,
+    )
+
     auth_user = None
     if token:
         try:
@@ -620,86 +879,284 @@ def export_allergen_registry(
         raise HTTPException(401, "Token non valido o scaduto")
 
     r = _my_restaurant(rid, auth_user, db)
+    dishes = [d for d in r.dishes if d.is_available]
+    if not dishes:
+        raise HTTPException(
+            400,
+            "Pubblica almeno un piatto nel menù prima di stampare il Registro Allergeni.",
+        )
+
+    missing: list[str] = []
+    if not (r.vat_number or "").strip():
+        missing.append("Partita IVA")
+    if not (r.allergen_manager or "").strip():
+        missing.append("referente allergeni (HACCP)")
+    if not r.menu_legal_confirmed_at:
+        missing.append("conferma di responsabilità sul menù (pubblica il menù dopo aver accettato la dichiarazione)")
+    if missing:
+        raise HTTPException(
+            400,
+            "Per un Registro legalmente utilizzabile completa: " + "; ".join(missing) + ".",
+        )
+
     try:
         from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
         from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.lib.styles import getSampleStyleSheet
-        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.platypus import (
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
     except ImportError:
         raise HTTPException(
             503,
             "Export PDF non disponibile: installa la dipendenza backend 'reportlab'.",
         )
 
+    def P(text: str, style) -> Paragraph:
+        return Paragraph(escape(text or "-").replace("\n", "<br/>"), style)
+
+    generated_at = datetime.now(timezone.utc)
+    generated_label = generated_at.strftime("%d/%m/%Y %H:%M UTC")
+    menu_version = r.menu_version or 0
+    legal_version = r.menu_legal_version or MENU_CONFIRMATION_VERSION
+    kitchen_ok = sum(1 for d in dishes if (d.kitchen_protocol_confirmed or 0))
+    kitchen_total = len(dishes)
+    doc_id = f"REG-{r.public_code}-V{menu_version}-{generated_at.strftime('%Y%m%d%H%M')}"
+
+    confirmer_name = r.allergen_manager
+    if r.menu_legal_confirmed_by:
+        confirmer = db.get(User, r.menu_legal_confirmed_by)
+        if confirmer:
+            confirmer_name = confirmer.display_name or confirmer.email or confirmer_name
+
+    legal_confirmed_label = (
+        r.menu_legal_confirmed_at.strftime("%d/%m/%Y %H:%M")
+        if r.menu_legal_confirmed_at
+        else "-"
+    )
+    menu_updated_label = (
+        r.menu_updated_at.strftime("%d/%m/%Y %H:%M")
+        if r.menu_updated_at
+        else "-"
+    )
+
+    owner_decl = " ".join(
+        line.strip()
+        for line in OWNER_DECLARATION_MARKDOWN.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    )
+
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
-        leftMargin=24,
-        rightMargin=24,
-        topMargin=24,
-        bottomMargin=24,
+        leftMargin=18 * mm,
+        rightMargin=18 * mm,
+        topMargin=14 * mm,
+        bottomMargin=16 * mm,
+        title=f"Registro Allergeni {r.name} v{menu_version}",
+        author=r.allergen_manager or r.name,
     )
     styles = getSampleStyleSheet()
-    details_str = f"Codice locale: {r.public_code} | Citta: {r.city or '-'}"
-    if r.vat_number:
-        details_str += f" | Partita IVA: {r.vat_number}"
-    if r.allergen_manager:
-        details_str += f" | Referente allergeni: {r.allergen_manager}"
-    details_str += f" | Versione menu: {r.menu_version or 0}"
+    title_style = ParagraphStyle(
+        "RegTitle",
+        parent=styles["Title"],
+        fontSize=16,
+        leading=20,
+        textColor=colors.HexColor("#14532d"),
+        spaceAfter=4,
+        alignment=TA_CENTER,
+    )
+    subtitle_style = ParagraphStyle(
+        "RegSub",
+        parent=styles["Normal"],
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor("#166534"),
+        alignment=TA_CENTER,
+        spaceAfter=8,
+    )
+    body_style = ParagraphStyle(
+        "RegBody",
+        parent=styles["Normal"],
+        fontSize=8,
+        leading=11,
+        alignment=TA_JUSTIFY,
+        spaceAfter=6,
+    )
+    meta_style = ParagraphStyle(
+        "RegMeta",
+        parent=styles["Normal"],
+        fontSize=8,
+        leading=11,
+        alignment=TA_LEFT,
+    )
+    cell_style = ParagraphStyle(
+        "RegCell",
+        parent=styles["Normal"],
+        fontSize=7.5,
+        leading=9.5,
+    )
+    small_style = ParagraphStyle(
+        "RegSmall",
+        parent=styles["Normal"],
+        fontSize=7,
+        leading=9,
+        textColor=colors.HexColor("#334155"),
+    )
+    warn_style = ParagraphStyle(
+        "RegWarn",
+        parent=styles["Normal"],
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor("#92400e"),
+        spaceAfter=6,
+    )
 
     story = [
-        Paragraph(f"Registro allergeni - {r.name}", styles["Title"]),
-        Paragraph(
-            details_str,
-            styles["Normal"],
+        P(
+            "REGISTRO DEGLI ALLERGENI ALIMENTARI",
+            title_style,
         ),
-        Paragraph(
-            (
-                "Informazioni dichiarate dal ristoratore ai sensi del Regolamento UE n. 1169/2011. "
-                "Il cliente deve sempre comunicare allergie e intolleranze al personale prima di ordinare."
-            ),
-            styles["Normal"],
+        P(
+            "Regolamento (UE) n. 1169/2011 — art. 44 e Allegato II · Documento da tenere in sala",
+            subtitle_style,
         ),
-        Spacer(1, 12),
+        P(REGISTRY_PDF_LEGAL_NOTICE, body_style),
+        P(REGISTRY_PDF_CONSUMER_NOTICE, body_style),
+        Spacer(1, 4),
     ]
 
-    data = [["Piatto", "Menu", "Categoria", "Contiene", "Possibili tracce"]]
-    for d in sorted(r.dishes, key=lambda x: ((x.menu_group or ""), (x.category or ""), x.name)):
-        if not d.is_available:
-            continue
+    header_rows = [
+        [P("Esercizio", meta_style), P(r.name, meta_style)],
+        [P("Codice locale AllerTgy", meta_style), P(str(r.public_code), meta_style)],
+        [P("Indirizzo", meta_style), P(r.address or "—", meta_style)],
+        [P("Città", meta_style), P(r.city or "—", meta_style)],
+        [P("Telefono", meta_style), P(r.phone or "—", meta_style)],
+        [P("Partita IVA", meta_style), P(r.vat_number or "—", meta_style)],
+        [P("Referente allergeni (HACCP)", meta_style), P(r.allergen_manager or "—", meta_style)],
+        [P("Versione menù", meta_style), P(str(menu_version), meta_style)],
+        [P("Ultimo aggiornamento menù", meta_style), P(menu_updated_label, meta_style)],
+        [P("Conferma responsabilità", meta_style), P(f"{legal_confirmed_label} · v.legale {legal_version}", meta_style)],
+        [P("Conferme protocollo cucina", meta_style), P(f"{kitchen_ok}/{kitchen_total} piatti", meta_style)],
+        [P("ID documento / stampa", meta_style), P(f"{doc_id} · generato {generated_label}", meta_style)],
+    ]
+    header_table = Table(header_rows, colWidths=[160, 520])
+    header_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#ecfdf5")),
+        ("BACKGROUND", (1, 0), (1, -1), colors.white),
+        ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#166534")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#bbf7d0")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    story.append(header_table)
+    story.append(Spacer(1, 8))
+
+    if kitchen_ok < kitchen_total:
+        story.append(P(
+            f"Attenzione: {kitchen_total - kitchen_ok} piatti senza conferma del protocollo anti-contaminazione crociata. "
+            "Completare le conferme cucina e ristampare il registro.",
+            warn_style,
+        ))
+
+    data = [[
+        P("Piatto", cell_style),
+        P("Categoria", cell_style),
+        P("Contiene (All. II)", cell_style),
+        P("Possibili tracce", cell_style),
+        P("Cucina", cell_style),
+    ]]
+    for d in sorted(dishes, key=lambda x: ((x.category or ""), x.name)):
+        kitchen_label = "Confermato" if (d.kitchen_protocol_confirmed or 0) else "Da confermare"
         data.append([
-            Paragraph(d.name, styles["BodyText"]),
-            Paragraph(d.menu_group or "Principale", styles["BodyText"]),
-            Paragraph(d.category or "-", styles["BodyText"]),
-            Paragraph(_allergen_names(d, "contains"), styles["BodyText"]),
-            Paragraph(_allergen_names(d, "traces"), styles["BodyText"]),
+            P(d.name, cell_style),
+            P(d.category or (d.menu_group or "—"), cell_style),
+            P(_allergen_names(d, "contains"), cell_style),
+            P(_allergen_names(d, "traces"), cell_style),
+            P(kitchen_label, cell_style),
         ])
 
-    table = Table(data, colWidths=[170, 90, 90, 230, 230], repeatRows=1)
+    table = Table(data, colWidths=[160, 90, 200, 200, 70], repeatRows=1)
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#166534")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("FONTSIZE", (0, 0), (-1, -1), 7.5),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")),
+        ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#94a3b8")),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
     ]))
     story.append(table)
-    story.append(Spacer(1, 12))
-    story.append(Paragraph(
-        (
-            f"Ultimo aggiornamento: {r.menu_updated_at or '-'} | "
-            f"Conferma responsabilita: {r.menu_legal_confirmed_at or '-'} | "
-            f"Versione legale: {r.menu_legal_version or '-'}"
+    story.append(Spacer(1, 10))
+
+    story.append(P("Dichiarazione del responsabile", subtitle_style))
+    story.append(P(owner_decl, body_style))
+    story.append(Spacer(1, 6))
+
+    sign_data = [[
+        P(
+            f"Referente / dichiarante: {confirmer_name or r.allergen_manager or '________________'}\n"
+            f"Data conferma digitale: {legal_confirmed_label}\n"
+            f"Data stampa: {generated_label}\n\n"
+            "Firma del responsabile: ________________________________",
+            meta_style,
         ),
-        styles["Normal"],
+        P(
+            "Timbro del locale (facoltativo):\n\n\n\n"
+            "________________________________",
+            meta_style,
+        ),
+    ]]
+    sign_table = Table(sign_data, colWidths=[360, 320])
+    sign_table.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#166534")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#bbf7d0")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f0fdf4")),
+    ]))
+    story.append(sign_table)
+    story.append(Spacer(1, 8))
+    story.append(P(
+        "Nota: in caso di modifica del menù, ristampare immediatamente questo registro e sostituire "
+        "la copia precedente. Conservare le versioni precedenti per eventuali controlli. "
+        f"ID documento: {doc_id}.",
+        small_style,
     ))
-    doc.build(story)
+
+    def _footer(canvas, _doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(colors.HexColor("#64748b"))
+        canvas.drawString(18 * mm, 8 * mm, f"{r.name} · Registro allergeni v{menu_version} · {doc_id}")
+        canvas.drawRightString(
+            landscape(A4)[0] - 18 * mm,
+            8 * mm,
+            f"Pagina {_doc.page}",
+        )
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=_footer, onLaterPages=_footer)
     buffer.seek(0)
 
-    filename = f"registro-allergeni-{r.public_code}.pdf"
+    filename = f"registro-allergeni-{r.public_code}-v{menu_version}.pdf"
     return StreamingResponse(
         buffer,
         media_type="application/pdf",

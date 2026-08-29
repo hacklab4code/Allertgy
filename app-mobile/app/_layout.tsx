@@ -22,7 +22,7 @@ export default function RootLayout() {
   const ready = fontsLoaded || !!fontErr;
 
   useEffect(() => {
-    if (ready) SplashScreen.hideAsync().catch(() => {});
+    if (ready) SplashScreen.hideAsync().catch(() => { });
   }, [ready]);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function RootLayout() {
           <Stack
             screenOptions={{
               headerTintColor: colors.brand,
-              headerTitleStyle: { fontWeight: '700', color: colors.onSurface },
+              headerTitleStyle: { fontWeight: '800', color: colors.onSurface },
               headerStyle: { backgroundColor: 'transparent' },
               headerBackground: () => <GlassHeaderBackground />,
               headerShadowVisible: false,
@@ -54,7 +54,8 @@ export default function RootLayout() {
           >
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="welcome" options={{ headerShown: false }} />
-            <Stack.Screen name="login" options={{ title: 'AllerTgy' }} />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="register" options={{ headerShown: false }} />
             <Stack.Screen name="register-allergies" options={{ title: 'Le tue allergie', headerBackVisible: false }} />
             <Stack.Screen name="legal" options={{ title: 'Termini e privacy', headerBackVisible: false }} />
             <Stack.Screen name="allergie" options={{ title: 'Le mie allergie' }} />
@@ -70,17 +71,37 @@ export default function RootLayout() {
                 contentStyle: { backgroundColor: 'transparent' },
               }}
             />
-            <Stack.Screen name="notifiche" options={{ title: 'Notifiche' }} />
+            <Stack.Screen
+              name="menu/[codice]/dish/[id]"
+              options={{
+                headerShown: false,
+                contentStyle: { backgroundColor: 'transparent' },
+              }}
+            />
+            <Stack.Screen name="notifiche" options={{ title: 'Notifiche', headerBackTitle: 'Indietro' }} />
             <Stack.Screen
               name="emergency"
               options={{ title: 'SOS emergenza', presentation: 'modal', headerShown: false }}
             />
             <Stack.Screen name="sub-profiles" options={{ title: 'Profili famiglia' }} />
-            <Stack.Screen name="allergy-card" options={{ title: 'Pass allergeni' }} />
+            <Stack.Screen
+              name="allergy-card"
+              options={{ title: 'Pass allergeni', presentation: 'modal' }}
+            />
             <Stack.Screen name="documenti" options={{ title: 'Documenti sanitari' }} />
             <Stack.Screen name="language" options={{ title: 'Lingua' }} />
+            <Stack.Screen name="account-settings" options={{ title: 'Dati account' }} />
+            <Stack.Screen name="subscription" options={{ title: 'Piano e abbonamento' }} />
             <Stack.Screen name="legal-docs" options={{ title: 'Documenti legali' }} />
-            <Stack.Screen name="reset-password" options={{ title: 'Reset password' }} />
+            <Stack.Screen name="dispensa" options={{ title: 'Dispensa e Scadenze' }} />
+            <Stack.Screen name="recalls" options={{ title: 'Richiami Alimentari' }} />
+            <Stack.Screen name="medical-dossier" options={{ title: 'Fascicolo Medico PDF' }} />
+            <Stack.Screen name="diario-reazioni" options={{ title: 'Diario delle Reazioni' }} />
+            <Stack.Screen name="lista-spesa" options={{ title: 'Lista della Spesa Sicura' }} />
+            <Stack.Screen name="lockscreen-ice" options={{ title: 'Sfondo Blocco ICE' }} />
+            <Stack.Screen name="allergie-crociate" options={{ title: 'Allergie Crociate' }} />
+            <Stack.Screen name="travel-hub" options={{ title: 'Frasario Viaggi' }} />
+            <Stack.Screen name="kitchen-safety-sheet" options={{ title: 'Kitchen Safety & B2B' }} />
             <Stack.Screen name="shared-profile/[token]" options={{ title: 'Profilo condiviso' }} />
           </Stack>
           <PortalHost />

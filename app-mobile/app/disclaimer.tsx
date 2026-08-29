@@ -6,8 +6,9 @@ import { api } from '../src/api/client';
 import { useSession } from '../src/store/session';
 import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
 import { useTranslation } from '../src/constants/translations';
-import { AppText, GlassScreenScroll, PuffyButton, Screen } from '../src/components/ui';
+import { AppText, GlassScreenScroll, SurfaceButton, Screen } from '../src/components/ui';
 import { colors, spacing, MIN_TOUCH_TARGET } from '../src/theme';
+import { useAdaptiveMeshInk } from '../src/hooks/useMeshInk';
 
 export default function Disclaimer() {
   const [talkToStaff, setTalkToStaff] = useState(false);
@@ -18,6 +19,7 @@ export default function Disclaimer() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const isIt = (language || 'it').toLowerCase() === 'it';
+  const { ref: titleRef, ink: titleInk, onLayout: onTitleLayout } = useAdaptiveMeshInk(true);
 
   const accept = async () => {
     setBusy(true);
@@ -38,14 +40,16 @@ export default function Disclaimer() {
     <Screen edges={false} ambient>
       <Stack.Screen options={{ headerRight: () => <LanguageFlagsRow inHeader /> }} />
 
-      <GlassScreenScroll showsVerticalScrollIndicator={false}>
-        <AppText variant="h1" style={styles.icon}>⚠️</AppText>
-        <AppText variant="h2" style={styles.title}>{t('safety_title')}</AppText>
-        <AppText variant="body" style={styles.text}>
-          {t('safety_intro')}
-          {'\n\n'}
-          <AppText variant="bodyBold">{t('safety_alert')}</AppText>
-        </AppText>
+      <GlassScreenScroll headerFloat={false} showsVerticalScrollIndicator={false}>
+        <View ref={titleRef} onLayout={onTitleLayout} style={styles.titleBlock}>
+          <AppText variant="h1" style={styles.icon}>⚠️</AppText>
+          <AppText variant="h2" color={titleInk.ink} style={styles.title}>{t('safety_title')}</AppText>
+          <AppText variant="body" color={titleInk.inkMuted} style={styles.text}>
+            {t('safety_intro')}
+            {'\n\n'}
+            <AppText variant="bodyBold" color={titleInk.ink}>{t('safety_alert')}</AppText>
+          </AppText>
+        </View>
 
         <View style={styles.checkBox}>
           <Check
@@ -64,7 +68,7 @@ export default function Disclaimer() {
       </GlassScreenScroll>
 
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-        <PuffyButton
+        <SurfaceButton
           label={t('disclaimer_confirm_btn')}
           onPress={accept}
           disabled={!ready || busy}
@@ -88,6 +92,7 @@ function Check({ checked, onPress, text }: { checked: boolean; onPress: () => vo
 
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.md },
+  titleBlock: { alignItems: 'center' },
   icon: { textAlign: 'center', marginBottom: spacing.sm },
   title: { textAlign: 'center', marginBottom: spacing.md },
   text: { textAlign: 'center', lineHeight: 23 },

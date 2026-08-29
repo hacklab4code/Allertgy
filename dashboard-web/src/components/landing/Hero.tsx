@@ -35,13 +35,13 @@ export const Hero = ({ scrollTo, onEnter, onClienti }: HeroProps) => {
           animate={{ scale: [1.06, 1.12, 1.06], x: [0, -14, 0] }}
           transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#FAF8F5] from-25% via-[#FAF8F5]/75 to-[#FAF8F5]/20" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#FAF8F5] via-transparent to-[#FAF8F5]/50" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#F6F2FC] from-25% via-[#F6F2FC]/75 to-[#F6F2FC]/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F6F2FC] via-transparent to-[#F6F2FC]/50" />
       </div>
 
       {/* Animated drawn food elements floating in the hero */}
       {[
-        { Icon: Pizza, top: "14%", left: "40%", size: 40, color: "#16A34A", dur: 7, delay: 0, rot: 14 },
+        { Icon: Pizza, top: "14%", left: "40%", size: 40, color: "#36255C", dur: 7, delay: 0, rot: 14 },
         { Icon: IceCreamCone, top: "58%", left: "44%", size: 34, color: "#DB2777", dur: 6, delay: 0.8, rot: -12 },
         { Icon: Cherry, top: "30%", left: "34%", size: 30, color: "#DC2626", dur: 8, delay: 0.4, rot: 10 },
         { Icon: Croissant, top: "70%", left: "36%", size: 34, color: "#EAB308", dur: 6.5, delay: 1.2, rot: -8 },
@@ -65,20 +65,20 @@ export const Hero = ({ scrollTo, onEnter, onClienti }: HeroProps) => {
           transition={{ duration: 0.7, ease: "easeOut" }}
           className="lg:col-span-6 space-y-7"
         >
-          <span className="inline-flex items-center gap-2 rounded-full bg-white border border-[#EFEBE1] px-4 py-2 text-[#5C6B61] text-xs font-bold uppercase tracking-[0.2em] shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-            <ShieldCheck className="w-4 h-4 text-[#16A34A]" strokeWidth={2} />
+          <span className="inline-flex items-center gap-2 rounded-full bg-white border border-[#E6DFF5] px-4 py-2 text-[#6B6575] text-xs font-bold uppercase tracking-[0.2em] shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+            <ShieldCheck className="w-4 h-4 text-[#36255C]" strokeWidth={2} />
             Non un menù — una risposta per te
           </span>
 
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-[0.95] text-[#1C221F] font-heading">
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-[0.95] text-[#36255C] font-heading">
             Cosa posso
             <br />
             mangiare qui?
             <br />
-            <span className="text-[#16A34A]">Scansiona e scopri.</span>
+            <span className="text-[#B9A6E8]">Scansiona e scopri.</span>
           </h1>
 
-          <p className="text-base lg:text-lg text-[#4A524D] max-w-lg leading-relaxed">
+          <p className="text-base lg:text-lg text-[#6B6575] max-w-lg leading-relaxed">
             Il QR al tavolo non mostra un menù generico: confronta le tue
             allergie con i piatti del locale e ti dice subito cosa puoi
             ordinare — verde, giallo o rosso.
@@ -112,7 +112,7 @@ export const Hero = ({ scrollTo, onEnter, onClienti }: HeroProps) => {
           className="lg:col-span-6"
         >
           <div className="relative card-clay-white p-6 md:p-7">
-            <div className="absolute -top-3.5 right-6 bg-[#1C221F] text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 border border-white/20 shadow-md">
+            <div className="absolute -top-3.5 right-6 bg-[#36255C] text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 border border-white/20 shadow-md">
               <span className="relative flex w-2 h-2">
                 <span className="absolute inline-flex h-full w-full rounded-full bg-[#4ADE80] opacity-75 animate-ping" />
                 <span className="relative inline-flex w-2 h-2 rounded-full bg-[#4ADE80]" />
@@ -120,10 +120,10 @@ export const Hero = ({ scrollTo, onEnter, onClienti }: HeroProps) => {
               Demo live
             </div>
 
-            <h3 className="text-xl font-extrabold text-[#1C221F] font-heading">
+            <h3 className="text-xl font-extrabold text-[#36255C] font-heading">
               Prova con le tue allergie
             </h3>
-            <p className="text-sm text-[#5C6B61] mt-1 mb-5">
+            <p className="text-sm text-[#6B6575] mt-1 mb-5">
               Ogni piatto cambia colore in base a cosa puoi e non puoi mangiare.
             </p>
 
@@ -139,7 +139,7 @@ export const Hero = ({ scrollTo, onEnter, onClienti }: HeroProps) => {
                     className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
                       active
                         ? "badge-clay-green border-transparent text-white"
-                        : "bg-white border-[#EFEBE1] text-[#4A524D] hover:border-[#16A34A]/40 shadow-sm"
+                        : "bg-white border-[#E6DFF5] text-[#6B6575] hover:border-[#D2C3F6]/40 shadow-sm"
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" strokeWidth={2} />
@@ -181,11 +181,11 @@ export const Hero = ({ scrollTo, onEnter, onClienti }: HeroProps) => {
                             <span className={`absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping ${s.dot}`} />
                             <span className={`relative inline-flex w-3 h-3 rounded-full ${s.dot}`} />
                           </span>
-                          <h4 className="font-bold text-sm text-[#1C221F] truncate font-heading">
+                          <h4 className="font-bold text-sm text-[#36255C] truncate font-heading">
                             {dish.nome}
                           </h4>
                         </div>
-                        <p className="text-xs text-[#5C6B61] mt-1 leading-snug">
+                        <p className="text-xs text-[#6B6575] mt-1 leading-snug">
                           {dish.descrizione}
                         </p>
                         {s.match.length > 0 && (
@@ -196,7 +196,7 @@ export const Hero = ({ scrollTo, onEnter, onClienti }: HeroProps) => {
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-sm font-extrabold text-[#1C221F]">
+                        <div className="text-sm font-extrabold text-[#36255C]">
                           {dish.prezzo}
                         </div>
                         <span className={badgeStyle}>

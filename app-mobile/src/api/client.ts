@@ -26,12 +26,45 @@ function getDevPackagerHost(): string | null {
   return host || null;
 }
 
-/** In dev usa l'host di Metro (stesso Mac del backend), anche con Development Build. */
+/** Host Metro che NON espongono anche l'API sulla porta 8000. */
+function isTunnelPackagerHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return (
+    h.endsWith('.exp.direct') ||
+    h.endsWith('.expo.dev') ||
+    h.endsWith('.ts.net') ||
+    h.includes('ngrok') ||
+    h.includes('cloudflare') ||
+    h.includes('trycloudflare.com') ||
+    h.includes('loca.lt')
+  );
+}
+
+/** Tailscale CGNAT 100.64.0.0/10 — se Tailscale è spento, non forzare API su quell'IP. */
+function isTailscaleCgnatHost(host: string): boolean {
+  const p = host.split('.').map((x) => Number(x));
+  return p.length === 4 && p[0] === 100 && p[1] >= 64 && p[1] <= 127 && p.every((n) => Number.isFinite(n));
+}
+
+/**
+ * In dev, se Metro è in LAN/Tailscale sullo stesso Mac del backend, riusa quell'host:8000.
+ * Con tunnel Expo (solo porta Metro) resta EXPO_PUBLIC_API_URL (es. Tailscale).
+ */
 function resolveApiUrl(): string {
   const envUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+  if (typeof window !== 'undefined' && window.location) {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:8000';
+    }
+  }
   if (__DEV__) {
     const host = getDevPackagerHost();
-    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+    if (
+      host &&
+      host !== 'localhost' &&
+      host !== '127.0.0.1' &&
+      !isTunnelPackagerHost(host)
+    ) {
       return `http://${host}:8000`;
     }
   }
@@ -40,6 +73,28 @@ function resolveApiUrl(): string {
 
 // Su dispositivo fisico imposta EXPO_PUBLIC_API_URL=http://<IP-del-tuo-Mac>:8000
 export const API = resolveApiUrl();
+
+/** Risolve URL media relativi e riscrivi host backend → host API (fondamentale su device/simulator). */
+export function resolveApiMediaUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    try {
+      const parsed = new URL(url);
+      const api = new URL(API);
+      const isSignedFile = parsed.pathname.includes('/files/');
+      const hostMismatch = parsed.host !== api.host;
+      const isLocalHost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+      const apiIsRemote = api.hostname !== 'localhost' && api.hostname !== '127.0.0.1';
+      if (__DEV__ && isSignedFile && (hostMismatch || (isLocalHost && apiIsRemote))) {
+        return `${API}${parsed.pathname}${parsed.search}`;
+      }
+    } catch {
+      // ignore malformed URL
+    }
+    return url;
+  }
+  return `${API}${url.startsWith('/') ? '' : '/'}${url}`;
+}
 
 const getWebUrl = () => {
   if (API.includes('localhost')) return 'http://localhost:5173';
@@ -135,7 +190,37 @@ export interface ProductLabelCacheResult {
   ingredients: string;
   allergeni_contenuti: string[];
   allergeni_tracce: string[];
+  source?: string;
+  image_url?: string | null;
+  confidence_score?: number;
+  verification_count?: number;
+  report_count?: number;
   cached_at: string;
+  last_verified_at?: string | null;
+}
+
+export interface BarcodeResolveResult {
+  barcode: string;
+  product_name: string;
+  brand: string;
+  ingredients: string;
+  allergeni_contenuti: string[];
+  allergeni_tracce: string[];
+  dieta_flags: string[];
+  source: 'allertgy_verified' | 'openfoodfacts' | 'openbeautyfacts' | 'ai_label' | 'upcitemdb' | string;
+  source_label: string;
+  image_url?: string | null;
+  confidence_score: number;
+  verification_count: number;
+  is_cosmetic: boolean;
+  last_verified_at?: string | null;
+  note?: string | null;
+}
+
+export interface BarcodeReportResult {
+  success: boolean;
+  message: string;
+  report_count: number;
 }
 
 export interface Review {
@@ -162,6 +247,8 @@ export interface AppNotification {
 }
 
 const REQUEST_TIMEOUT_MS = 15000;
+/** Analisi AI (Vision/OCR): Gemini può impiegare 30–90s su foto menù. */
+const AI_REQUEST_TIMEOUT_MS = 120000;
 
 let onUnauthorized: (() => void) | null = null;
 
@@ -177,14 +264,19 @@ export class SessionExpiredError extends Error {
   }
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } catch (e) {
     if (e instanceof Error && e.name === 'AbortError') {
-      throw new Error('Richiesta scaduta: il server non ha risposto entro 15 secondi.');
+      const secs = Math.round(timeoutMs / 1000);
+      throw new Error(`Richiesta scaduta: il server non ha risposto entro ${secs} secondi.`);
     }
     throw e;
   } finally {
@@ -192,7 +284,11 @@ async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Re
   }
 }
 
-async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function req<T>(
+  path: string,
+  init: RequestInit = {},
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<T> {
   const token = useSession.getState().token;
   const language = useSession.getState().language || 'it';
   const headers: Record<string, string> = {
@@ -206,7 +302,7 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
   let res: Response;
   try {
-    res = await fetchWithTimeout(`${API}${path}`, { ...init, headers });
+    res = await fetchWithTimeout(`${API}${path}`, { ...init, headers }, timeoutMs);
   } catch (e) {
     if (e instanceof Error && e.message.includes('scaduta')) throw e;
     throw new Error(
@@ -256,18 +352,34 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ token, new_password: newPassword }),
     }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    req<{ detail: string }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    }),
 
   /* ---------- cliente ---------- */
   listRestaurants: () => req<Menu[]>('/restaurants'),
   listRestaurantsSummary: () => req<RestaurantSummary[]>('/restaurants/summary'),
   allergens: () => req<Allergen[]>('/allergens'),
   myAllergens: () => req<Allergen[]>('/profile/allergens'),
-  saveAllergens: (codes: string[], intensities: Record<string, 'lieve'|'moderata'|'grave'> = {}) =>
+  saveAllergens: (
+    codes: string[],
+    intensities: Record<string, 'lieve' | 'moderata' | 'grave'> = {},
+    criteria: Record<string, 'assoluto' | 'crudo' | 'cotto'> = {},
+  ) =>
     req<Allergen[]>('/profile/allergens', {
       method: 'PUT',
       body: JSON.stringify({
         allergen_codes: codes,
-        allergens: codes.map(c => ({ code: c, intensity: intensities[c] || 'moderata' }))
+        allergens: codes.map(c => ({
+          code: c,
+          intensity: intensities[c] || 'moderata',
+          criterio: criteria[c] || 'assoluto',
+        })),
       }),
     }),
   acceptLegalConsents: (acceptHealthData = true) =>
@@ -329,6 +441,8 @@ export const api = {
     }
     return res;
   },
+  getPublicRestaurant: (codice: string) =>
+    req<import('../types').PublicRestaurant>(`/restaurants/${codice}/public`),
   evaluateMenu: (codice: string, allergenCodes: string[], excludedIngredients: string[] = []) =>
     req<MenuValutato>(`/restaurants/${codice}/menu/evaluate`, {
       method: 'POST',
@@ -338,6 +452,11 @@ export const api = {
       }),
     }),
   getProfile: () => req<UserProfile>('/profile'),
+  updateProfile: (displayName: string) =>
+    req<UserProfile>('/profile', {
+      method: 'PUT',
+      body: JSON.stringify({ display_name: displayName }),
+    }),
   getReferralStats: () => req<import('../types').ReferralStats>('/profile/referral'),
   updateAppleHealth: (
     apple_health_connected: number,
@@ -459,10 +578,21 @@ export const api = {
     const fd = new FormData();
     fd.append('file', { uri: fileUri, name: `etichetta.${ext}`, type: mimeType } as any);
     fd.append('barcode', barcode);
-    return req<ProductLabelAnalyzeResult>('/profile/product-label/analyze', { method: 'POST', body: fd });
+    return req<ProductLabelAnalyzeResult>(
+      '/profile/product-label/analyze',
+      { method: 'POST', body: fd },
+      AI_REQUEST_TIMEOUT_MS,
+    );
   },
   getProductLabelCache: (barcode: string) =>
     req<ProductLabelCacheResult>(`/profile/product-label/${encodeURIComponent(barcode)}`),
+  resolveBarcode: (barcode: string) =>
+    req<BarcodeResolveResult>(`/profile/barcode/${encodeURIComponent(barcode)}/resolve`),
+  reportBarcode: (barcode: string, reason: string, note?: string) =>
+    req<BarcodeReportResult>(`/profile/barcode/${encodeURIComponent(barcode)}/report`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, note }),
+    }),
   startTrial: (restaurantId: number, plan: BusinessPlan) =>
     req<Restaurant>('/billing/start-trial', {
       method: 'POST',
@@ -509,14 +639,40 @@ export const api = {
       id: number; action: string; menu_version: number; note: string | null; created_at: string;
     }[]>(`/admin/restaurants/${restaurantId}/menu/audit`),
   saveMenu: (rid: number, piatti: PiattoIn[]) =>
-    req<unknown>(`/admin/restaurants/${rid}/menu`, {
+    req<PiattoIn[]>(`/admin/restaurants/${rid}/menu`, {
       method: 'PUT',
       body: JSON.stringify({ piatti, replace: true }),
     }),
-  approve: (rid: number, legalAcknowledged: boolean) =>
+  createDish: (rid: number, dish: PiattoIn, publish = true) =>
+    req<import('../types').DishSaveOut>(
+      `/admin/restaurants/${rid}/dishes?publish=${publish ? 'true' : 'false'}`,
+      { method: 'POST', body: JSON.stringify(dish) },
+    ),
+  updateDish: (rid: number, dishId: number, dish: PiattoIn, publish = true) =>
+    req<import('../types').DishSaveOut>(
+      `/admin/restaurants/${rid}/dishes/${dishId}?publish=${publish ? 'true' : 'false'}`,
+      { method: 'PUT', body: JSON.stringify(dish) },
+    ),
+  confirmKitchenAll: (rid: number, publish = true) =>
+    req<{
+      updated: number;
+      menu_version: number;
+      menu_updated_at: string | null;
+      published: boolean;
+      registry_ready: boolean;
+    }>(
+      `/admin/restaurants/${rid}/dishes/confirm-kitchen-all?publish=${publish ? 'true' : 'false'}`,
+      { method: 'POST' },
+    ),
+  deleteDish: (rid: number, dishId: number) =>
+    req<void>(`/admin/restaurants/${rid}/dishes/${dishId}`, { method: 'DELETE' }),
+  approve: (rid: number, legalAcknowledged: boolean, republishOnly = false) =>
     req<Restaurant>(`/admin/restaurants/${rid}/approve`, {
       method: 'POST',
-      body: JSON.stringify({ legal_acknowledged: legalAcknowledged }),
+      body: JSON.stringify({
+        legal_acknowledged: legalAcknowledged,
+        republish_only: republishOnly,
+      }),
     }),
   listAnnotations: (code: string) => req<CustomerAnnotation[]>(`/restaurants/${code}/annotations`),
   createAnnotation: (code: string, allergenId: number, ingredient: string | null, notes: string) =>
@@ -530,15 +686,17 @@ export const api = {
       body: JSON.stringify(data),
     }),
   analyze: (formData: FormData) =>
-    req<{ ai_stub: boolean; note: string; piatti: PiattoIn[] }>('/admin/menu/analyze', {
-      method: 'POST',
-      body: formData,
-    }),
+    req<{ ai_stub: boolean; note: string; piatti: PiattoIn[] }>(
+      '/admin/menu/analyze',
+      { method: 'POST', body: formData },
+      AI_REQUEST_TIMEOUT_MS,
+    ),
   analyzeUrl: (url: string) =>
-    req<{ ai_stub: boolean; note: string; piatti: PiattoIn[] }>('/admin/menu/analyze-url', {
-      method: 'POST',
-      body: JSON.stringify({ url }),
-    }),
+    req<{ ai_stub: boolean; note: string; piatti: PiattoIn[] }>(
+      '/admin/menu/analyze-url',
+      { method: 'POST', body: JSON.stringify({ url }) },
+      AI_REQUEST_TIMEOUT_MS,
+    ),
   uploadImage: (formData: FormData) =>
     req<{ url: string }>('/admin/upload-image', {
       method: 'POST',
@@ -559,4 +717,17 @@ export const api = {
     req<unknown>(`/admin/restaurants/${rid}/photos/${photoId}`, {
       method: 'DELETE',
     }),
+  analyzePaperMenu: (formData: FormData) =>
+    req<{ ai_stub: boolean; note: string; piatti: PiattoIn[] }>(
+      '/profile/ocr/paper-menu',
+      { method: 'POST', body: formData },
+      AI_REQUEST_TIMEOUT_MS,
+    ),
+  analyzePaperMenuUrl: (url: string) =>
+    req<{ ai_stub: boolean; note: string; piatti: PiattoIn[] }>(
+      '/profile/ocr/paper-menu-url',
+      { method: 'POST', body: JSON.stringify({ url }) },
+      AI_REQUEST_TIMEOUT_MS,
+    ),
 };
+

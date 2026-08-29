@@ -33,6 +33,7 @@ from ..schemas import (
     NotificationOut,
     ProfileAllergensIn,
     ProfilePhotoOut,
+    ProfileUpdateIn,
     UserDocumentOut,
     UserProfileOut,
     SubProfileIn,
@@ -49,6 +50,11 @@ from ..schemas import (
     BarcodeScanOut,
     ProductLabelAnalyzeOut,
     ProductLabelCacheOut,
+    BarcodeProductResolveOut,
+    BarcodeProductReportIn,
+    BarcodeProductReportOut,
+    AnalyzeOut,
+    AnalyzeUrlIn,
 )
 from ..security import get_current_user
 from ..rate_limit import rate_limiter
@@ -56,12 +62,15 @@ from ..legal import LEGAL_TERMS_VERSION, PRIVACY_VERSION, SAFETY_DISCLAIMER_VERS
 from ..services import storage
 from ..services.medical_document_analyze import analyze_medical_document
 from ..services.product_label_analyze import analyze_product_label
+from ..services.barcode_resolver import resolve_barcode_cascade
+from ..services.menu_analyze import analyze_menu_image, analyze_menu_url
 from ..services.product_label_cache import (
     cache_allergeni_contenuti,
     cache_allergeni_tracce,
     canonical_barcode,
     get_cached_label,
     upsert_cached_label,
+    increment_product_report,
 )
 from ..services.push import notify_users
 from ..services.plan_limits import (
@@ -119,6 +128,25 @@ def get_profile(user: User = Depends(get_current_user), db: Session = Depends(ge
     return user
 
 
+@router.put("", response_model=UserProfileOut)
+def update_profile(
+    data: ProfileUpdateIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Aggiorna i dati account (nome visualizzato). L'email resta immutabile."""
+    if data.display_name is not None:
+        name = data.display_name.strip()
+        if not name:
+            raise HTTPException(400, "Il nome non può essere vuoto")
+        if len(name) > 100:
+            raise HTTPException(400, "Il nome può avere al massimo 100 caratteri")
+        user.display_name = name
+        db.commit()
+        db.refresh(user)
+    return user
+
+
 @router.get("/referral", response_model=ReferralStatsOut)
 def get_referral_stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Codice invito e statistiche referral per clienti che portano commercianti."""
@@ -165,7 +193,69 @@ def _label_cache_to_out(row) -> ProductLabelCacheOut:
         ingredients=row.ingredients,
         allergeni_contenuti=cache_allergeni_contenuti(row),
         allergeni_tracce=cache_allergeni_tracce(row),
+        source=getattr(row, "source", "ai_label") or "ai_label",
+        image_url=getattr(row, "image_url", None),
+        confidence_score=getattr(row, "confidence_score", 1.0) or 1.0,
+        verification_count=getattr(row, "verification_count", 1) or 1,
+        report_count=getattr(row, "report_count", 0) or 0,
         cached_at=row.updated_at or row.created_at,
+        last_verified_at=getattr(row, "last_verified_at", None),
+    )
+
+
+@router.get("/barcode/{barcode}/resolve", response_model=BarcodeProductResolveOut)
+def resolve_product_barcode(
+    barcode: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Risoluzione a cascata multi-database (Cloud AllerTgy -> Open Food Facts -> Open Beauty -> UPC)."""
+    if user.role != "customer":
+        raise HTTPException(403, "Solo i clienti possono verificare i prodotti")
+
+    ensure_barcode_scan_allowed(user, db)
+
+    resolved = resolve_barcode_cascade(db, barcode)
+    if not resolved:
+        raise HTTPException(404, "Prodotto non presente nei database alimentari o cosmetici")
+
+    return BarcodeProductResolveOut(
+        barcode=resolved.barcode,
+        product_name=resolved.product_name,
+        brand=resolved.brand,
+        ingredients=resolved.ingredients,
+        allergeni_contenuti=resolved.allergeni_contenuti,
+        allergeni_tracce=resolved.allergeni_tracce,
+        dieta_flags=resolved.dieta_flags,
+        source=resolved.source,
+        source_label=resolved.source_label,
+        image_url=resolved.image_url,
+        confidence_score=resolved.confidence_score,
+        verification_count=resolved.verification_count,
+        is_cosmetic=resolved.is_cosmetic,
+        last_verified_at=resolved.last_verified_at,
+        note=resolved.note,
+    )
+
+
+@router.post("/barcode/{barcode}/report", response_model=BarcodeProductReportOut)
+def report_product_barcode(
+    barcode: str,
+    body: BarcodeProductReportIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Segnalazione formula cambiata o ingredienti errati (Crowdsourced Safety)."""
+    if user.role != "customer":
+        raise HTTPException(403, "Solo i clienti possono inviare segnalazioni")
+
+    cnt = increment_product_report(db, barcode)
+    db.commit()
+
+    return BarcodeProductReportOut(
+        success=True,
+        message="Segnalazione registrata con successo. Grazie per contribuire alla sicurezza di tutti!",
+        report_count=cnt,
     )
 
 
@@ -182,6 +272,7 @@ def get_product_label_cache(
     if not row:
         raise HTTPException(404, "Etichetta non ancora in archivio")
     return _label_cache_to_out(row)
+
 
 
 @router.post(
@@ -267,6 +358,7 @@ def get_my_allergens(user: User = Depends(get_current_user)):
             emoji=ua.allergen.emoji,
             is_diet=ua.allergen.is_diet,
             intensity=ua.intensity,
+            criterio=getattr(ua, "criterio", None) or "assoluto",
         )
         for ua in user.user_allergens
     ]
@@ -280,9 +372,11 @@ def set_my_allergens(
 ):
     codes = data.allergen_codes
     intensity_map = {}
+    criterio_map = {}
     if data.allergens:
         codes = [a.code for a in data.allergens]
         intensity_map = {a.code: a.intensity for a in data.allergens}
+        criterio_map = {a.code: (a.criterio or "assoluto") for a in data.allergens}
 
     allergens = db.scalars(
         select(Allergen).where(Allergen.code.in_(codes))
@@ -294,8 +388,18 @@ def set_my_allergens(
     now = datetime.now(timezone.utc)
     for a in allergens:
         intensity = intensity_map.get(a.code, "moderata")
+        criterio = criterio_map.get(a.code, "assoluto")
+        if criterio not in ("assoluto", "crudo", "cotto"):
+            criterio = "assoluto"
+        if intensity not in ("lieve", "moderata", "grave"):
+            intensity = "moderata"
         db.add(UserAllergen(
-            user_id=user.id, allergen_id=a.id, source="manual", confirmed_at=now, intensity=intensity
+            user_id=user.id,
+            allergen_id=a.id,
+            source="manual",
+            confirmed_at=now,
+            intensity=intensity,
+            criterio=criterio,
         ))
     user.onboarding_completed_at = now
     db.commit()
@@ -309,6 +413,7 @@ def set_my_allergens(
             emoji=ua.allergen.emoji,
             is_diet=ua.allergen.is_diet,
             intensity=ua.intensity,
+            criterio=getattr(ua, "criterio", None) or "assoluto",
         )
         for ua in user.user_allergens
     ]
@@ -637,6 +742,7 @@ def confirm_extraction(
             emoji=ua.allergen.emoji,
             is_diet=ua.allergen.is_diet,
             intensity=ua.intensity,
+            criterio=getattr(ua, "criterio", None) or "assoluto",
         )
         for ua in user.user_allergens
     ]
@@ -767,7 +873,8 @@ def list_sub_profiles(
                         code=a_obj.code,
                         name_it=a_obj.name_it,
                         emoji=a_obj.emoji,
-                        intensity=pa.intensity
+                        intensity=pa.intensity,
+                        criterio=getattr(pa, "criterio", None) or "assoluto",
                     )
                 )
         res.append(
@@ -813,7 +920,8 @@ def create_sub_profile(
             profile_id=p.id,
             allergen_id=a_obj.id,
             source="manual",
-            intensity=item.intensity
+            intensity=item.intensity if item.intensity in ("lieve", "moderata", "grave") else "moderata",
+            criterio=item.criterio if item.criterio in ("assoluto", "crudo", "cotto") else "assoluto",
         )
         db.add(pa)
         allergen_list.append(
@@ -821,7 +929,8 @@ def create_sub_profile(
                 code=a_obj.code,
                 name_it=a_obj.name_it,
                 emoji=a_obj.emoji,
-                intensity=item.intensity
+                intensity=pa.intensity,
+                criterio=pa.criterio,
             )
         )
     db.commit()
@@ -868,7 +977,8 @@ def update_sub_profile(
             profile_id=p.id,
             allergen_id=a_obj.id,
             source="manual",
-            intensity=item.intensity
+            intensity=item.intensity if item.intensity in ("lieve", "moderata", "grave") else "moderata",
+            criterio=item.criterio if item.criterio in ("assoluto", "crudo", "cotto") else "assoluto",
         )
         db.add(pa)
         allergen_list.append(
@@ -876,7 +986,8 @@ def update_sub_profile(
                 code=a_obj.code,
                 name_it=a_obj.name_it,
                 emoji=a_obj.emoji,
-                intensity=item.intensity
+                intensity=pa.intensity,
+                criterio=pa.criterio,
             )
         )
     db.commit()
@@ -920,6 +1031,7 @@ def _share_allergens_from_user(user: User) -> list[SubProfileAllergenOut]:
             name_it=ua.allergen.name_it,
             emoji=ua.allergen.emoji,
             intensity=ua.intensity,
+            criterio=getattr(ua, "criterio", None) or "assoluto",
         )
         for ua in user.user_allergens
     ]
@@ -932,6 +1044,7 @@ def _share_allergens_from_profile(profile) -> list[SubProfileAllergenOut]:
             name_it=pa.allergen.name_it,
             emoji=pa.allergen.emoji,
             intensity=pa.intensity,
+            criterio=getattr(pa, "criterio", None) or "assoluto",
         )
         for pa in profile.profile_allergens
     ]
@@ -1183,3 +1296,38 @@ def get_shared_profile(token: str, db: Session = Depends(get_db)):
         expires_at=share.expires_at,
         allergens=allergens,
     )
+
+
+@router.post("/ocr/paper-menu", response_model=AnalyzeOut)
+async def analyze_paper_menu(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Estrazione AI di piatti e allergeni da foto di menù cartaceo (Funzione PRO per clienti)."""
+    if user.role != "customer":
+        raise HTTPException(403, "Funzione riservata agli utenti cliente")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "File immagine vuoto")
+
+    content_type = file.content_type or "image/jpeg"
+    return analyze_menu_image(content, file.filename or "menu_paper.jpg", content_type)
+
+
+@router.post("/ocr/paper-menu-url", response_model=AnalyzeOut)
+def analyze_paper_menu_url(
+    data: AnalyzeUrlIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Estrazione AI di piatti e allergeni da link menù online / PDF (Funzione PRO per clienti)."""
+    if user.role != "customer":
+        raise HTTPException(403, "Funzione riservata agli utenti cliente")
+
+    url = (data.url or "").strip()
+    if not url:
+        raise HTTPException(400, "URL menù mancante")
+    return analyze_menu_url(url)
+

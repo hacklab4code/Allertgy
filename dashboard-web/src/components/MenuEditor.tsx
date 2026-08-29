@@ -1,13 +1,36 @@
-import { useState } from 'react';
-import { api, type Allergen, type DishIn, type Photo, type MenuOutItem } from '../api';
+import { useRef, useState } from 'react';
+import { api, type Allergen, type DishIn, type DishOut, type Photo, type MenuOutItem } from '../api';
+
+export type DishSaveResult = {
+  dish: DishOut;
+  menu_version: number;
+  menu_updated_at: string | null;
+  published: boolean;
+  registry_ready: boolean;
+  index: number;
+  silent?: boolean;
+};
 
 interface Props {
   piatti: DishIn[];
   allergens: Allergen[];
   onChange: (p: DishIn[]) => void;
+  onDelete?: (dish: DishIn, newList: DishIn[]) => void;
   restaurantPhotos?: Photo[];
   menus?: MenuOutItem[];
+  /** Se presente, ogni scheda ha Salva immediato (niente replace del menù intero). */
+  restaurantId?: number;
+  onDishSaved?: (result: DishSaveResult) => void;
+  /** Chiamato dopo conferma cucina su tutti i piatti. */
+  onKitchenAllConfirmed?: (res: {
+    updated: number;
+    menu_version: number;
+    menu_updated_at: string | null;
+    published: boolean;
+  }) => void;
 }
+
+const AUTOSAVE_MS = 650;
 
 const STOCK_PHOTOS = [
   { name: 'Bruschetta', url: 'https://images.unsplash.com/photo-1572656631137-7935297eff55?auto=format&fit=crop&w=600&q=80' },
@@ -21,30 +44,120 @@ const STOCK_PHOTOS = [
   { name: 'Pizza', url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80' },
 ];
 
-export default function MenuEditor({ piatti, allergens, onChange, restaurantPhotos, menus = [] }: Props) {
+export default function MenuEditor({
+  piatti,
+  allergens,
+  onChange,
+  onDelete,
+  restaurantPhotos,
+  menus = [],
+  restaurantId,
+  onDishSaved,
+  onKitchenAllConfirmed,
+}: Props) {
   const foodAllergens = allergens.filter((a) => !a.is_diet);
   const diets = allergens.filter((a) => a.is_diet);
   const [activeGalleryIndex, setActiveGalleryIndex] = useState<number | null>(null);
   const [galleryTab, setGalleryTab] = useState<'stock' | 'restaurant'>('stock');
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
   const [activeAllergensIndex, setActiveAllergensIndex] = useState<number | null>(null);
+  const [savingIndex, setSavingIndex] = useState<number | null>(null);
+  const [savedFlashIndex, setSavedFlashIndex] = useState<number | null>(null);
+  const [confirmingKitchenAll, setConfirmingKitchenAll] = useState(false);
+  const piattiRef = useRef(piatti);
+  piattiRef.current = piatti;
+  const autosaveTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
-  const update = (i: number, patch: Partial<DishIn>) =>
-    onChange(piatti.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+  const saveDish = async (
+    i: number,
+    opts?: { silent?: boolean; dishOverride?: DishIn },
+  ) => {
+    if (!restaurantId) return;
+    const dish = opts?.dishOverride ?? piattiRef.current[i];
+    if (!dish?.nome_piatto?.trim()) {
+      if (!opts?.silent) alert('Inserisci il nome del piatto prima di salvare.');
+      return;
+    }
+    // Autosave solo su piatti già persistiti (evita create spam mentre si digita il nome)
+    if (opts?.silent && !dish.id) return;
+    setSavingIndex(i);
+    try {
+      const payload: DishIn = {
+        nome_piatto: dish.nome_piatto.trim(),
+        descrizione: dish.descrizione ?? null,
+        categoria: dish.categoria ?? null,
+        prezzo_cents: dish.prezzo_cents ?? null,
+        image_url: dish.image_url ?? null,
+        menu_group: dish.menu_group ?? 'Principale',
+        menu_id: dish.menu_id ?? null,
+        kitchen_protocol_confirmed: dish.kitchen_protocol_confirmed ?? 0,
+        cross_contamination_checked_at: dish.cross_contamination_checked_at ?? null,
+        allergeni_contenuti: dish.allergeni_contenuti || [],
+        allergeni_tracce: dish.allergeni_tracce || [],
+        translations: dish.translations,
+      };
+      const res = dish.id
+        ? await api.updateDish(restaurantId, dish.id, payload, true)
+        : await api.createDish(restaurantId, payload, true);
+      const latest = piattiRef.current;
+      const next = [...latest];
+      const base = latest[i] ?? dish;
+      next[i] = {
+        ...base,
+        id: res.dish.id,
+        nome_piatto: res.dish.nome_piatto,
+        descrizione: res.dish.descrizione ?? null,
+        categoria: res.dish.categoria ?? null,
+        prezzo_cents: res.dish.prezzo_cents ?? null,
+        image_url: res.dish.image_url ?? null,
+        menu_group: res.dish.menu_group ?? 'Principale',
+        menu_id: res.dish.menu_id ?? null,
+        kitchen_protocol_confirmed: res.dish.kitchen_protocol_confirmed,
+        cross_contamination_checked_at: res.dish.cross_contamination_checked_at ?? null,
+        allergeni_contenuti: res.dish.allergeni_contenuti || [],
+        allergeni_tracce: res.dish.allergeni_tracce || [],
+        translations: res.dish.translations,
+      };
+      onChange(next);
+      onDishSaved?.({ ...res, index: i, silent: opts?.silent });
+      setSavedFlashIndex(i);
+      setTimeout(() => setSavedFlashIndex((cur) => (cur === i ? null : cur)), 1600);
+      if (!opts?.silent) setActiveAllergensIndex(null);
+    } catch (err) {
+      if (!opts?.silent) alert((err as Error).message);
+    } finally {
+      setSavingIndex(null);
+    }
+  };
+
+  const scheduleAutosave = (i: number) => {
+    if (!restaurantId) return;
+    const existing = autosaveTimers.current[i];
+    if (existing) clearTimeout(existing);
+    autosaveTimers.current[i] = setTimeout(() => {
+      void saveDish(i, { silent: true });
+    }, AUTOSAVE_MS);
+  };
+
+  const update = (i: number, patch: Partial<DishIn>, autosave = false) => {
+    const next = piattiRef.current.map((p, j) => (j === i ? { ...p, ...patch } : p));
+    onChange(next);
+    if (autosave) scheduleAutosave(i);
+  };
 
   const toggleDiet = (i: number, code: string) => {
-    const p = piatti[i];
+    const p = piattiRef.current[i];
     let contenuti = [...p.allergeni_contenuti];
     if (contenuti.includes(code)) {
       contenuti = contenuti.filter((c) => c !== code);
     } else {
       contenuti.push(code);
     }
-    update(i, { allergeni_contenuti: contenuti });
+    update(i, { allergeni_contenuti: contenuti }, true);
   };
 
   const toggleAllergen = (i: number, code: string) => {
-    const p = piatti[i];
+    const p = piattiRef.current[i];
     let contenuti = [...p.allergeni_contenuti];
     let tracce = [...p.allergeni_tracce];
     if (contenuti.includes(code)) {
@@ -55,8 +168,29 @@ export default function MenuEditor({ piatti, allergens, onChange, restaurantPhot
     } else {
       contenuti.push(code);
     }
-    update(i, { allergeni_contenuti: contenuti, allergeni_tracce: tracce });
+    update(i, { allergeni_contenuti: contenuti, allergeni_tracce: tracce }, true);
   };
+
+  const confirmKitchenAll = async () => {
+    if (!restaurantId) return;
+    setConfirmingKitchenAll(true);
+    try {
+      const res = await api.confirmKitchenAll(restaurantId, true);
+      const now = new Date().toISOString();
+      onChange(piattiRef.current.map((p) => ({
+        ...p,
+        kitchen_protocol_confirmed: 1,
+        cross_contamination_checked_at: now,
+      })));
+      onKitchenAllConfirmed?.(res);
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setConfirmingKitchenAll(false);
+    }
+  };
+
+  const pendingKitchen = piatti.filter((p) => (p.kitchen_protocol_confirmed ?? 0) !== 1).length;
 
   const handleFileUpload = async (i: number, file: File) => {
     setUploadingIndex(i);
@@ -96,6 +230,24 @@ export default function MenuEditor({ piatti, allergens, onChange, restaurantPhot
 
   return (
     <div className="space-y-8">
+      {restaurantId && piatti.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-amber-50/80 border border-amber-200 rounded-2xl px-4 py-3">
+          <p className="text-[11px] text-amber-950 font-semibold leading-snug">
+            Tap allergeni = autosave.
+            {pendingKitchen > 0
+              ? ` ${pendingKitchen} piatti senza conferma cucina.`
+              : ' Tutte le schede hanno conferma cucina.'}
+          </p>
+          <button
+            type="button"
+            onClick={confirmKitchenAll}
+            disabled={confirmingKitchenAll || pendingKitchen === 0}
+            className="shrink-0 px-3.5 py-2 rounded-xl bg-amber-800 hover:bg-amber-900 text-white text-[11px] font-black disabled:opacity-40"
+          >
+            {confirmingKitchenAll ? 'Conferma...' : 'Conferma cucina su tutti'}
+          </button>
+        </div>
+      )}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {piatti.map((p, i) => {
           const imgUrl = getFullImageUrl(p.image_url, p.nome_piatto, p.categoria || '');
@@ -112,7 +264,14 @@ export default function MenuEditor({ piatti, allergens, onChange, restaurantPhot
             <div key={i} className="bg-white rounded-3xl shadow-sm border border-slate-200/85 overflow-hidden flex flex-col relative group/card hover:shadow-lg hover:border-slate-300/80 transition-all duration-300">
               {/* Bottone Elimina */}
               <button 
-                onClick={() => onChange(piatti.filter((_, j) => j !== i))}
+                onClick={() => {
+                  const nuovi = piatti.filter((_, j) => j !== i);
+                  if (onDelete) {
+                    onDelete(p, nuovi);
+                  } else {
+                    onChange(nuovi);
+                  }
+                }}
                 className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/40 hover:bg-rose-600 text-white flex items-center justify-center backdrop-blur-md transition-all duration-200 shadow hover:scale-105"
                 title="Elimina Piatto"
               >
@@ -411,8 +570,8 @@ export default function MenuEditor({ piatti, allergens, onChange, restaurantPhot
                               const checked = e.target.checked ? 1 : 0;
                               update(i, {
                                 kitchen_protocol_confirmed: checked,
-                                cross_contamination_checked_at: checked ? new Date().toISOString() : null
-                              });
+                                cross_contamination_checked_at: checked ? new Date().toISOString() : null,
+                              }, true);
                             }}
                             className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                           />
@@ -474,17 +633,45 @@ export default function MenuEditor({ piatti, allergens, onChange, restaurantPhot
                         </div>
                       </div>
 
-                      <div className="flex justify-end pt-1">
+                      <div className="flex justify-between items-center gap-2 pt-1">
+                        {p.kitchen_protocol_confirmed === 1 ? (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg">
+                            Cucina OK
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">Cucina non confermata</span>
+                        )}
                         <button
                           type="button"
                           onClick={() => setActiveAllergensIndex(i)}
                           className="text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border border-emerald-200/65 rounded-xl px-3.5 py-1.5 transition-all font-bold flex items-center gap-1 bg-white hover:scale-102"
                         >
-                          ✏️ Gestisci Allergeni
+                          Gestisci Allergeni
                         </button>
                       </div>
                     </div>
                   )}
+
+                  {restaurantId ? (
+                    <button
+                      type="button"
+                      onClick={() => saveDish(i)}
+                      disabled={savingIndex === i}
+                      className={`w-full mt-3 py-2.5 rounded-xl text-xs font-black transition-all shadow-sm ${
+                        savedFlashIndex === i
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50'
+                      }`}
+                    >
+                      {savingIndex === i
+                        ? 'Salvataggio...'
+                        : savedFlashIndex === i
+                          ? 'Salvato'
+                          : p.id
+                            ? 'Salva ora'
+                            : 'Crea e salva piatto'}
+                    </button>
+                  ) : null}
 
                 </div>
               </div>

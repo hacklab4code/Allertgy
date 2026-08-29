@@ -20,6 +20,9 @@ module.exports = {
       max_restarts: 100,
       min_uptime: '15s',
       restart_delay: 5000,
+      env: {
+        ALLERTGY_REMOTE: '0',
+      },
     },
     {
       name: 'allertgy-web',

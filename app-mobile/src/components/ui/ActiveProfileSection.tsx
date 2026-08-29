@@ -11,7 +11,7 @@ import { AppText } from './AppText';
 import { AvatarBubble, avatarForIndex } from './AvatarBubble';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { GlassCard } from './GlassCard';
-import { PuffyButton } from './PuffyButton';
+import { SurfaceButton } from './SurfaceButton';
 import { Section } from './Section';
 
 type Props = {
@@ -202,6 +202,7 @@ export function ActiveProfileSection({
                 <AppText variant="caption">
                   {a.emoji} {a.name_it}
                   {a.intensity ? ` · ${a.intensity}` : ''}
+                  {a.criterio && a.criterio !== 'assoluto' ? ` · ${a.criterio}` : ''}
                 </AppText>
               </View>
             ))
@@ -211,7 +212,7 @@ export function ActiveProfileSection({
         </View>
 
         <View style={styles.actions}>
-          <PuffyButton
+          <SurfaceButton
             label={t.editAllergies}
             onPress={openAllergies}
             variant="soft"
@@ -221,7 +222,7 @@ export function ActiveProfileSection({
           />
           {!isSelf && (
             <>
-              <PuffyButton
+              <SurfaceButton
                 label={t.editProfile}
                 onPress={openEdit}
                 variant="secondary"
@@ -229,7 +230,7 @@ export function ActiveProfileSection({
                 fullWidth={false}
                 style={styles.actionBtn}
               />
-              <PuffyButton
+              <SurfaceButton
                 label={t.deleteProfile}
                 onPress={confirmDelete}
                 variant="danger"
@@ -240,7 +241,7 @@ export function ActiveProfileSection({
             </>
           )}
           {isSelf && (
-            <PuffyButton
+            <SurfaceButton
               label={t.editProfile}
               onPress={openEdit}
               variant="secondary"
