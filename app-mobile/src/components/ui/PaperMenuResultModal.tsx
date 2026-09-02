@@ -82,13 +82,13 @@ export function PaperMenuResultModal({
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerTitleRow}>
-              <Ionicons name="sparkles" size={24} color={colors.brand200} />
+              <Ionicons name="sparkles-outline" size={24} color={colors.brand200} />
               <AppText variant="h2" style={styles.headerTitle}>
                 {isIt ? 'Menù Scansionato AI' : 'AI Scanned Menu'}
               </AppText>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color={colors.onSurfaceMuted} />
+              <Ionicons name="close-outline" size={24} color={colors.onSurfaceMuted} />
             </TouchableOpacity>
           </View>
 

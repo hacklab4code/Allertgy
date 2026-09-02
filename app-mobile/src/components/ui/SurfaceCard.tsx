@@ -1,5 +1,10 @@
 import React from 'react';
 import { Pressable, StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { colors, radius, spacing, WIREFRAME_MODE } from '../../theme';
 import { wireBox } from '../../wireframe';
@@ -39,6 +44,8 @@ type Props = {
   accentWidth?: number;
 };
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export function SurfaceCard({
   children,
   onPress,
@@ -48,6 +55,11 @@ export function SurfaceCard({
   tint = 'none',
   radius: cardRadius = radius.md,
 }: Props) {
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   if (WIREFRAME_MODE) {
     const box = [styles.stretch, wireBox({ fill: SURFACE_TINT_BG[tint] }), padded && styles.padded, style];
     if (onPress) {
@@ -85,16 +97,22 @@ export function SurfaceCard({
   }
 
   return (
-    <Pressable
+    <AnimatedPressable
       testID={testID}
+      onPressIn={() => {
+        scale.value = withSpring(0.982, { damping: 20, stiffness: 420 });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 16, stiffness: 320 });
+      }}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
-      style={({ pressed }) => [surface, pressed && styles.pressed]}
+      style={[surface, animStyle]}
     >
       {children}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

@@ -123,7 +123,7 @@ export default function OwnerRegistro() {
       {pdfReprintNeeded && canPrint ? (
         <GlassCard style={[styles.card, styles.warnCard]}>
           <View style={styles.warnRow}>
-            <Ionicons name="alert-circle" size={22} color={colors.amberText} />
+            <Ionicons name="alert-circle-outline" size={22} color={colors.amberText} />
             <View style={{ flex: 1 }}>
               <AppText variant="bodyBold" style={{ fontSize: 14, color: colors.amberText }}>
                 Ristampa obbligatoria

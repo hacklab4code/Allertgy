@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { colors, spacing, font } from '../../theme';
+import { useSession } from '../../store/session';
 import { AppText } from './AppText';
 import { AvatarBubble, avatarForIndex } from './AvatarBubble';
 
@@ -11,6 +12,8 @@ type Profile = {
   id: number;
   name: string;
   relationship?: string;
+  photo_uri?: string | null;
+  image_url?: string | null;
   allergens?: { code?: string }[];
 };
 
@@ -39,6 +42,7 @@ export function ProfileSwitcher({
 
   const self = avatarForIndex(0);
   const isSelfActive = activeProfileId === null;
+  const profilePhotoUrl = useSession((s) => s.profilePhotoUrl);
 
   return (
     <ScrollView
@@ -59,6 +63,7 @@ export function ProfileSwitcher({
         }}
       >
         <AvatarBubble
+          imageUrl={profilePhotoUrl}
           emoji={self.emoji}
           color={self.color}
           active={isSelfActive}
@@ -107,6 +112,7 @@ export function ProfileSwitcher({
             }}
           >
             <AvatarBubble
+              imageUrl={p.photo_uri || p.image_url}
               emoji={av.emoji}
               color={av.color}
               active={active}
@@ -147,7 +153,7 @@ export function ProfileSwitcher({
           }}
         >
           <View style={styles.addBubble}>
-            <Ionicons name="person-add" size={22} color={colors.brand} />
+            <Ionicons name="person-add-outline" size={22} color={colors.brand} />
           </View>
           <AppText style={styles.addName} numberOfLines={1}>
             {isIt ? 'Gestisci' : 'Manage'}
@@ -214,18 +220,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   allergyBadge: {
-    backgroundColor: colors.greenSoft,
+    backgroundColor: colors.brand200,
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 10,
     marginTop: 2,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: 'rgba(35, 33, 44, 0.12)',
   },
   allergyBadgeText: {
     fontSize: 9.5,
     fontFamily: font.bold,
-    color: colors.onGreen || '#065F46',
+    color: colors.brand,
   },
   addCardItem: {
     flexDirection: 'column',

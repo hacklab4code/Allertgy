@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 export interface LargeCardProps {
   title?: string;
@@ -88,13 +88,13 @@ export const LargeCard: React.FC<LargeCardProps> = ({
           <Text style={styles.twTitle}>{title}</Text>
           <View style={styles.twRatingBadge}>
             <Text style={styles.twRatingText}>{rating.toFixed(1)}</Text>
-            <Ionicons name="star" size={10} color="white" />
+            <Ionicons name="star-outline" size={10} color="white" />
           </View>
         </View>
 
         {/* Sconto */}
         <View style={styles.twDiscountRow}>
-          <MaterialCommunityIcons name="brightness-percent" size={16} color="#2563eb" />
+          <Ionicons name="pricetag-outline" size={15} color="#2563eb" />
           <Text style={styles.twDiscountDesc}>{discountText}</Text>
         </View>
 
@@ -103,7 +103,7 @@ export const LargeCard: React.FC<LargeCardProps> = ({
 
         {/* Tag finale */}
         <View style={styles.twPackagingTag}>
-          <Ionicons name="checkmark" size={14} color="#1f7041" />
+          <Ionicons name="checkmark-circle-outline" size={14} color="#1f7041" />
           <Text style={styles.twPackagingText}>{tagText}</Text>
         </View>
       </View>

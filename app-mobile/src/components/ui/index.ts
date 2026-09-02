@@ -65,6 +65,8 @@ export { SettingsRow, SettingsDivider } from './SettingsRow';
 export { HeaderAddButton } from './HeaderAddButton';
 export { GlassIconButton } from './GlassIconButton';
 export { GlassBackButton } from './GlassBackButton';
+export { NavHeaderBackButton } from './NavHeaderBackButton';
+export { ScreenTopHeader } from './ScreenTopHeader';
 export { OnboardingSlides, type OnboardingSlide } from './OnboardingSlides';
 export {
   GlassScreenScroll,
@@ -84,7 +86,7 @@ export { SmallCard, McDonaldsCard } from '../SmallCard';
 export { LargeCard, ThirdWaveCard } from '../LargeCard';
 export { CustomRestaurantCard } from '../CustomRestaurantCard';
 export { AllergyConfigModal } from './AllergyConfigModal';
-export { AllergyChip, CATEGORY_ICONS } from './AllergyChip';
+export { AllergyChip, CATEGORY_ICONS, CATEGORY_OUTLINE_ICONS } from './AllergyChip';
 export {
   SemaforoBadge,
   type SemaforoBadgeProps,

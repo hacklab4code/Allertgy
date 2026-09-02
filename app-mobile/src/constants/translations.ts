@@ -127,17 +127,25 @@ export const TRANSLATIONS = {
     legal_read_safety: "Disclaimer di sicurezza",
 
     // Disclaimer Screen
-    safety_title: "La tua sicurezza prima di tutto",
-    safety_intro: "AllerTgy ti aiuta a orientarti nel menù, ma non sostituisce la comunicazione diretta con il ristorante.",
-    safety_alert: "Comunica SEMPRE le tue allergie al personale di sala prima di ordinare, anche con semaforo verde, per verificare contaminazioni crociate e variazioni in cucina.",
-    disclaimer_staff_promise: "Mi impegno a comunicare le allergie al personale prima di ordinare.",
-    disclaimer_support_only: "Ho capito che AllerTgy è uno strumento di supporto e non sostituisce il confronto con il locale o un parere medico.",
-    disclaimer_confirm_btn: "Confermo e continuo",
+    safety_title: "Sicurezza e non-responsabilità medica",
+    safety_intro: "AllerTgy è un software di puro ausilio informativo. Non costituisce un dispositivo medico, non effettua diagnosi e non sostituisce la comunicazione diretta con il personale del locale.",
+    safety_alert: "Comunica SEMPRE le tue allergie al personale di sala prima di ordinare, anche con semaforo verde: contaminazioni crociate e cambi ricetta sono sotto l'esclusiva responsabilità del ristorante.",
+    disclaimer_staff_promise: "Mi impegno a comunicare verbalmente le allergie al personale prima di consumare cibi.",
+    disclaimer_support_only: "Comprendo che AllerTgy è un supporto informativo e manlevo l'applicazione da ogni responsabilità clinica o alimentare.",
+    disclaimer_confirm_btn: "Accetto i termini e continuo",
     accept_continue: "Accetto e Continua",
+
+    // Account Deletion & GDPR
+    delete_account_section: "Gestione dati e privacy (GDPR)",
+    delete_account_btn: "Elimina account e dati sanitari",
+    delete_account_desc: "Elimina definitivamente il tuo profilo, i sottoprofili familiari, i referti medici e tutta la cronologia.",
+    delete_account_confirm_title: "Eliminare definitivamente l'account?",
+    delete_account_confirm_msg: "Questa operazione è irreversibile. Il tuo account, tutti i dati allergenici e i documenti sanitari verranno cancellati per sempre.",
+    delete_account_success: "Il tuo account e tutti i dati sanitari sono stati eliminati definitivamente.",
 
     // Allergie Select Screen
     select_allergies_title: "Seleziona le tue allergie e intolleranze",
-    select_allergies_subtitle: "Scegli tra oltre 100 allergeni e intolleranze. Tieni premuto un chip per impostare intensità (lieve = giallo) e criterio di forma (assoluto / solo crudo / solo cotto).",
+    select_allergies_subtitle: "Scegli tra oltre 100 allergeni e intolleranze. Tieni premuto un chip per impostare intensità (lieve = giallo, media = arancione, grave = rosso) e criterio di forma (assoluto / solo crudo / solo cotto).",
     search_allergen_placeholder: "Cerca allergene (es. latte, glutine…)",
     save_profile_btn: "Salva profilo",
     no_allergies_btn: "Non ho allergie / Continua",
@@ -346,17 +354,25 @@ export const TRANSLATIONS = {
     legal_read_safety: "Safety disclaimer",
 
     // Disclaimer Screen
-    safety_title: "Your safety first",
-    safety_intro: "AllerTgy helps you navigate the menu, but does not replace direct communication with the restaurant.",
-    safety_alert: "ALWAYS tell waiting staff about your allergies before ordering — even on green lights — to check cross-contamination and last-minute kitchen changes.",
-    disclaimer_staff_promise: "I promise to communicate my allergies to staff before ordering.",
-    disclaimer_support_only: "I understand AllerTgy is a support tool and does not replace speaking with the venue or medical advice.",
-    disclaimer_confirm_btn: "Confirm and continue",
+    safety_title: "Safety & Medical Disclaimer",
+    safety_intro: "AllerTgy is an informational support tool. It is not a medical device, does not provide medical diagnosis, and does not replace direct verbal communication with restaurant staff.",
+    safety_alert: "ALWAYS tell waiting staff about your allergies before ordering — even on green lights — cross-contamination and recipe variations are the sole responsibility of the venue.",
+    disclaimer_staff_promise: "I promise to verbally communicate my allergies to staff before consuming food.",
+    disclaimer_support_only: "I understand AllerTgy is an informational tool and I hold the app harmless from any medical or dietary liability.",
+    disclaimer_confirm_btn: "Accept terms and continue",
     accept_continue: "Accept & Continue",
+
+    // Account Deletion & GDPR
+    delete_account_section: "Data & Privacy Management (GDPR)",
+    delete_account_btn: "Delete account and health data",
+    delete_account_desc: "Permanently erase your profile, family sub-profiles, medical documents and all history.",
+    delete_account_confirm_title: "Permanently delete account?",
+    delete_account_confirm_msg: "This action cannot be undone. Your account, all allergy data and medical files will be permanently erased from our servers.",
+    delete_account_success: "Your account and all health data have been permanently deleted.",
 
     // Allergie Select Screen
     select_allergies_title: "Select your allergies and intolerances",
-    select_allergies_subtitle: "Choose from over 100 allergens and intolerances. Press and hold a chip to set severity (mild = yellow) and form criterion (absolute / raw only / cooked only).",
+    select_allergies_subtitle: "Choose from over 100 allergens and intolerances. Press and hold a chip to set severity (mild = yellow, moderate = orange, severe = red) and form criterion (absolute / raw only / cooked only).",
     search_allergen_placeholder: "Search allergen (e.g. milk, gluten...)",
     save_profile_btn: "Save profile",
     no_allergies_btn: "I have no allergies / Continue",

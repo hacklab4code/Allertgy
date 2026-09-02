@@ -1,0 +1,259 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "app_name": "allerTgy",
+  "version": "2.0.0",
+  "brand_thesis": {
+    "concept": "Calm Clinical Clarity",
+    "tone": "Affidabile, umano, protettivo senza allarmismi, preciso e conforme alle normative sanitarie/HACCP.",
+    "rule_of_thumb": "Nessuna promessa assoluta (no '100% sicuro'), chiarezza assoluta al tavolo in meno di 3 secondi."
+  },
+  "colors": {
+    "brand": {
+      "primary": "#23212C",
+      "primaryHover": "#191820",
+      "primaryActive": "#121118",
+      "dark": "#191820",
+      "darker": "#121118",
+      "ink": "#23212C",
+      "light": "#F1FEC8",
+      "surface": "#F7FEE7",
+      "soft": "#F1FEC8",
+      "border": "#E2F4A6",
+      "borderStrong": "#23212C",
+      "text": "#23212C",
+      "vanilla": "#F1FEC8",
+      "lavender": "#F1FEC8",
+      "cosmic": "#23212C",
+      "50": "#FCFFF2",
+      "100": "#F7FEE7",
+      "200": "#F1FEC8",
+      "300": "#E2F4A6"
+    },
+    "gradients": {
+      "premium": "linear-gradient(135deg, #121118 0%, #23212C 50%, #353344 100%)",
+      "premiumHover": "linear-gradient(135deg, #0A090E 0%, #191820 50%, #23212C 100%)",
+      "vanilla": "linear-gradient(135deg, #F1FEC8 0%, #E6F8AB 50%, #D8F18C 100%)",
+      "heroGlow": "radial-gradient(ellipse at top, rgba(35, 33, 44, 0.15) 0%, rgba(248, 250, 252, 0) 70%)"
+    },
+    "glass": {
+      "cssGlass": {
+        "background": "rgba(255, 255, 255, 0.2)",
+        "borderRadius": "16px",
+        "boxShadow": "0 4px 30px rgba(0, 0, 0, 0.1)",
+        "backdropFilter": "blur(5px)",
+        "webkitBackdropFilter": "blur(5px)",
+        "border": "1px solid rgba(255, 255, 255, 0.3)"
+      },
+      "cosmic": {
+        "hex": "#23212C",
+        "rgb": "35, 33, 44",
+        "rgba": "rgba(35, 33, 44, 0.82)",
+        "opacity": 0.82,
+        "border": "1px solid rgba(255, 255, 255, 0.15)",
+        "borderRadius": "16px",
+        "boxShadow": "0 4px 30px rgba(0, 0, 0, 0.15)",
+        "blur": "5px"
+      },
+      "vanilla": {
+        "hex": "#F1FEC8",
+        "rgb": "241, 254, 200",
+        "rgba": "rgba(241, 254, 200, 0.60)",
+        "opacity": 0.60,
+        "border": "1px solid rgba(255, 255, 255, 0.4)",
+        "borderRadius": "16px",
+        "boxShadow": "0 4px 30px rgba(0, 0, 0, 0.1)",
+        "blur": "5px"
+      }
+    },
+    "surface": {
+      "background": "#F8FAFC",
+      "backgroundSecondary": "#F1F5F9",
+      "backgroundTertiary": "#F1FEC8",
+      "card": "#FFFFFF",
+      "cardSecondary": "#F8FAFC",
+      "cardInverse": "#23212C",
+      "overlay": "rgba(15, 23, 42, 0.40)",
+      "modalBackdrop": "rgba(15, 23, 42, 0.60)"
+    },
+    "text": {
+      "primary": "#0F172A",
+      "secondary": "#475569",
+      "muted": "#94A3B8",
+      "inverse": "#FFFFFF",
+      "brand": "#23212C",
+      "brandDark": "#191820"
+    },
+    "borders": {
+      "subtle": "#F1F5F9",
+      "default": "#E2E8F0",
+      "strong": "#CBD5E1",
+      "brand": "#E2F4A6",
+      "brandStrong": "#23212C"
+    },
+    "semaforo": {
+      "safe": {
+        "key": "safe",
+        "label": "Idoneo",
+        "sublabel": "Nessun allergene rilevato",
+        "emoji": "🟢",
+        "icon": "checkmark-circle",
+        "solid": "#10B981",
+        "soft": "#ECFDF5",
+        "border": "#A7F3D0",
+        "borderStrong": "#6EE7B7",
+        "text": "#065F46",
+        "description": "Idoneo secondo i dati dichiarati dal locale."
+      },
+      "warning": {
+        "key": "warning",
+        "label": "Attenzione",
+        "sublabel": "Tracce o dati da confermare",
+        "emoji": "🟡",
+        "icon": "alert-circle",
+        "solid": "#F59E0B",
+        "soft": "#FFFBEB",
+        "border": "#FDE68A",
+        "borderStrong": "#FCD34D",
+        "text": "#92400E",
+        "description": "Possibili tracce o contaminazioni: chiedi conferma al personale."
+      },
+      "danger": {
+        "key": "danger",
+        "label": "Non idoneo",
+        "sublabel": "Contiene allergeni del profilo",
+        "emoji": "🔴",
+        "icon": "close-circle",
+        "solid": "#EF4444",
+        "soft": "#FEF2F2",
+        "border": "#FECACA",
+        "borderStrong": "#FCA5A5",
+        "text": "#991B1B",
+        "description": "Contiene allergeni esclusi dal tuo profilo. Da evitare."
+      },
+      "neutral": {
+        "key": "neutral",
+        "label": "Non verificato",
+        "sublabel": "Dati non disponibili",
+        "emoji": "⚪",
+        "icon": "help-circle",
+        "solid": "#64748B",
+        "soft": "#F1F5F9",
+        "border": "#E2E8F0",
+        "borderStrong": "#CBD5E1",
+        "text": "#334155",
+        "description": "Dati allergeni non disponibili per questo piatto."
+      }
+    },
+    "b2b_owner": {
+      "primary": "#059669",
+      "primaryHover": "#047857",
+      "accent": "#10B981",
+      "soft": "#ECFDF5",
+      "border": "#A7F3D0",
+      "ink": "#064E3B"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "display": [
+        "Sora",
+        "Cabinet Grotesk",
+        "-apple-system",
+        "sans-serif"
+      ],
+      "body": [
+        "Inter",
+        "Outfit",
+        "Nunito",
+        "-apple-system",
+        "sans-serif"
+      ],
+      "mono": [
+        "ui-monospace",
+        "SFMono-Regular",
+        "Menlo",
+        "monospace"
+      ]
+    },
+    "scale": {
+      "xs": {
+        "fontSize": 11,
+        "lineHeight": 14
+      },
+      "sm": {
+        "fontSize": 13,
+        "lineHeight": 18
+      },
+      "base": {
+        "fontSize": 15,
+        "lineHeight": 22
+      },
+      "md": {
+        "fontSize": 16,
+        "lineHeight": 24
+      },
+      "lg": {
+        "fontSize": 18,
+        "lineHeight": 26
+      },
+      "xl": {
+        "fontSize": 20,
+        "lineHeight": 28
+      },
+      "2xl": {
+        "fontSize": 24,
+        "lineHeight": 32
+      },
+      "3xl": {
+        "fontSize": 30,
+        "lineHeight": 38
+      },
+      "4xl": {
+        "fontSize": 36,
+        "lineHeight": 44
+      },
+      "hero": {
+        "fontSize": 48,
+        "lineHeight": 54
+      }
+    }
+  },
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "xl": 32,
+    "2xl": 48,
+    "3xl": 64
+  },
+  "radius": {
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 20,
+    "2xl": 24,
+    "3xl": 32,
+    "pill": 9999
+  },
+  "shadows": {
+    "sm": "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+    "card": "0 4px 20px -2px rgba(35, 33, 44, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.04)",
+    "raised": "0 10px 30px -4px rgba(35, 33, 44, 0.12), 0 4px 10px -2px rgba(0, 0, 0, 0.05)",
+    "dropdown": "0 14px 36px -4px rgba(35, 33, 44, 0.16)",
+    "verdictGlowGreen": "0 0 16px rgba(16, 185, 129, 0.35)",
+    "verdictGlowYellow": "0 0 16px rgba(245, 158, 11, 0.35)",
+    "verdictGlowRed": "0 0 16px rgba(239, 68, 68, 0.35)"
+  },
+  "badges": {
+    "profileAllergen": {
+      "bg": "#F1FEC8",
+      "text": "#23212C",
+      "border": "#E2F4A6"
+    },
+    "chefPass": {
+      "gradient": "linear-gradient(135deg, #121118, #23212C, #353344)",
+      "text": "#FFFFFF"
+    }
+  }
+}

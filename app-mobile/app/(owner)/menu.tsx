@@ -470,7 +470,7 @@ export default function MenuEditor() {
             {saving || photoBusy ? (
               <ActivityIndicator size="small" color={colors.brand} />
             ) : flashed ? (
-              <Ionicons name="checkmark-circle" size={18} color={colors.green} />
+              <Ionicons name="checkmark-circle-outline" size={18} color={colors.green} />
             ) : (
               <View style={[styles.kitchenDot, kitchenOk ? styles.kitchenDotOk : styles.kitchenDotWarn]} />
             )}
@@ -507,7 +507,7 @@ export default function MenuEditor() {
               ) : null}
               {thumb && !photoBusy ? (
                 <View style={styles.editorPhotoBadge}>
-                  <Ionicons name="camera" size={12} color="#FFF" />
+                  <Ionicons name="camera-outline" size={12} color="#FFF" />
                   <AppText variant="caption" color="#FFF" style={{ fontSize: 10, fontWeight: '800' }}>
                     Cambia
                   </AppText>
@@ -607,7 +607,7 @@ export default function MenuEditor() {
               }
             >
               <View style={[styles.checkbox, kitchenOk && styles.checkboxOn]}>
-                {kitchenOk ? <Ionicons name="checkmark" size={14} color="#FFF" /> : null}
+                {kitchenOk ? <Ionicons name="checkmark-outline" size={14} color="#FFF" /> : null}
               </View>
               <AppText variant="caption" style={{ flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '600' }}>
                 Conferma cucina: niente contaminazione crociata sugli allergeni esclusi
@@ -840,7 +840,7 @@ export default function MenuEditor() {
             </AppText>
           </View>
           <TouchableOpacity style={styles.addBtn} onPress={() => openAddDish()} activeOpacity={0.85}>
-            <Ionicons name="add" size={20} color="#FFF" />
+            <Ionicons name="add-outline" size={20} color="#FFF" />
           </TouchableOpacity>
         </View>
 
@@ -924,7 +924,7 @@ export default function MenuEditor() {
               >
                 {indices.map((i) => renderDishRow(i))}
                 <TouchableOpacity style={styles.addInCat} onPress={() => openAddDish(cat === 'Senza categoria' ? undefined : cat)}>
-                  <Ionicons name="add" size={16} color={colors.brand} />
+                  <Ionicons name="add-outline" size={16} color={colors.brand} />
                   <AppText variant="caption" color={colors.brand} style={{ fontWeight: '700' }}>
                     Aggiungi in {cat}
                   </AppText>
@@ -957,7 +957,7 @@ export default function MenuEditor() {
         {!legalAlreadyCurrent ? (
           <TouchableOpacity style={styles.legalRow} onPress={() => setLegalAck(!legalAck)}>
             <View style={[styles.checkbox, legalAck && styles.checkboxOn]}>
-              {legalAck ? <Ionicons name="checkmark" size={14} color="#FFF" /> : null}
+              {legalAck ? <Ionicons name="checkmark-outline" size={14} color="#FFF" /> : null}
             </View>
             <AppText variant="caption" style={{ flex: 1, fontSize: 12, lineHeight: 18, fontWeight: '600' }}>
               Confermo di aver verificato ingredienti, allergeni e tracce. Le informazioni pubblicate

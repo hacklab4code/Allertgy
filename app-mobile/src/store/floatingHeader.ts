@@ -11,12 +11,12 @@ type FloatingHeaderState = {
   reportScroll: (offsetY: number, deltaY: number) => void;
 };
 
-const TOP_SHOW_Y = 12;
-const DELTA_HIDE = 8;
-const DELTA_SHOW = 6;
+const TOP_SHOW_Y = 20;
+const DELTA_HIDE = 5;
+const DELTA_SHOW = 4;
 
 /**
- * Chrome floating (SOS + titolo + notifiche): nascosto in scroll-down, visibile in scroll-up.
+ * Chrome floating: sempre visibile e fisso in alto durante lo scorrimento.
  */
 export const useFloatingHeader = create<FloatingHeaderState>((set, get) => ({
   visible: true,
@@ -30,17 +30,9 @@ export const useFloatingHeader = create<FloatingHeaderState>((set, get) => ({
   setTitle: (title) => {
     if (get().title !== title) set({ title });
   },
-  reportScroll: (offsetY, deltaY) => {
-    if (offsetY <= TOP_SHOW_Y) {
-      if (!get().visible) set({ visible: true });
-      return;
-    }
-    if (deltaY > DELTA_HIDE) {
-      if (get().visible) set({ visible: false });
-      return;
-    }
-    if (deltaY < -DELTA_SHOW) {
-      if (!get().visible) set({ visible: true });
-    }
+  reportScroll: (_offsetY, _deltaY) => {
+    // Mantiene l'header sempre fisso e visibile in alto durante lo scroll
+    if (!get().visible) set({ visible: true });
   },
 }));
+

@@ -11,27 +11,39 @@ export function canUseNativeLiquidGlass(reduceTransparency: boolean) {
   }
 }
 
+let cachedReduceTransparency = false;
+let isListenerInitialized = false;
+const transparencyListeners = new Set<(val: boolean) => void>();
+
+function initGlobalTransparencyListener() {
+  if (isListenerInitialized) return;
+  isListenerInitialized = true;
+
+  if (typeof AccessibilityInfo?.isReduceTransparencyEnabled === 'function') {
+    AccessibilityInfo.isReduceTransparencyEnabled()
+      .then((enabled) => {
+        cachedReduceTransparency = enabled;
+        transparencyListeners.forEach((fn) => fn(enabled));
+      })
+      .catch(() => {});
+  }
+
+  if (typeof AccessibilityInfo?.addEventListener === 'function') {
+    AccessibilityInfo.addEventListener('reduceTransparencyChanged', (enabled) => {
+      cachedReduceTransparency = enabled;
+      transparencyListeners.forEach((fn) => fn(enabled));
+    });
+  }
+}
+
 export function useNativeLiquidGlass() {
-  const [reduceTransparency, setReduceTransparency] = useState(false);
+  const [reduceTransparency, setReduceTransparency] = useState(cachedReduceTransparency);
 
   useEffect(() => {
-    let mounted = true;
-
-    if (typeof AccessibilityInfo?.isReduceTransparencyEnabled === 'function') {
-      AccessibilityInfo.isReduceTransparencyEnabled()
-        .then((enabled) => {
-          if (mounted) setReduceTransparency(enabled);
-        })
-        .catch(() => {});
-    }
-
-    const sub = typeof AccessibilityInfo?.addEventListener === 'function'
-      ? AccessibilityInfo.addEventListener('reduceTransparencyChanged', setReduceTransparency)
-      : null;
-
+    initGlobalTransparencyListener();
+    transparencyListeners.add(setReduceTransparency);
     return () => {
-      mounted = false;
-      sub?.remove?.();
+      transparencyListeners.delete(setReduceTransparency);
     };
   }, []);
 

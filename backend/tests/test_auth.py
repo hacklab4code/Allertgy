@@ -178,3 +178,37 @@ class TestHealth:
         body = res.json()
         assert body["status"] == "ok"
         assert body["db"] is True
+
+
+class TestDeleteAccount:
+    def test_delete_account_success(self, client):
+        """Cancellazione account utente autenticato."""
+        # 1. Registra utente
+        res_reg = client.post("/auth/register", json={
+            "email": "delete_me@example.com",
+            "password": "DeleteMe1234!",
+            "role": "customer",
+            "accept_terms": True,
+            "accept_privacy": True,
+            "accept_health_data": True,
+        })
+        assert res_reg.status_code == status.HTTP_201_CREATED
+        token = res_reg.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 2. Verifica che il profilo sia leggibile
+        res_prof = client.get("/profile", headers=headers)
+        assert res_prof.status_code == status.HTTP_200_OK
+        assert res_prof.json()["email"] == "delete_me@example.com"
+
+        # 3. Elimina account
+        res_del = client.delete("/auth/delete-account", headers=headers)
+        assert res_del.status_code == status.HTTP_200_OK
+        assert "eliminati definitivamente" in res_del.json()["detail"]
+
+        # 4. Verifica che il login successivo fallisca
+        res_log = client.post("/auth/login", json={
+            "email": "delete_me@example.com",
+            "password": "DeleteMe1234!",
+        })
+        assert res_log.status_code == status.HTTP_401_UNAUTHORIZED

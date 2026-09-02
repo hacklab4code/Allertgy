@@ -334,7 +334,7 @@ export default function Locali() {
           contentStyle={styles.searchBorderContent}
         >
           <View style={styles.searchBox}>
-            <Ionicons name="search" size={18} color={colors.onSurfaceMuted} />
+            <Ionicons name="search-outline" size={18} color={colors.onSurfaceMuted} />
             <TextInput
               placeholder={isIt ? 'Nome o città' : 'Name or city'}
               placeholderTextColor={colors.textMuted}
@@ -347,11 +347,11 @@ export default function Locali() {
             />
             {searchQuery ? (
               <Pressable onPress={() => setSearchQuery('')} hitSlop={10} style={{ marginRight: 4 }}>
-                <Ionicons name="close-circle" size={18} color={colors.onSurfaceMuted} />
+                <Ionicons name="close-circle-outline" size={18} color={colors.onSurfaceMuted} />
               </Pressable>
             ) : null}
 
-            {/* Icona Mappa PNG 3D all'interno a destra della barra */}
+            {/* Icona Mappa 2D all'interno a destra della barra */}
             <Pressable
               onPress={toggleViewMode}
               style={({ pressed }) => [styles.mapInsideBar, pressed && { opacity: 0.8 }]}
@@ -361,11 +361,13 @@ export default function Locali() {
                   : (isIt ? 'Mostra mappa' : 'Show map')
               }
             >
-              <Image
-                source={require('../../../assets/icon_mappa.png')}
-                style={styles.mapIconImg}
-                resizeMode="contain"
-              />
+              <View style={styles.mapBtnPill}>
+                <Ionicons
+                  name={onMap ? 'list' : 'map'}
+                  size={19}
+                  color="#23212C"
+                />
+              </View>
             </Pressable>
           </View>
         </SemaforoGeminiBorder>
@@ -728,9 +730,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  mapIconImg: {
-    width: 36,
-    height: 36,
+  mapBtnPill: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F1FEC8',
+    borderWidth: 1,
+    borderColor: '#E2F4A6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchBorder: {
     flex: 1,

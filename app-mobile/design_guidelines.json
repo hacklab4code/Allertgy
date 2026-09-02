@@ -1,58 +1,60 @@
 {
   "app_name": "allerTgy",
   "concept": "Calm clinical clarity — tipografia forte, superfici sobrie, semaforo preciso",
-  "personality": "Cosmic ink + Vanilla accent — look moderno, sofisticato e leggibile",
-  "personality_one_liner": "Superfici Cosmic (#23212C) e Vanilla (#F1FEC8), card pulite, semaforo intatto.",
+  "personality": "Cosmic (#23212C) + Vanilla (#F1FEC8) — look moderno, vivace, affidabile e distintamente cosmico con glassmorphism",
+  "personality_one_liner": "Superfici Cosmic (#23212C) con accenti Vanilla (#F1FEC8), semaforo clinico puro (Verde/Giallo/Rosso) ed effetto glassmorphism.",
   "color": {
-    "surface": "#F6F2FC",
-    "onSurface": "#23212C",
-    "onSurfaceMuted": "#6B6575",
+    "surface": "#F8FAFC",
+    "onSurface": "#0F172A",
+    "onSurfaceMuted": "#64748B",
     "surfaceSecondary": "#FFFFFF",
-    "onSurfaceSecondary": "#23212C",
+    "onSurfaceSecondary": "#0F172A",
     "surfaceTertiary": "#F1FEC8",
     "onSurfaceTertiary": "#23212C",
     "surfaceInverse": "#23212C",
     "onSurfaceInverse": "#FFFFFF",
     "brand": "#23212C",
     "brandPrimary": "#23212C",
+    "brandHover": "#191820",
     "onBrandPrimary": "#FFFFFF",
     "onBrand": "#FFFFFF",
     "brandSecondary": "#F1FEC8",
     "onBrandSecondary": "#23212C",
-    "brandTertiary": "#F1FEC8",
+    "brandTertiary": "#F7FEE7",
     "onBrandTertiary": "#23212C",
-    "brandDark": "#1A1822",
+    "brandDark": "#191820",
     "brandDarker": "#121118",
-    "brand50": "#FAFDF0",
-    "brand100": "#F5FCD8",
+    "brand50": "#FCFFF2",
+    "brand100": "#F7FEE7",
     "brand200": "#F1FEC8",
-    "brand300": "#E2F5A0",
+    "brand300": "#E2F4A6",
     "brandInk": "#23212C",
     "cosmic": "#23212C",
     "vanilla": "#F1FEC8",
-    "success": "#34D399",
+    "success": "#10B981",
     "onSuccess": "#065F46",
-    "warning": "#FBBF24",
+    "warning": "#F59E0B",
     "onWarning": "#92400E",
-    "error": "#F87171",
+    "error": "#EF4444",
     "onError": "#991B1B",
-    "border": "#E6DFF5",
+    "border": "#E2E8F0",
+    "borderBrand": "#E2F4A6",
     "borderStrong": "#23212C",
-    "divider": "rgba(35, 33, 44, 0.06)",
-    "shadow": "rgba(35, 33, 44, 0.10)",
-    "overlay": "rgba(35, 33, 44, 0.40)",
+    "divider": "rgba(15, 23, 42, 0.06)",
+    "shadow": "rgba(35, 33, 44, 0.12)",
+    "overlay": "rgba(15, 23, 42, 0.40)",
     "white": "#FFFFFF",
-    "ink": "#23212C",
-    "inkSoft": "#383545",
-    "textSecondary": "#6B6575",
-    "textMuted": "#948E9C"
+    "ink": "#0F172A",
+    "inkSoft": "#334155",
+    "textSecondary": "#475569",
+    "textMuted": "#94A3B8"
   },
   "verdict": {
     "green": {
       "solid": "#10B981",
       "soft": "#ECFDF5",
       "on": "#065F46",
-      "border": "#6EE7B7",
+      "border": "#A7F3D0",
       "emoji": "🟢"
     },
     "yellow": {
@@ -71,22 +73,50 @@
     }
   },
   "glass": {
-    "blurIntensityIos": 40,
+    "blurIntensityIos": 60,
     "blurIntensityAndroid": 80,
-    "tint": "systemUltraThinMaterialLight",
-    "fill": "rgba(255, 255, 255, 0.62)",
-    "borderTop": "rgba(255, 255, 255, 0.82)",
-    "borderSide": "rgba(210, 195, 246, 0.45)",
-    "shadowColor": "rgba(54, 37, 92, 0.10)",
+    "tint": "dark",
+    "cssGlass": {
+      "background": "rgba(255, 255, 255, 0.2)",
+      "borderRadius": "16px",
+      "boxShadow": "0 4px 30px rgba(0, 0, 0, 0.1)",
+      "backdropFilter": "blur(5px)",
+      "webkitBackdropFilter": "blur(5px)",
+      "border": "1px solid rgba(255, 255, 255, 0.3)"
+    },
+    "cosmic": {
+      "hex": "#23212C",
+      "rgb": "35, 33, 44",
+      "rgba": "rgba(35, 33, 44, 0.82)",
+      "opacity": 0.82,
+      "border": "1px solid rgba(255, 255, 255, 0.15)",
+      "borderRadius": "16px",
+      "boxShadow": "0 4px 30px rgba(0, 0, 0, 0.15)",
+      "blur": "5px"
+    },
+    "vanilla": {
+      "hex": "#F1FEC8",
+      "rgb": "241, 254, 200",
+      "rgba": "rgba(241, 254, 200, 0.60)",
+      "opacity": 0.60,
+      "border": "1px solid rgba(255, 255, 255, 0.4)",
+      "borderRadius": "16px",
+      "boxShadow": "0 4px 30px rgba(0, 0, 0, 0.1)",
+      "blur": "5px"
+    },
+    "fill": "rgba(35, 33, 44, 0.82)",
+    "borderTop": "rgba(241, 254, 200, 0.35)",
+    "borderSide": "rgba(255, 255, 255, 0.12)",
+    "shadowColor": "rgba(18, 17, 24, 0.25)",
     "shadowRadius": 18,
     "shadowOffsetY": 8,
-    "overlayColor": "rgba(255, 255, 255, 0.42)",
-    "brandTint": "rgba(210, 195, 246, 0.22)"
+    "overlayColor": "rgba(35, 33, 44, 0.82)",
+    "brandTint": "rgba(241, 254, 200, 0.20)"
   },
   "marshmallow": {
     "glossTop": "rgba(255, 255, 255, 0.92)",
     "glossEdge": "rgba(255, 255, 255, 0.55)",
-    "shadowColor": "#36255C",
+    "shadowColor": "#23212C",
     "pressScale": 0.91
   },
   "scanSphere": {
@@ -102,7 +132,7 @@
     "breatheDurationMs": 1800
   },
   "shadow": {
-    "color": "#36255C",
+    "color": "#23212C",
     "cardElevation": 2,
     "raisedElevation": 4,
     "defaultElevation": 2,
@@ -140,10 +170,10 @@
     "3xl": 64
   },
   "radius_tokens": {
-    "sm": 12,
-    "md": 16,
-    "lg": 24,
-    "xl": 32,
+    "sm": 10,
+    "md": 14,
+    "lg": 18,
+    "xl": 22,
     "pill": 999
   },
   "shadow_tier": 1,
@@ -151,42 +181,42 @@
   "icon_set": "emoji_first",
   "glassmorphism": {
     "enabled": true,
-    "structure": "Liquid Glass lavanda soft — solo tab bar, header e overlay",
+    "structure": "Cosmic Glass (#23212C / RGB 35, 33, 44 / blur 5px) & Vanilla Glass (#F1FEC8 / RGB 241, 254, 200) — tab bar, header e overlay",
     "interactive": "Puffy solid — pulsanti, card, chip allergeni, semaforo emoji",
     "do's": [
-      "Atmosphere = soft lavender mist, never dark violet flood",
-      "Primary actions and ink = exact violet #36255C",
-      "Soft fills and glass frost = exact lavender #D2C3F6",
-      "White puffy cards on lavanda canvas",
-      "Reserve traffic-light colors for verdicts — never use them as brand fill"
+      "Atmosphere = clean ceramic white cards with Cosmic Glass (#23212C) & Vanilla Glow (#F1FEC8)",
+      "Primary actions = Cosmic #23212C with hover #191820 and Vanilla #F1FEC8 accents",
+      "Chef Pass / Premium = dark cosmic obsidian gradient (linear-gradient(135deg, #121118, #23212C, #353344))",
+      "Allergen profile badges = soft vanilla #F1FEC8, never green",
+      "Reserve traffic-light colors strictly for verdicts (Safe green #10B981, Warning yellow #F59E0B, Danger red #EF4444)"
     ],
     "dont's": [
-      "Don't invent muddy mid-purples between lavender and violet",
-      "Don't wash the whole screen with dark violet gradients",
-      "Don't use green/teal as brand color — it competes with semaforo verde",
-      "Don't blur traffic-light verdict badges — keep them solid and glossy"
+      "Don't use green as brand fill or profile badge (green is reserved for safe food)",
+      "Don't wash screens in flat dead grey — use luminous Cosmic & Vanilla accents",
+      "Don't add rainbow gradients or multi-color glowing overlays under the dock/tab bar",
+      "Don't blur traffic-light verdict badges — keep them solid, clear, and high contrast"
     ]
   },
   "components_rules": {
     "icons_and_imagery": {
       "type": "emoji_first",
-      "phase": "icons_now_emoji_later",
-      "rule": "Fase 1: Ionicons + semaforo colorato. Fase 2: emoji in bolle puffy. Ionicons solo per back, close, chevron."
+      "phase": "emoji_unified",
+      "rule": "Sistema iconografico unificato basato su Emoji (stile moderno, accogliente e pulito). Ionicons solo per back, close, chevron."
     }
   },
   "platform_libraries": {
     "glass": {
-      "ios": "expo-blur systemUltraThinMaterialLight",
-      "android": "expo-blur dimezisBlurView",
-      "web": "backdrop-filter blur(20px) saturate(150%)"
+      "ios": "expo-blur tint=dark with rgba(35,33,44,0.82) overlay",
+      "android": "expo-blur tint=dark with rgba(35,33,44,0.82) overlay",
+      "web": "backdrop-filter blur(5px) saturate(150%)"
     },
     "blur": "expo-blur",
     "animation": "react-native-reanimated"
   },
   "instructions_to_main_agent": [
-    "Two pure colors only: lavender #D2C3F6 (air/soft/glass) and violet #36255C (ink/actions).",
-    "Background is soft lavanda mist #F6F2FC — never a dark violet canopy.",
-    "Cards are white; glass is white frost + lavender tint like the Instagram cards.",
-    "Semaforo stays green/yellow/red forever."
+    "Brand base: Cosmic #23212C for standard buttons and active states with Vanilla #F1FEC8 accents.",
+    "Premium exclusive: Gradient Cosmic #23212C for Chef Pass / VIP upsell.",
+    "Background is clean luminous canvas #F8FAFC with white #FFFFFF cards and Cosmic Glass glow.",
+    "Semaforo is strictly Green #10B981 / Yellow #F59E0B / Red #EF4444."
   ]
 }

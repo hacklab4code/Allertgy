@@ -33,8 +33,6 @@ import {
   GlassBackButton,
   LoadingBlock,
   MenuUnavailableCard,
-  ScrollEntry,
-  ScrollFocusEndPad,
   SurfaceButton,
   Screen,
   VenueBottomBar,
@@ -342,9 +340,9 @@ export default function MenuScreen() {
                 </View>
               </View>
               <TouchableOpacity style={styles.mapsButton} activeOpacity={0.8} onPress={openMaps}>
-                <Ionicons name="navigate" size={16} color={colors.onBrand} />
+                <Ionicons name="navigate-outline" size={16} color={colors.onBrand} />
                 <Text style={styles.mapsButtonText}>{isIt ? 'Apri in Maps' : 'Open in Maps'}</Text>
-                <Ionicons name="arrow-forward" size={17} color={colors.onBrand} />
+                <Ionicons name="arrow-forward-outline" size={17} color={colors.onBrand} />
               </TouchableOpacity>
               <View style={styles.infoDivider} />
             </>
@@ -461,9 +459,13 @@ export default function MenuScreen() {
         ) : null}
         <View style={styles.categoryDishes}>
           {cat.piatti.map(({ p, esito, tavolataInfo }) => (
-            <ScrollEntry key={p.id} animation="candycane" lite={items.length > 24}>
-              <DishCard piatto={p} esito={esito} restaurantCode={codice} tavolataInfo={tavolataInfo} />
-            </ScrollEntry>
+            <DishCard
+              key={p.id}
+              piatto={p}
+              esito={esito}
+              restaurantCode={codice}
+              tavolataInfo={tavolataInfo}
+            />
           ))}
         </View>
       </View>
@@ -519,6 +521,7 @@ export default function MenuScreen() {
       <GlassScreenScroll
         headerFloat={false}
         showsVerticalScrollIndicator={false}
+        insetBottom={90}
         contentContainerStyle={styles.scrollContent}
       >
         <VenueHero
@@ -657,7 +660,6 @@ export default function MenuScreen() {
                         ) : (
                           <View style={styles.menuList}>
                             {renderDishGroups(items)}
-                            <ScrollFocusEndPad />
                           </View>
                         )}
                       </View>
@@ -669,16 +671,17 @@ export default function MenuScreen() {
           </>
         )}
 
-        {activeVenueTab === 'esperienza' && (
-          <MenuReviewsSection
-            menu={menu}
-            language={language}
-            canSubmit={canReview}
-            state={reviewState}
-          />
+        {activeVenueTab === 'info' && (
+          <View style={{ gap: spacing.md }}>
+            {renderVenueInfo()}
+            <MenuReviewsSection
+              menu={menu}
+              language={language}
+              canSubmit={canReview}
+              state={reviewState}
+            />
+          </View>
         )}
-
-        {activeVenueTab === 'info' && renderVenueInfo()}
       </GlassScreenScroll>
 
       <VenueBottomBar
@@ -686,13 +689,17 @@ export default function MenuScreen() {
         onChange={setActiveVenueTab}
         language={language}
         activeStatus={allergensPublished ? filtro : null}
-        onOrbPress={() => {
+        onStatusChange={(s) => {
           if (!allergensPublished) return;
-          const idx = SEMAFORO_ORDER.indexOf(filtro);
-          const next = SEMAFORO_ORDER[(idx + 1) % SEMAFORO_ORDER.length];
-          handleFiltroChange(next);
+          handleFiltroChange(s);
           if (activeVenueTab !== 'menu') setActiveVenueTab('menu');
         }}
+        counts={{
+          verde: conta('verde'),
+          giallo: conta('giallo'),
+          rosso: conta('rosso'),
+        }}
+        venueName={menu.nome_ristorante}
       />
     </Screen>
   );
@@ -705,7 +712,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 0,
-    paddingBottom: TAB_BAR_CLEARANCE + 12,
+    paddingBottom: 90,
     gap: spacing.md,
     alignItems: 'stretch',
   },

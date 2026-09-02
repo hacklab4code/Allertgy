@@ -1,0 +1,55 @@
+# Render Blueprint Specification for AllerTgy
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # -------------------------------------------------------------
+  # 1. Backend FastAPI Service (Python 3.11)
+  # -------------------------------------------------------------
+  - type: web
+    name: allertgy-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    region: frankfurt # Frankfurt (Germania) - Minima latenza per l'Italia
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2 --proxy-headers
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: APP_ENV
+        value: production
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_HOST
+        sync: false # Inserisci l'host del tuo database (es. Hostinger o Render MySQL)
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+  # -------------------------------------------------------------
+  # 2. Vetrina & Download Hub Frontend (React SPA)
+  # -------------------------------------------------------------
+  - type: web
+    name: allertgy-web
+    runtime: static
+    rootDir: vetrina-frontend/frontend
+    plan: free
+    region: frankfurt
+    buildCommand: yarn install && yarn build
+    staticPublishPath: ./build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    autoDeploy: true

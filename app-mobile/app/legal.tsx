@@ -6,7 +6,7 @@ import { api } from '../src/api/client';
 import { useSession } from '../src/store/session';
 import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
 import { useTranslation } from '../src/constants/translations';
-import { AppText, GlassScreenScroll, SurfaceButton, Screen, Section } from '../src/components/ui';
+import { AppText, GlassScreenScroll, SurfaceButton, Screen, ScreenTopHeader, Section } from '../src/components/ui';
 import { colors, spacing, MIN_TOUCH_TARGET } from '../src/theme';
 
 function Check({ checked, onPress, text }: { checked: boolean; onPress: () => void; text: string }) {
@@ -59,7 +59,7 @@ export default function LegalScreen() {
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen options={{ headerRight: () => <LanguageFlagsRow inHeader /> }} />
+      <ScreenTopHeader showBack={false} rightElement={<LanguageFlagsRow inHeader />} />
 
       <GlassScreenScroll headerFloat={false} showsVerticalScrollIndicator={false}>
         <AppText variant="h1" style={styles.icon}>⚖️</AppText>

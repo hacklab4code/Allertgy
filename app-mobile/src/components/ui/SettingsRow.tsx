@@ -8,12 +8,14 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { colors, font } from '../../theme';
+import { useIsDarkMode } from '../../hooks/useAppTheme';
 import { AppText } from './AppText';
 
 type Props = {
   icon: keyof typeof Ionicons.glyphMap;
   iconColor?: string;
   iconBg?: string;
+  iconSize?: number;
   title: string;
   subtitle?: string;
   onPress?: () => void;
@@ -25,15 +27,24 @@ type Props = {
 };
 
 export function SettingsDivider() {
-  return <View style={styles.divider} />;
+  const isDark = useIsDarkMode();
+  return (
+    <View
+      style={[
+        styles.divider,
+        isDark && { backgroundColor: 'rgba(255, 255, 255, 0.08)' },
+      ]}
+    />
+  );
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function SettingsRow({
   icon,
-  iconColor = colors.brand,
-  iconBg = colors.brand50,
+  iconColor,
+  iconBg,
+  iconSize = 22,
   title,
   subtitle,
   onPress,
@@ -42,30 +53,50 @@ export function SettingsRow({
   danger = false,
   titleColor,
 }: Props) {
+  const isDark = useIsDarkMode();
   const scale = useSharedValue(1);
-  const resolvedTitleColor = danger ? colors.red : (titleColor ?? colors.brandInk);
+
+  const defaultIconColor = danger
+    ? colors.red
+    : isDark
+      ? '#F1FEC8'
+      : '#334155';
+
+  const resolvedIconColor = iconColor || defaultIconColor;
+
+  const resolvedTitleColor = danger
+    ? colors.red
+    : titleColor
+      ? titleColor
+      : isDark
+        ? '#FFFFFF'
+        : '#0F172A';
+
+  const resolvedSubtitleColor = isDark ? '#94A3B8' : '#64748B';
 
   const containerAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
+  const hasIconBg = !!iconBg && iconBg !== 'transparent';
+
   const body = (
     <View style={styles.innerRow}>
-      <View style={[styles.iconWell, { backgroundColor: iconBg }]}>
-        <Ionicons name={icon} size={18} color={danger ? colors.red : iconColor} />
+      <View style={[styles.iconWell, hasIconBg ? { backgroundColor: iconBg } : styles.iconWellClean]}>
+        <Ionicons name={icon} size={iconSize} color={resolvedIconColor} />
       </View>
       <View style={styles.rowBody}>
         <AppText
           numberOfLines={1}
           color={resolvedTitleColor}
-          style={[styles.title, danger && styles.titleDanger]}
+          style={[styles.title, isDark && styles.titleDark, danger && styles.titleDanger]}
         >
           {title}
         </AppText>
         {subtitle ? (
           <AppText
-            color={colors.textSecondary}
-            style={styles.subtitle}
+            color={resolvedSubtitleColor}
+            style={[styles.subtitle, isDark && styles.subtitleDark]}
             numberOfLines={2}
           >
             {subtitle}
@@ -75,7 +106,11 @@ export function SettingsRow({
       </View>
       {right}
       {onPress ? (
-        <Ionicons name="chevron-forward" size={18} color={colors.borderStrong} />
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={isDark ? 'rgba(255, 255, 255, 0.35)' : '#94A3B8'}
+        />
       ) : null}
     </View>
   );
@@ -90,12 +125,12 @@ export function SettingsRow({
 
   return (
     <AnimatedPressable
-        onPressIn={() => {
-          scale.value = withSpring(0.985, { damping: 18, stiffness: 420 });
-        }}
-        onPressOut={() => {
-          scale.value = withSpring(1, { damping: 14, stiffness: 280 });
-        }}
+      onPressIn={() => {
+        scale.value = withSpring(0.985, { damping: 18, stiffness: 420 });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 14, stiffness: 280 });
+      }}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
@@ -113,6 +148,7 @@ type SwitchRowProps = {
   icon: keyof typeof Ionicons.glyphMap;
   iconColor?: string;
   iconBg?: string;
+  iconSize?: number;
   title: string;
   subtitle?: string;
   value: boolean;
@@ -121,24 +157,30 @@ type SwitchRowProps = {
 
 export function SettingsSwitchRow({
   icon,
-  iconColor = colors.brand,
-  iconBg = colors.brand50,
+  iconColor,
+  iconBg,
+  iconSize = 22,
   title,
   subtitle,
   value,
   onValueChange,
 }: SwitchRowProps) {
+  const isDark = useIsDarkMode();
+  const defaultIconColor = isDark ? '#F1FEC8' : '#334155';
+  const resolvedIconColor = iconColor || defaultIconColor;
+  const hasIconBg = !!iconBg && iconBg !== 'transparent';
+
   return (
     <View style={styles.tile}>
-      <View style={[styles.iconWell, { backgroundColor: iconBg }]}>
-        <Ionicons name={icon} size={18} color={iconColor} />
+      <View style={[styles.iconWell, hasIconBg ? { backgroundColor: iconBg } : styles.iconWellClean]}>
+        <Ionicons name={icon} size={iconSize} color={resolvedIconColor} />
       </View>
       <View style={styles.rowBody}>
-        <AppText numberOfLines={1} color={colors.brandInk} style={styles.title}>
+        <AppText numberOfLines={1} color={isDark ? '#FFFFFF' : '#0F172A'} style={styles.title}>
           {title}
         </AppText>
         {subtitle ? (
-          <AppText color={colors.textSecondary} style={styles.subtitle} numberOfLines={2}>
+          <AppText color={isDark ? '#94A3B8' : '#64748B'} style={styles.subtitle} numberOfLines={2}>
             {subtitle}
           </AppText>
         ) : null}
@@ -162,7 +204,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     width: '100%',
     minHeight: 52,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 6,
     backgroundColor: 'transparent',
   },
@@ -170,7 +212,7 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
   },
   tileExpanded: {
     alignItems: 'flex-start',
@@ -178,17 +220,22 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0, 0, 0, 0.08)',
-    marginLeft: 48,
-    marginVertical: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    marginLeft: 46,
+    marginVertical: 1,
   },
   iconWell: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+  iconWellClean: {
+    backgroundColor: 'transparent',
+    width: 28,
+    height: 28,
   },
   rowBody: {
     flex: 1,
@@ -198,11 +245,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: font.displaySemibold,
-    color: colors.brandInk,
-    fontSize: 15,
+    color: '#0F172A',
+    fontSize: 15.5,
     lineHeight: 20,
     letterSpacing: -0.2,
     fontWeight: '600',
+  },
+  titleDark: {
+    color: '#FFFFFF',
   },
   titleDanger: {
     color: colors.red,
@@ -211,8 +261,11 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: font.regular,
-    color: colors.textSecondary,
+    color: '#64748B',
     fontSize: 13,
     lineHeight: 16,
+  },
+  subtitleDark: {
+    color: '#94A3B8',
   },
 });

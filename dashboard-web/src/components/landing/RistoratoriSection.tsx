@@ -71,29 +71,29 @@ const BENEFITS: BenefitItem[] = [
     Icon: ShieldCheck,
     title: "Compliance UE 100% Garantita",
     desc: "Rispetta il Regolamento UE 1169/2011 ed evita sanzioni senza fogli cartacei disordinati.",
-    color: "text-[#36255C]",
-    bg: "bg-[#E6DFF5]",
+    color: "text-[#10B981]",
+    bg: "bg-[#ECFDF5]",
   },
   {
     Icon: Clock,
     title: "Zero Errori in Sala",
     desc: "I camerieri non devono più correre in cucina a chiedere ingredienti durante i picchi di lavoro.",
-    color: "text-[#2563EB]",
-    bg: "bg-[#DBEAFE]",
+    color: "text-[#7C3AED]",
+    bg: "bg-[#EDE9FE]",
   },
   {
     Icon: TrendingUp,
     title: "+25% Scontrino Medio",
     desc: "Le persone con allergie o intolleranze scelgono locali sicuri e trascinano ampie comitive.",
-    color: "text-[#D97706]",
-    bg: "bg-[#FEF3C7]",
+    color: "text-[#F59E0B]",
+    bg: "bg-[#FFFBEB]",
   },
   {
     Icon: RefreshCw,
     title: "Aggiornamenti in Tempo Reale",
     desc: "Modifica un ingrediente dall'editor e il menù si aggiorna all'istante su tutti i QR Code.",
-    color: "text-[#9333EA]",
-    bg: "bg-[#F3E8FF]",
+    color: "text-[#6366F1]",
+    bg: "bg-[#EEF2FF]",
   },
 ];
 
@@ -108,14 +108,14 @@ export const RistoratoriSection = ({ scrollTo, onEnterDashboard }: RistoratoriSe
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-14">
         <div className="max-w-2xl">
-          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.2em] bg-[#E6DFF5] text-[#36255C]">
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.2em] bg-[#EDE9FE] text-[#7C3AED]">
             <Sparkles className="w-3.5 h-3.5" />
             Per i ristoratori
           </span>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-[#36255C] mt-4 font-heading">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-[#0F172A] mt-4 font-heading">
             Digitalizza il tuo locale e attira nuovi clienti, in 4 passi
           </h2>
-          <p className="text-[#6B6575] mt-3 text-base lg:text-lg leading-relaxed">
+          <p className="text-[#475569] mt-3 text-base lg:text-lg leading-relaxed">
             Trasforma un obbligo di legge in un'opportunità di business. Zero pratiche burocratiche, massima sicurezza per i tuoi ospiti.
           </p>
         </div>
@@ -131,7 +131,7 @@ export const RistoratoriSection = ({ scrollTo, onEnterDashboard }: RistoratoriSe
           {onEnterDashboard && (
             <button
               onClick={onEnterDashboard}
-              className="inline-flex items-center gap-2 btn-clay-white font-semibold px-7 py-4 rounded-full border-0 cursor-pointer text-[#36255C]"
+              className="inline-flex items-center gap-2 btn-clay-white font-semibold px-7 py-4 rounded-full border-0 cursor-pointer text-[#7C3AED]"
             >
               Accedi alla Dashboard
             </button>
@@ -149,26 +149,26 @@ export const RistoratoriSection = ({ scrollTo, onEnterDashboard }: RistoratoriSe
             viewport={{ once: true, margin: "-80px" }}
             transition={{ duration: 0.55, delay: i * 0.1 }}
             data-testid={`ristoratori-step-${i + 1}`}
-            className={`${s.span} card-clay-white p-8 hover:-translate-y-1 transition-transform flex flex-col justify-between`}
+            className={`${s.span} bg-white rounded-3xl border border-[#E2E8F0] p-8 shadow-[0_8px_30px_rgba(124,58,237,0.04)] hover:-translate-y-1 transition-transform flex flex-col justify-between`}
           >
             <div>
               <div className="flex items-start justify-between">
-                <div className="grid place-items-center w-14 h-14 rounded-2xl bg-[#36255C] text-white">
-                  <s.Icon className="w-7 h-7 text-[#B9A6E8]" strokeWidth={1.75} />
+                <div className="grid place-items-center w-14 h-14 rounded-2xl bg-[#2E1065] text-white shadow-md">
+                  <s.Icon className="w-7 h-7 text-[#DDD6FE]" strokeWidth={2} />
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#36255C] bg-[#E6DFF5] px-3 py-1 rounded-full">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#7C3AED] bg-[#EDE9FE] px-3 py-1 rounded-full border border-[#DDD6FE]">
                     {s.badge}
                   </span>
-                  <span className="text-4xl font-extrabold text-[#E6DFF5] font-heading">
+                  <span className="text-4xl font-extrabold text-[#DDD6FE] font-heading">
                     {s.n}
                   </span>
                 </div>
               </div>
-              <h3 className="text-xl font-extrabold mt-6 text-[#36255C] font-heading">
+              <h3 className="text-xl font-extrabold mt-6 text-[#0F172A] font-heading">
                 {s.title}
               </h3>
-              <p className="text-sm text-[#6B6575] mt-2 leading-relaxed max-w-md">
+              <p className="text-sm text-[#475569] mt-2 leading-relaxed max-w-md">
                 {s.desc}
               </p>
             </div>
@@ -177,12 +177,12 @@ export const RistoratoriSection = ({ scrollTo, onEnterDashboard }: RistoratoriSe
       </div>
 
       {/* Strategic Benefits (Bento Grid) */}
-      <div className="bg-[#E6DFF5]/40 border border-[#E6DFF5] rounded-3xl p-8 md:p-12">
+      <div className="bg-[#F1F5F9]/50 border border-[#E2E8F0] rounded-3xl p-8 md:p-12">
         <div className="max-w-xl mb-10">
-          <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#36255C]">
+          <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#7C3AED]">
             Perché sceglierci
           </span>
-          <h3 className="text-2xl sm:text-3xl font-extrabold text-[#36255C] mt-2 font-heading">
+          <h3 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] mt-2 font-heading">
             Tutti i vantaggi per la tua attività
           </h3>
         </div>
@@ -195,20 +195,20 @@ export const RistoratoriSection = ({ scrollTo, onEnterDashboard }: RistoratoriSe
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-60px" }}
               transition={{ duration: 0.45, delay: i * 0.08 }}
-              className="card-clay-white p-6 flex flex-col justify-between"
+              className="bg-white rounded-2xl p-6 border border-[#E2E8F0] shadow-sm flex flex-col justify-between"
             >
               <div>
                 <div className={`w-12 h-12 rounded-xl grid place-items-center ${b.bg} ${b.color} mb-4`}>
                   <b.Icon className="w-6 h-6" strokeWidth={2} />
                 </div>
-                <h4 className="font-extrabold text-[#36255C] font-heading text-base">
+                <h4 className="font-extrabold text-[#0F172A] font-heading text-base">
                   {b.title}
                 </h4>
-                <p className="text-xs text-[#6B6575] mt-2 leading-relaxed">
+                <p className="text-xs text-[#64748B] mt-2 leading-relaxed">
                   {b.desc}
                 </p>
               </div>
-              <div className="mt-4 pt-3 border-t border-[#E6DFF5]/50 flex items-center gap-1.5 text-[11px] font-bold text-[#36255C]">
+              <div className="mt-4 pt-3 border-t border-[#F8FAFC] flex items-center gap-1.5 text-[11px] font-bold text-[#10B981]">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Incluso nel servizio</span>
               </div>

@@ -134,7 +134,7 @@ export function MenuScanModal({
                     style={styles.backBtn}
                     hitSlop={8}
                   >
-                    <Ionicons name="arrow-back" size={20} color={colors.onSurface} />
+                    <Ionicons name="arrow-back-outline" size={20} color={colors.onSurface} />
                   </TouchableOpacity>
                 )}
 
@@ -145,7 +145,7 @@ export function MenuScanModal({
                 </AppText>
 
                 <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={10}>
-                  <Ionicons name="close" size={18} color={colors.onSurfaceMuted} />
+                  <Ionicons name="close-outline" size={18} color={colors.onSurfaceMuted} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -250,7 +250,7 @@ export function MenuScanModal({
                         }}
                         hitSlop={8}
                       >
-                        <Ionicons name="close-circle" size={18} color={colors.onSurfaceMuted} />
+                        <Ionicons name="close-circle-outline" size={18} color={colors.onSurfaceMuted} />
                       </TouchableOpacity>
                     ) : null
                   }

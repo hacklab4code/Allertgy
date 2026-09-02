@@ -1,11 +1,12 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { WIREFRAME_MODE } from '../theme';
 import { AppText } from './ui/AppText';
 
-const HIT = 42;
+const HIT = 52;
 
 function openEmergency() {
   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -41,38 +42,30 @@ export default function SosHeaderButton() {
       ]}
       hitSlop={8}
     >
-      <Image
-        source={require('../../assets/header_sos.png')}
-        style={styles.sosIconImage}
-        resizeMode="contain"
-      />
+      <MaterialCommunityIcons name="alarm-light-outline" size={24} color="#EF4444" />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   sosCircleButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#EF4444',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(239, 68, 68, 0.18)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(239, 68, 68, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#EF4444',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sosIconImage: {
-    width: 36,
-    height: 36,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonPressed: {
     opacity: 0.75,
-    transform: [{ scale: 0.97 }],
+    transform: [{ scale: 0.96 }],
   },
   wire: {
     width: HIT,

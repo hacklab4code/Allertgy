@@ -22,32 +22,63 @@ export type MoodPalette = {
  */
 export const MOOD_PALETTES: Record<ExperienceMood, MoodPalette> = {
   brand: {
-    top: '#23212C',
-    mid: '#3D384D',
-    soft: '#F1FEC8',
-    bottom: '#F6F2FC',
-    glow: '#F1FEC8',
+    top: '#F4FDE2',
+    mid: '#F8FDF0',
+    soft: '#FCFEF9',
+    bottom: '#F8FAFC',
+    glow: '#E2F7A8',
   },
   green: {
-    top: '#059669',
-    mid: '#34D399',
-    soft: '#D1FAE5',
-    bottom: '#F6F2FC',
-    glow: '#34D399',
+    top: '#ECFDF5',
+    mid: '#F0FDF4',
+    soft: '#F6FBF8',
+    bottom: '#F8FAFC',
+    glow: '#A7F3D0',
   },
   yellow: {
-    top: '#D97706',
-    mid: '#FBBF24',
-    soft: '#FEF3C7',
-    bottom: '#F6F2FC',
-    glow: '#FBBF24',
+    top: '#FFFBEB',
+    mid: '#FEF3C7',
+    soft: '#FDFBF5',
+    bottom: '#F8FAFC',
+    glow: '#FDE68A',
   },
   red: {
-    top: '#DC2626',
-    mid: '#F87171',
-    soft: '#FEE2E2',
-    bottom: '#F6F2FC',
-    glow: '#F87171',
+    top: '#FEF2F2',
+    mid: '#FEE2E2',
+    soft: '#FDF7F7',
+    bottom: '#F8FAFC',
+    glow: '#FECACA',
+  },
+};
+
+export const MOOD_PALETTES_DARK: Record<ExperienceMood, MoodPalette> = {
+  brand: {
+    top: '#736B98',
+    mid: '#645B88',
+    soft: '#59507C',
+    bottom: '#504771',
+    glow: '#DDD6FE',
+  },
+  green: {
+    top: '#2D7F67',
+    mid: '#236E58',
+    soft: '#1B5B49',
+    bottom: '#2F4840',
+    glow: '#A7F3D0',
+  },
+  yellow: {
+    top: '#B46C26',
+    mid: '#9E5B1D',
+    soft: '#7E4612',
+    bottom: '#4E3F32',
+    glow: '#FEF08A',
+  },
+  red: {
+    top: '#CC2E2E',
+    mid: '#AC2323',
+    soft: '#8D1B1B',
+    bottom: '#503338',
+    glow: '#FECDD3',
   },
 };
 

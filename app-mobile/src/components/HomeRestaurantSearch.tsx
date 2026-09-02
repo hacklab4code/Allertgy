@@ -197,7 +197,7 @@ export default function HomeRestaurantSearch({
   return (
     <View style={styles.wrap}>
       <View style={[styles.searchBox, focused && styles.searchBoxFocused]}>
-        <Ionicons name="search" size={19} color={focused ? colors.brand : colors.onSurfaceMuted} />
+        <Ionicons name="search-outline" size={19} color={focused ? colors.brand : colors.onSurfaceMuted} />
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -214,7 +214,7 @@ export default function HomeRestaurantSearch({
         />
         {trimmed ? (
           <Pressable onPress={clear} hitSlop={10} accessibilityLabel={isIt ? 'Cancella ricerca' : 'Clear search'}>
-            <Ionicons name="close-circle" size={18} color={colors.onSurfaceMuted} />
+            <Ionicons name="close-circle-outline" size={18} color={colors.onSurfaceMuted} />
           </Pressable>
         ) : null}
       </View>
@@ -356,9 +356,9 @@ export default function HomeRestaurantSearch({
                             : (isIt ? 'Aggiungi ai preferiti' : 'Add to favorites')}
                         >
                           <Ionicons
-                            name={favorite ? 'heart' : 'heart-outline'}
+                            name="heart-outline"
                             size={18}
-                            color={favorite ? colors.brand : colors.onSurfaceMuted}
+                            color={favorite ? '#EF4444' : colors.onSurfaceMuted}
                           />
                         </Pressable>
                       </View>

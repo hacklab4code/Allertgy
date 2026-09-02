@@ -26,7 +26,7 @@ export default function Landing({ onEnter, onClienti }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-[#F6F2FC] text-[#36255C] font-body antialiased relative selection:bg-[#D2C3F6] selection:text-[#36255C]">
+    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] font-body antialiased relative selection:bg-[#DDD6FE] selection:text-[#2E1065]">
       <AnimatedBackground />
       <Nav scrollTo={scrollTo} onEnter={onEnter} onClienti={onClienti} />
       <main>

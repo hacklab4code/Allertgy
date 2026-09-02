@@ -16,8 +16,6 @@ import {
 import Animated, {
   Extrapolation,
   interpolate,
-  runOnJS,
-  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
@@ -82,59 +80,22 @@ function ScrollEntryInner({
   const reduceMotion = useSystemReduceMotion();
   const enabled = !!timeline && !reduceMotion && !lite;
 
-  const hostRef = React.useRef<View>(null);
-  const anchorPageY = useSharedValue(0);
-  const measuredAtScroll = useSharedValue(0);
+  const layoutY = useSharedValue(0);
   const itemH = useSharedValue(120);
   const itemW = useSharedValue(320);
   const ready = useSharedValue(0);
 
-  const syncAnchor = useCallback(() => {
-    if (!enabled || !timeline) return;
-    const node = hostRef.current;
-    if (!node) return;
-    node.measureInWindow((_x, y, w, h) => {
-      if (h <= 0 || w <= 0) return;
-      anchorPageY.value = y;
-      measuredAtScroll.value = timeline.scrollY.value;
-      itemH.value = h;
-      itemW.value = w;
-      ready.value = 1;
-    });
-  }, [enabled, timeline, anchorPageY, measuredAtScroll, itemH, itemW, ready]);
-
-  useEffect(() => {
-    if (!enabled) return undefined;
-    syncAnchor();
-    const t1 = setTimeout(syncAnchor, 120);
-    const t2 = setTimeout(syncAnchor, 420);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [enabled, syncAnchor]);
-
-  // Immagini / layout sopra che crescono → riallinea l’ancora (senza questo gli item in fondo “muoiono”).
-  useAnimatedReaction(
-    () => (timeline ? timeline.contentH.value : 0),
-    (curr, prev) => {
-      if (!enabled || !timeline) return;
-      if (prev == null) return;
-      if (Math.abs(curr - prev) < 4) return;
-      runOnJS(syncAnchor)();
+  const handleLayout = useCallback(
+    (event: any) => {
+      const { y, height, width } = event.nativeEvent.layout;
+      if (height > 0 && width > 0) {
+        layoutY.value = y;
+        itemH.value = height;
+        itemW.value = width;
+        ready.value = 1;
+      }
     },
-    [enabled, timeline, syncAnchor],
-  );
-
-  // Riallinea ogni ~120px di scroll: evita drift dopo scroll lunghi / reload immagini.
-  useAnimatedReaction(
-    () => (timeline ? Math.round(timeline.scrollY.value / 120) : 0),
-    (curr, prev) => {
-      if (!enabled || !timeline) return;
-      if (prev == null || curr === prev) return;
-      runOnJS(syncAnchor)();
-    },
-    [enabled, timeline, syncAnchor],
+    [layoutY, itemH, itemW, ready],
   );
 
   const animStyle = useAnimatedStyle(() => {
@@ -149,8 +110,8 @@ function ScrollEntryInner({
       return { opacity: 1, transform: [{ translateY: 0 }, { translateX: 0 }, { scale: 1 }] };
     }
 
-    const pageY =
-      anchorPageY.value - (timeline.scrollY.value - measuredAtScroll.value);
+    // Calcolo puramente su UI-thread senza chiamate bridge
+    const pageY = layoutY.value - timeline.scrollY.value;
     const maxScroll = Math.max(0, timeline.contentH.value - vh);
     const scrollY = timeline.scrollY.value;
     const nearTop = scrollY <= 8;
@@ -166,24 +127,24 @@ function ScrollEntryInner({
     if (animation === 'send-and-receive') {
       const enter = interpolate(
         pageY,
-        [vh - h * 0.2, vh - h * 1.35],
+        [vh - h * 0.1, vh - h * 0.8],
         [0, 1],
         Extrapolation.CLAMP,
       );
       const exit = interpolate(
         pageY,
-        [h * 1.05, -h * 1.15],
+        [h * 0.8, -h * 0.8],
         [0, 1],
         Extrapolation.CLAMP,
       );
 
-      const enterOpacity = interpolate(enter, [0, 0.35, 1], [0, 0.6, 1], Extrapolation.CLAMP);
-      const enterY = interpolate(enter, [0, 0.5, 1], [0.22, 0.08, 0], Extrapolation.CLAMP);
-      const exitOpacity = interpolate(exit, [0, 0.5, 1], [1, 0.5, 0], Extrapolation.CLAMP);
-      const exitY = interpolate(exit, [0, 1], [0, -0.35], Extrapolation.CLAMP);
+      const enterOpacity = interpolate(enter, [0, 0.4, 1], [0.35, 0.75, 1], Extrapolation.CLAMP);
+      const enterY = interpolate(enter, [0, 0.6, 1], [16, 6, 0], Extrapolation.CLAMP);
+      const exitOpacity = interpolate(exit, [0, 0.6, 1], [1, 0.65, 0], Extrapolation.CLAMP);
+      const exitY = interpolate(exit, [0, 1], [0, -18], Extrapolation.CLAMP);
 
       const opacity = Math.min(enterOpacity, exitOpacity);
-      const translateY = exit > 0.002 ? exitY * h : enterY * h;
+      const translateY = exit > 0.002 ? exitY : enterY;
 
       return {
         opacity,
@@ -193,7 +154,6 @@ function ScrollEntryInner({
 
     if (animation === 'candycane') {
       const exiting = pageY < 0;
-      // Enter: opaco appena il piatto è quasi tutto in viewport (non serve 2× altezza).
       const focus = exiting
         ? interpolate(pageY, [-h, 0], [0, 1], Extrapolation.CLAMP)
         : interpolate(pageY, [vh - h * 1.05, vh + h * 0.15], [1, 0], Extrapolation.CLAMP);
@@ -212,8 +172,8 @@ function ScrollEntryInner({
       return {
         opacity: focus,
         transform: [
-          { translateY: exiting ? (1 - focus) * h * 0.3 : interpolate(focus, [0, 1], [16, 0], Extrapolation.CLAMP) },
-          { scale: interpolate(focus, [0, 1], [0.94, 1], Extrapolation.CLAMP) },
+          { translateY: exiting ? (1 - focus) * h * 0.2 : interpolate(focus, [0, 1], [12, 0], Extrapolation.CLAMP) },
+          { scale: interpolate(focus, [0, 1], [0.96, 1], Extrapolation.CLAMP) },
         ],
       };
     }
@@ -227,10 +187,9 @@ function ScrollEntryInner({
 
   return (
     <View
-      ref={hostRef}
       collapsable={false}
       style={[styles.host, style]}
-      onLayout={syncAnchor}
+      onLayout={handleLayout}
     >
       <Animated.View style={animStyle}>{children}</Animated.View>
     </View>

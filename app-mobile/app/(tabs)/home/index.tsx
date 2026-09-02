@@ -9,17 +9,15 @@ import {
 } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsDarkMode } from '../../../src/hooks/useAppTheme';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../../src/api/client';
 import { calcolaCompatibilita } from '../../../src/engine/compatibility';
 import RestaurantCard from '../../../src/components/RestaurantCard';
-import { HomeTopHeader } from '../../../src/components/HomeTopHeader';
 import { HomeProfileShieldCard } from '../../../src/components/HomeProfileShieldCard';
-import HomeQuickActionHub from '../../../src/components/HomeQuickActionHub';
-import HomeDietaryFilterBar, { type DietaryFilterId } from '../../../src/components/HomeDietaryFilterBar';
-import HomeRecentScansWidget from '../../../src/components/HomeRecentScansWidget';
+import { HomeQuickActions, HomeFoodRecallsCard } from '../../../src/components/HomeQuickActionHub';
 import HomeSafetyTipCard from '../../../src/components/HomeSafetyTipCard';
 import { useSession } from '../../../src/store/session';
 import { useProfileSheet } from '../../../src/store/profileSheet';
@@ -33,6 +31,7 @@ import { distanceKm, formatDistanceLabel } from '../../../src/utils/venueDistanc
 import { useActiveProfileAllergies } from '../../../src/hooks/useActiveProfileAllergies';
 import { useAdaptiveMeshInk } from '../../../src/hooks/useMeshInk';
 import { useSectionTitle } from '../../../src/hooks/useSectionTitle';
+import { TAB_BAR_CLEARANCE } from '../../../src/layoutConstants';
 import {
   AppText,
   ErrorStateCard,
@@ -74,7 +73,7 @@ export default function Home() {
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [locationStatus, setLocationStatus] = useState<'prompt' | 'granted' | 'denied' | 'error'>('prompt');
   const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
-  const [selectedFilter, setSelectedFilter] = useState<DietaryFilterId>('all');
+  const isDark = useIsDarkMode();
 
   const activeProfileIndex = useMemo(() => {
     if (activeProfileId === null) return 1; // Sofia / default avatar
@@ -223,37 +222,7 @@ export default function Home() {
       return enrich(r, dist);
     });
 
-    let filtered = pool;
-    if (selectedFilter === 'safe100') {
-      const safeOnly = pool.filter((v) => (v.compatibility?.percentuale ?? 0) === 100);
-      if (safeOnly.length > 0) filtered = safeOnly;
-    } else if (selectedFilter === 'gluten_free') {
-      const gfOnly = pool.filter((v) =>
-        v.name.toLowerCase().includes('gluten') ||
-        v.name.toLowerCase().includes('senza glutine') ||
-        (v.compatibility?.percentuale ?? 0) >= 70,
-      );
-      if (gfOnly.length > 0) filtered = gfOnly;
-    } else if (selectedFilter === 'lactose_free') {
-      const lfOnly = pool.filter((v) =>
-        (v.compatibility?.percentuale ?? 0) >= 70,
-      );
-      if (lfOnly.length > 0) filtered = lfOnly;
-    } else if (selectedFilter === 'pizza') {
-      const pizzaOnly = pool.filter((v) =>
-        v.name.toLowerCase().includes('pizz') || v.name.toLowerCase().includes('pizzeria'),
-      );
-      if (pizzaOnly.length > 0) filtered = pizzaOnly;
-    } else if (selectedFilter === 'sushi') {
-      const sushiOnly = pool.filter((v) =>
-        v.name.toLowerCase().includes('sushi') ||
-        v.name.toLowerCase().includes('giapponese') ||
-        v.name.toLowerCase().includes('ramen'),
-      );
-      if (sushiOnly.length > 0) filtered = sushiOnly;
-    }
-
-    return filtered
+    return pool
       .slice()
       .sort((a, b) => {
         if (hasAllergie) {
@@ -271,13 +240,13 @@ export default function Home() {
         return a.distance - b.distance;
       })
       .slice(0, 12);
-  }, [restaurants, userLocation, enrich, hasAllergie, selectedFilter]);
+  }, [restaurants, userLocation, enrich, hasAllergie]);
 
-  const onToggleFavorite = (code: string, name: string) => {
+  const onToggleFavorite = useCallback((code: string, name: string) => {
     void toggleRestaurantFavorite(code, name);
-  };
+  }, []);
 
-  const renderCard = (item: HomeVenue) => (
+  const renderCard = useCallback((item: HomeVenue) => (
     <View key={item.code} style={styles.horizontalCardItem}>
       <RestaurantCard
         code={item.code}
@@ -299,7 +268,7 @@ export default function Home() {
         ratingCount={item.ratingCount}
       />
     </View>
-  );
+  ), [isFavorite, onToggleFavorite]);
 
   const renderPicks = (venuesList = rankedVenues) => {
     if (restaurantsError) {
@@ -357,25 +326,12 @@ export default function Home() {
 
   return (
     <Screen edges={false} style={styles.screen}>
-      <HomeTopHeader
-        scrollY={scrollY}
-        restaurants={restaurants}
-        loadingRestaurants={loadingRestaurants}
-        restaurantsError={restaurantsError}
-        onRetryRestaurants={loadRestaurants}
-        allergie={allergie}
-        ingredientiEsclusi={ingredientiEsclusi}
-        userLocation={userLocation}
-        isFavorite={isFavorite}
-        onToggleFavorite={onToggleFavorite}
-        isIt={isIt}
-      />
       <GlassScreenScroll
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
         externalScrollY={scrollY}
-        topPaddingOverride={insets.top + 60}
+        topPaddingOverride={0}
         headerFloat={false}
       >
         {/* 1. HERO CARD IN ALTO: IDENTITÀ, PROFILO ATTIVO & SCUDO ALLERGENI */}
@@ -386,41 +342,38 @@ export default function Home() {
           activeProfileIndex={activeProfileIndex}
           allergie={allergie}
           allergyIntensities={allergyIntensities}
+          allergyCriteria={allergyCriteria}
           hasAllergie={hasAllergie}
           isIt={isIt}
         />
 
-        {/* 2. QUICK ACTION HUB (2 GRANDI HERO ACTIONS + 2x2 TOOLS + LIVE RECALLS) */}
-        <HomeQuickActionHub isIt={isIt} />
+        {/* 2. AZIONI RAPIDE (4 ICONE 3D: DIARIO, PASSAPORTO, FRASARIO, LISTA SPESA) */}
+        <HomeQuickActions isIt={isIt} />
 
         {/* 3. CAROSELLO LOCALI PIÙ COMPATIBILI VICINO A TE */}
         <View style={styles.carouselBlock}>
           <View style={styles.sectionHeaderRow}>
-            <View style={styles.titleWithIcon}>
-              <Ionicons name="compass-outline" size={20} color="#23212C" />
-              <AppText variant="h2" style={styles.sectionTitle}>
-                {isIt ? 'Locali più compatibili vicino a te' : 'Most compatible near you'}
-              </AppText>
-            </View>
+            <AppText
+              variant="h2"
+              style={[
+                styles.sectionTitle,
+                { color: isDark ? '#FFFFFF' : '#1F2937' },
+              ]}
+            >
+              {isIt ? 'Locali più compatibili vicino a te' : 'Most compatible near you'}
+            </AppText>
             <Pressable onPress={() => router.push('/(tabs)/locali')} hitSlop={8}>
-              <AppText style={styles.seeAllBtn}>
+              <AppText style={[styles.seeAllBtn, isDark && { color: '#A5B4FC' }]}>
                 {isIt ? 'Vedi tutti' : 'See all'}
               </AppText>
             </Pressable>
           </View>
 
-          {/* Filtri rapidi per il carosello */}
-          <HomeDietaryFilterBar
-            selectedFilter={selectedFilter}
-            onSelectFilter={setSelectedFilter}
-            isIt={isIt}
-          />
-
           {renderPicks(rankedVenues)}
         </View>
 
-        {/* 4. WIDGET SPESA SICURA & RECENTI */}
-        <HomeRecentScansWidget isIt={isIt} />
+        {/* 4. ALLERTE & RICHIAMI ALIMENTARI */}
+        <HomeFoodRecallsCard isIt={isIt} />
 
         {/* 5. TIP DI SICUREZZA INTERATTIVO ROTANTE */}
         <HomeSafetyTipCard isIt={isIt} />
@@ -434,7 +387,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: 40,
+    paddingBottom: TAB_BAR_CLEARANCE + 70,
     gap: 4,
   },
   carouselBlock: {
@@ -444,7 +397,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 12,
   },
   titleWithIcon: {
     flexDirection: 'row',

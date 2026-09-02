@@ -387,7 +387,7 @@ function FavoriteDishCard({
         </View>
       </Pressable>
       <Pressable onPress={onToggle} hitSlop={8} style={styles.dishStar} accessibilityLabel="Rimuovi dai preferiti">
-        <Ionicons name="star" size={20} color={colors.amberText} />
+        <Ionicons name="star-outline" size={20} color={colors.amberText} />
       </Pressable>
     </GlassCard>
   );

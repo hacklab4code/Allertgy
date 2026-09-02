@@ -25,7 +25,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HEADER_FLOAT_CLEARANCE, TAB_BAR_CLEARANCE, SCREEN_PADDING_H } from '../../layoutConstants';
-import { meshScrollY, useMeshScrollY } from '../../hooks/useMeshInk';
+import { meshScrollY } from '../../hooks/useMeshInk';
 import { useFloatingHeader } from '../../store/floatingHeader';
 import { colors, spacing } from '../../theme';
 import { LiquidGlassView } from './LiquidGlassView';
@@ -48,16 +48,15 @@ export const GLASS_CAROUSEL_PAD_B = 8;
 export const GLASS_CAROUSEL_CARD_W = 240;
 
 /** Bridge JS throttled per massima fluidità nativa a 120fps. */
-const JS_SCROLL_EPS = 32;
+const JS_SCROLL_EPS = 8;
 
 type ScreenScrollProps = ScrollViewProps & {
   insetBottom?: number;
   /** true = spazio per SOS/notifiche (tab). false = solo safe area (stack). */
   headerFloat?: boolean;
   /**
-   * Aggiorna SOS/notifiche su scroll-down/up.
-   * Default = headerFloat. Usa true con headerFloat false quando l'header è fuori dallo scroll
-   * (es. Ristoranti).
+   * Aggiorna SOS/notifiche/tabbar su scroll-down/up.
+   * Default = true.
    */
   trackFloatingChrome?: boolean;
   /** SharedValue opzionale per sincronizzare animazioni esterne (es. HomeTopHeader) a 120fps */
@@ -69,14 +68,14 @@ type ScreenScrollProps = ScrollViewProps & {
 /** Scroll principale schermata — sfondo visibile, gap uniforme tra blocchi vetro. */
 export function GlassScreenScroll({
   children,
-  contentContainerStyle,
   style,
+  contentContainerStyle,
+  showsVerticalScrollIndicator = false,
   insetBottom = TAB_BAR_CLEARANCE,
   headerFloat = true,
   trackFloatingChrome,
   externalScrollY,
   topPaddingOverride,
-  showsVerticalScrollIndicator = false,
   onScroll,
   onLayout,
   onContentSizeChange,
@@ -89,11 +88,11 @@ export function GlassScreenScroll({
     : headerFloat
     ? insets.top + HEADER_FLOAT_CLEARANCE
     : spacing.sm;
-  const trackChrome = trackFloatingChrome ?? headerFloat;
+  const trackChrome = trackFloatingChrome ?? true;
   const lastY = useRef(0);
+
   const reportScroll = useFloatingHeader((s) => s.reportScroll);
   const showHeader = useFloatingHeader((s) => s.show);
-  const setMeshScrollY = useMeshScrollY((s) => s.setY);
   const scrollY = useSharedValue(0);
   const viewportH = useSharedValue(0);
   const contentH = useSharedValue(0);
@@ -105,20 +104,18 @@ export function GlassScreenScroll({
   useFocusEffect(
     useCallback(() => {
       meshScrollY.value = localScrollY.value;
-      setMeshScrollY(localScrollY.value);
-    }, [localScrollY, setMeshScrollY]),
+    }, [localScrollY]),
   );
 
   const handleScrollJS = useCallback((y: number) => {
-    setMeshScrollY(y);
     if (trackChrome) {
       const dy = y - lastY.current;
       lastY.current = y;
       reportScroll(y, dy);
     }
-  }, [setMeshScrollY, trackChrome, reportScroll]);
+  }, [trackChrome, reportScroll]);
 
-  // UI-thread: scrollY + mesh fade ogni frame; JS (chrome) throttled → meno scatti
+  // UI-thread: scrollY + mesh fade ogni frame a 120fps senza bridge congestion
   const onScrollAnim = useAnimatedScrollHandler({
     onScroll: (e) => {
       const y = e.contentOffset.y;
@@ -128,7 +125,7 @@ export function GlassScreenScroll({
       if (externalScrollY) {
         externalScrollY.value = y;
       }
-      if (Math.abs(y - lastJsY.value) >= JS_SCROLL_EPS) {
+      if (trackChrome && Math.abs(y - lastJsY.value) >= JS_SCROLL_EPS) {
         lastJsY.value = y;
         runOnJS(handleScrollJS)(y);
       }
@@ -158,9 +155,11 @@ export function GlassScreenScroll({
         nestedScrollEnabled
         onMomentumScrollEnd={(e) => {
           props.onMomentumScrollEnd?.(e);
-          handleScrollJS(e.nativeEvent.contentOffset.y);
-          if (trackChrome && e.nativeEvent.contentOffset.y <= 12) {
-            showHeader();
+          if (trackChrome) {
+            handleScrollJS(e.nativeEvent.contentOffset.y);
+            if (e.nativeEvent.contentOffset.y <= 12) {
+              showHeader();
+            }
           }
         }}
         contentContainerStyle={[

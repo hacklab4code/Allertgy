@@ -16,40 +16,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
-import {
-  Apple,
-  Bean,
-  Carrot,
-  ChevronDown,
-  ChevronLeft,
-  ChevronUp,
-  Egg,
-  Fish,
-  MapPin,
-  MessageCircle,
-  Milk,
-  Nut,
-  Pencil,
-  Phone,
-  Pill,
-  Play,
-  RotateCcw,
-  Salad,
-  Send,
-  Settings,
-  ShieldAlert,
-  Syringe,
-  Timer,
-  TriangleAlert,
-  User,
-  Wheat,
-  Wine,
-  X,
-} from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '../src/store/session';
 import { getAllergenName } from '../src/engine/translations';
 import { colors, font, radius, spacing } from '../src/theme';
 import { api } from '../src/api/client';
+import { ScreenTopHeader } from '../src/components/ui';
 
 type IntensityLevel = 'lieve' | 'moderata' | 'grave';
 
@@ -242,19 +214,19 @@ export default function EmergencyScreen() {
 
   const renderAllergenIcon = (code: string) => {
     const clean = code.toLowerCase().trim();
-    const iconProps = { size: 18, color: '#7C789B', strokeWidth: 2 };
+    const iconProps = { size: 18, color: '#7C789B' };
 
-    if (['glutine', 'cereali', 'frumento', 'orzo', 'segale', 'avena', 'farro'].includes(clean)) return <Wheat {...iconProps} />;
-    if (['latte', 'lattosio', 'formaggio'].includes(clean)) return <Milk {...iconProps} />;
-    if (['frutta_guscio', 'frutta_a_guscio', 'arachidi', 'noci', 'nocciole', 'mandorle', 'pistacchi', 'anacardi'].includes(clean)) return <Nut {...iconProps} />;
-    if (['uova', 'uovo'].includes(clean)) return <Egg {...iconProps} />;
-    if (['pesce', 'crostacei', 'molluschi'].includes(clean)) return <Fish {...iconProps} />;
-    if (['soia', 'lupini', 'legumi', 'fagioli', 'lenticchie'].includes(clean)) return <Bean {...iconProps} />;
-    if (['sedano', 'verdura', 'spinaci', 'broccoli'].includes(clean)) return <Salad {...iconProps} />;
-    if (['mela', 'frutta', 'pesca', 'fragole'].includes(clean)) return <Apple {...iconProps} />;
-    if (['carota'].includes(clean)) return <Carrot {...iconProps} />;
-    if (['solfiti', 'vino'].includes(clean)) return <Wine {...iconProps} />;
-    return <TriangleAlert {...iconProps} />;
+    if (['glutine', 'cereali', 'frumento', 'orzo', 'segale', 'avena', 'farro'].includes(clean)) return <Ionicons name="nutrition-outline" {...iconProps} />;
+    if (['latte', 'lattosio', 'formaggio'].includes(clean)) return <Ionicons name="water-outline" {...iconProps} />;
+    if (['frutta_guscio', 'frutta_a_guscio', 'arachidi', 'noci', 'nocciole', 'mandorle', 'pistacchi', 'anacardi'].includes(clean)) return <Ionicons name="ellipse-outline" {...iconProps} />;
+    if (['uova', 'uovo'].includes(clean)) return <Ionicons name="egg-outline" {...iconProps} />;
+    if (['pesce', 'crostacei', 'molluschi'].includes(clean)) return <Ionicons name="fish-outline" {...iconProps} />;
+    if (['soia', 'lupini', 'legumi', 'fagioli', 'lenticchie'].includes(clean)) return <Ionicons name="leaf-outline" {...iconProps} />;
+    if (['sedano', 'verdura', 'spinaci', 'broccoli'].includes(clean)) return <Ionicons name="leaf-outline" {...iconProps} />;
+    if (['mela', 'frutta', 'pesca', 'fragole'].includes(clean)) return <Ionicons name="nutrition-outline" {...iconProps} />;
+    if (['carota'].includes(clean)) return <Ionicons name="nutrition-outline" {...iconProps} />;
+    if (['solfiti', 'vino'].includes(clean)) return <Ionicons name="wine-outline" {...iconProps} />;
+    return <Ionicons name="warning-outline" {...iconProps} />;
   };
 
   const handleCall112 = () => {
@@ -320,32 +292,20 @@ export default function EmergencyScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: Math.max(insets.top, 16) }]}>
-      <Stack.Screen options={{ headerShown: false }} />
+    <View style={styles.container}>
+      <ScreenTopHeader title="Emergenza SOS & ICE" />
 
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 36 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* TOP HEADER */}
-        <View style={styles.topHeader}>
-          <Pressable
-            style={({ pressed }) => [styles.backButton, pressed && styles.btnPressed]}
-            onPress={() => router.back()}
-            accessibilityRole="button"
-            accessibilityLabel={isIt ? 'Indietro' : 'Back'}
-          >
-            <ChevronLeft size={22} color="#1E1B4B" strokeWidth={2.5} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Emergenza SOS & ICE</Text>
-        </View>
 
         {/* 1. CALL 112 BANNER CARD */}
         <View style={styles.callCard}>
           <View style={styles.callCardTopRow}>
             <View style={styles.callIconBadge}>
-              <Phone size={24} color="#FFFFFF" strokeWidth={2.4} />
+              <Ionicons name="call-outline" size={24} color="#FFFFFF" />
             </View>
             <View style={styles.callTextContainer}>
               <Text style={styles.callTitle}>Chiama il 112</Text>
@@ -366,7 +326,7 @@ export default function EmergencyScreen() {
         {/* 2. REAL-TIME GPS LOCATION CARD FOR DISPATCHER */}
         <View style={styles.locationCard}>
           <View style={styles.locationCardHead}>
-            <MapPin size={18} color="#2563EB" />
+            <Ionicons name="location-outline" size={18} color="#2563EB" />
             <Text style={styles.locationCardTitle}>
               {isIt ? 'La tua posizione (da leggere al 112)' : 'Your location (read to 112)'}
             </Text>
@@ -384,12 +344,12 @@ export default function EmergencyScreen() {
         {/* 3. QUICK SOS TO TRUSTED CONTACT (SMS / WHATSAPP) */}
         <View style={styles.cardContainer}>
           <View style={styles.cardHeaderRow}>
-            <User size={18} color="#1E1B4B" strokeWidth={2.2} />
+            <Ionicons name="person-outline" size={18} color="#1E1B4B" />
             <Text style={styles.cardHeaderTitle}>
               {isIt ? 'Contatto fidato' : 'Trusted contact'}
             </Text>
             <Pressable onPress={openEditModal} hitSlop={8} style={styles.cardHeaderAction}>
-              <Pencil size={15} color="#7C789B" strokeWidth={2} />
+              <Ionicons name="create-outline" size={16} color="#7C789B" />
             </Pressable>
           </View>
 
@@ -405,7 +365,7 @@ export default function EmergencyScreen() {
               style={({ pressed }) => [styles.contactCallBtn, pressed && styles.btnPressed]}
               onPress={handleCallContact}
             >
-              <Phone size={18} color="#FFFFFF" strokeWidth={2.4} />
+              <Ionicons name="call-outline" size={18} color="#FFFFFF" />
             </Pressable>
           </View>
 
@@ -414,14 +374,14 @@ export default function EmergencyScreen() {
               style={({ pressed }) => [styles.sosSmsBtn, pressed && styles.btnPressed]}
               onPress={handleSendSosSms}
             >
-              <Send size={15} color="#FFFFFF" />
+              <Ionicons name="chatbubble-ellipses-outline" size={15} color="#FFFFFF" />
               <Text style={styles.sosBtnText}>{isIt ? 'SMS SOS + GPS' : 'SOS SMS + GPS'}</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.sosWhatsAppBtn, pressed && styles.btnPressed]}
               onPress={handleSendSosWhatsApp}
             >
-              <MessageCircle size={15} color="#FFFFFF" />
+              <Ionicons name="logo-whatsapp" size={15} color="#FFFFFF" />
               <Text style={styles.sosBtnText}>WhatsApp SOS</Text>
             </Pressable>
           </View>
@@ -430,7 +390,7 @@ export default function EmergencyScreen() {
         {/* 4. ADRENALINE AUTO-INJECTOR INTERACTIVE GUIDE */}
         <View style={[styles.cardContainer, styles.adrenalineCard]}>
           <View style={styles.cardHeaderRow}>
-            <Syringe size={18} color="#DC2626" strokeWidth={2.2} />
+            <Ionicons name="medkit-outline" size={18} color="#DC2626" />
             <Text style={[styles.cardHeaderTitle, { color: '#991B1B' }]}>
               {isIt ? 'Autoiniettore Adrenalina (EpiPen / Fastjekt)' : 'Adrenaline Auto-Injector Guide'}
             </Text>
@@ -447,7 +407,7 @@ export default function EmergencyScreen() {
               setAdrenalineModalVisible(true);
             }}
           >
-            <Play size={16} color="#FFFFFF" />
+            <Ionicons name="play-outline" size={16} color="#FFFFFF" />
             <Text style={styles.adrenalineGuideBtnText}>
               {isIt ? 'Avvia Guida Interattiva con Timer' : 'Start Interactive Guide with Timer'}
             </Text>
@@ -457,12 +417,12 @@ export default function EmergencyScreen() {
         {/* 5. ACTIVE ALLERGENS LIST */}
         <View style={styles.cardContainer}>
           <View style={styles.cardHeaderRow}>
-            <TriangleAlert size={18} color="#F75555" strokeWidth={2.2} />
+            <Ionicons name="warning-outline" size={18} color="#F75555" />
             <Text style={styles.cardHeaderTitle}>
               {isIt ? `Allergeni di ${profileName}` : `Allergens of ${profileName}`}
             </Text>
             <Pressable onPress={() => router.push('/allergie')} hitSlop={8} style={styles.cardHeaderAction}>
-              <Settings size={15} color="#7C789B" strokeWidth={2} />
+              <Ionicons name="options-outline" size={16} color="#7C789B" />
             </Pressable>
           </View>
 
@@ -507,7 +467,7 @@ export default function EmergencyScreen() {
                   ? (isIt ? 'Mostra meno' : 'Show less')
                   : (isIt ? `Mostra tutti i ${allergenItems.length} allergeni` : `Show all ${allergenItems.length} allergens`)}
               </Text>
-              {allergensExpanded ? <ChevronUp size={16} color="#4A3F8C" /> : <ChevronDown size={16} color="#4A3F8C" />}
+              {allergensExpanded ? <Ionicons name="chevron-up" size={16} color="#4A3F8C" /> : <Ionicons name="chevron-down" size={16} color="#4A3F8C" />}
             </Pressable>
           )}
         </View>
@@ -515,18 +475,18 @@ export default function EmergencyScreen() {
         {/* 6. MEDICINES TO TAKE */}
         <View style={styles.cardContainer}>
           <View style={styles.cardHeaderRow}>
-            <Pill size={18} color="#1E1B4B" strokeWidth={2.2} />
+            <Ionicons name="medical-outline" size={18} color="#1E1B4B" />
             <Text style={styles.cardHeaderTitle}>
               {isIt ? 'Farmaci & Note Personali' : 'Medicines & Personal Notes'}
             </Text>
             <Pressable onPress={openEditModal} hitSlop={8} style={styles.cardHeaderAction}>
-              <Pencil size={15} color="#7C789B" strokeWidth={2} />
+              <Ionicons name="create-outline" size={16} color="#7C789B" />
             </Pressable>
           </View>
 
           <View style={styles.medicineList}>
             <View style={styles.medicineRow}>
-              <View style={styles.medicineIconCircle}><Syringe size={18} color="#F75555" /></View>
+              <View style={styles.medicineIconCircle}><Ionicons name="medkit-outline" size={18} color="#F75555" /></View>
               <View style={styles.medicineInfo}>
                 <Text style={styles.medicineName}>EpiPen / Fastjekt (Adrenalina)</Text>
                 <Text style={styles.medicineInstruction}>Coscia antero-laterale esterna</Text>
@@ -535,7 +495,7 @@ export default function EmergencyScreen() {
             </View>
 
             <View style={styles.medicineRow}>
-              <View style={styles.medicineIconCircle}><Pill size={18} color="#F59E0B" /></View>
+              <View style={styles.medicineIconCircle}><Ionicons name="medical-outline" size={18} color="#F59E0B" /></View>
               <View style={styles.medicineInfo}>
                 <Text style={styles.medicineName}>Antistaminico / Cortisonico</Text>
                 <Text style={styles.medicineInstruction}>Solo per reazioni lievi o post-iniezione</Text>
@@ -544,7 +504,7 @@ export default function EmergencyScreen() {
 
             {emergencyMedicines ? (
               <View style={[styles.medicineRow, styles.customMedicineRow]}>
-                <View style={styles.medicineIconCircle}><Pill size={18} color="#7C789B" /></View>
+                <View style={styles.medicineIconCircle}><Ionicons name="medical-outline" size={18} color="#7C789B" /></View>
                 <View style={styles.medicineInfo}>
                   <Text style={styles.medicineName}>{isIt ? 'Note & Farmaci Personali' : 'Personal Notes'}</Text>
                   <Text style={styles.medicineInstruction}>{emergencyMedicines}</Text>
@@ -561,11 +521,11 @@ export default function EmergencyScreen() {
           <View style={styles.adrenalineModalContent}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Syringe size={22} color="#DC2626" />
+                <Ionicons name="medkit-outline" size={22} color="#DC2626" />
                 <Text style={styles.modalTitle}>{isIt ? 'Guida Iniezione Adrenalina' : 'Adrenaline Injection Guide'}</Text>
               </View>
               <Pressable onPress={() => setAdrenalineModalVisible(false)} style={styles.modalCloseBtn}>
-                <X size={20} color="#1E1B4B" />
+                <Ionicons name="close-outline" size={20} color="#1E1B4B" />
               </Pressable>
             </View>
 
@@ -611,13 +571,13 @@ export default function EmergencyScreen() {
                 <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
                   {!timerRunning && !timerDone && (
                     <Pressable style={styles.timerControlBtn} onPress={startAdrenalineTimer}>
-                      <Play size={16} color="#FFFFFF" />
+                      <Ionicons name="play-outline" size={16} color="#FFFFFF" />
                       <Text style={styles.timerControlBtnText}>{isIt ? 'Avvia Timer 5s' : 'Start 5s Timer'}</Text>
                     </Pressable>
                   )}
                   {(timerRunning || timerDone) && (
                     <Pressable style={[styles.timerControlBtn, { backgroundColor: '#4B5563' }]} onPress={resetAdrenalineTimer}>
-                      <RotateCcw size={16} color="#FFFFFF" />
+                      <Ionicons name="refresh-outline" size={16} color="#FFFFFF" />
                       <Text style={styles.timerControlBtnText}>{isIt ? 'Ricomincia' : 'Reset'}</Text>
                     </Pressable>
                   )}
@@ -645,7 +605,7 @@ export default function EmergencyScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{isIt ? 'Modifica Contatto & Farmaci SOS' : 'Edit SOS Contact & Medicines'}</Text>
               <Pressable onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
-                <X size={20} color="#1E1B4B" />
+                <Ionicons name="close-outline" size={20} color="#1E1B4B" />
               </Pressable>
             </View>
 
@@ -811,7 +771,7 @@ const styles = StyleSheet.create({
   locationAddressText: {
     fontFamily: font.bold,
     fontSize: 16,
-    color: '#1E3A8A',
+    color: '#23212C',
     lineHeight: 21,
   },
   locationCoordsSub: {
@@ -975,13 +935,13 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 8,
   },
-  severityBadgeGrave: { backgroundColor: '#FCE9EA' },
-  severityBadgeModerata: { backgroundColor: '#FFF4DC' },
-  severityBadgeLieve: { backgroundColor: '#F3F2F8' },
+  severityBadgeGrave: { backgroundColor: '#FEF2F2' },
+  severityBadgeModerata: { backgroundColor: '#FFF7ED' },
+  severityBadgeLieve: { backgroundColor: '#FEFCE8' },
   severityText: { fontSize: 11.5, fontWeight: '700' },
-  severityTextGrave: { color: '#C92A2A' },
-  severityTextModerata: { color: '#B45309' },
-  severityTextLieve: { color: '#6B6690' },
+  severityTextGrave: { color: '#DC2626' },
+  severityTextModerata: { color: '#EA580C' },
+  severityTextLieve: { color: '#CA8A04' },
   expandToggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',

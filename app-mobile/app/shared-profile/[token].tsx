@@ -10,6 +10,7 @@ import {
   GlassScreenScroll,
   SurfaceButton,
   Screen,
+  ScreenTopHeader,
 } from '../../src/components/ui';
 import { colors, spacing, radius } from '../../src/theme';
 
@@ -44,7 +45,7 @@ export default function SharedProfileScreen() {
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen options={{ title: isIt ? 'Profilo condiviso' : 'Shared profile' }} />
+      <ScreenTopHeader title={isIt ? 'Profilo condiviso' : 'Shared profile'} />
       <GlassScreenScroll headerFloat={false}>
         {loading ? (
           <ActivityIndicator color={colors.brand} />

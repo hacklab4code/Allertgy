@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '../src/store/session';
-import { AppText, Screen, SurfaceButton } from '../src/components/ui';
+import { AppText, NavHeaderBackButton, Screen, ScreenTopHeader, SurfaceButton } from '../src/components/ui';
 import { colors, font, radius, spacing } from '../src/theme';
 import { api } from '../src/api/client';
 import type { Menu, Piatto } from '../src/types';
@@ -24,108 +24,97 @@ import { shareOfficialAllergenBook } from '../src/services/officialAllergenBook'
 
 export default function KitchenSafetySheetScreen() {
   const insets = useSafeAreaInsets();
-  const { language, role, email } = useSession();
+  const { language, email } = useSession();
   const isIt = (language || 'it').toLowerCase() === 'it';
 
   const [menu, setMenu] = useState<Menu | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedStation, setSelectedStation] = useState<string>('tutte');
   const [haccpManager, setHaccpManager] = useState('');
+  const [selectedStation, setSelectedStation] = useState<string>('tutte');
+  const [editModalVisible, setEditModalVisible] = useState(false);
   const [aiModalVisible, setAiModalVisible] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState<ReturnType<typeof autoDetectMenuAllergens>>([]);
+  const [aiSuggestions, setAiSuggestions] = useState<Array<{ id: number; nome_piatto: string; suggestedAllergens: string[] }>>([]);
+  const [editingDish, setEditingDish] = useState<Piatto | null>(null);
+  const [customAllergensDraft, setCustomAllergensDraft] = useState<string[]>([]);
+  const [crossContamDraft, setCrossContamDraft] = useState<string[]>([]);
+  const [savingDish, setSavingDish] = useState(false);
 
   useEffect(() => {
-    async function fetchMenu() {
+    async function fetchOwnerMenu() {
       try {
-        setLoading(true);
-        // Try getting owner restaurant or demo
-        const profile = await api.getProfile().catch(() => null);
-        const code = (profile as any)?.public_code || (profile as any)?.restaurant_code || 'DEMO';
-        const m = await api.menu(code).catch(() => null);
-        if (m) {
-          setMenu(m);
-        } else {
-          // Fallback demo menu for restaurateurs
-          setMenu({
-            restaurant_id: 1,
-            public_code: 'DEMO',
-            nome_ristorante: 'Osteria del Buongusto',
-            citta: 'Milano',
-            indirizzo: 'Via Roma 12',
-            aggiornato_il: new Date().toISOString(),
-            menu_available: true,
-            piatti: [
-              {
-                id: 101,
-                nome_piatto: 'Spaghetti alla Carbonara',
-                categoria: 'Primi Piatti',
-                descrizione: 'Guanciale croccante, tuorli d\'uovo freschi, pecorino romano DOP, pepe nero',
-                prezzo_cents: 1400,
-                allergeni_contenuti: ['glutine', 'uova', 'latte'],
-                allergeni_tracce: [],
-                kitchen_protocol_confirmed: 1,
-              },
-              {
-                id: 102,
-                nome_piatto: 'Fritto Misto del Tirreno',
-                categoria: 'Secondi di Pesce',
-                descrizione: 'Calamari, gamberi rosa e paranza fritti in pastella di grano tenero',
-                prezzo_cents: 1800,
-                allergeni_contenuti: ['glutine', 'crostacei', 'molluschi', 'pesce'],
-                allergeni_tracce: [],
-                kitchen_protocol_confirmed: 1,
-              },
-              {
-                id: 103,
-                nome_piatto: 'Risotto ai Funghi Porcini (Senza Glutine)',
-                categoria: 'Primi Piatti',
-                descrizione: 'Riso Carnaroli mantecato con burro e parmigiano 24 mesi, brodo vegetale',
-                prezzo_cents: 1600,
-                allergeni_contenuti: ['latte', 'sedano'],
-                allergeni_tracce: [],
-                kitchen_protocol_confirmed: 1,
-              },
-              {
-                id: 104,
-                nome_piatto: 'Tiramisù Tradizionale',
-                categoria: 'Dessert',
-                descrizione: 'Savoiardi bagnati al caffè espresso, crema al mascarpone e cacao amaro',
-                prezzo_cents: 700,
-                allergeni_contenuti: ['glutine', 'latte', 'uova'],
-                allergeni_tracce: ['frutta_a_guscio'],
-                kitchen_protocol_confirmed: 0,
-              },
-            ],
-          });
-        }
+        const data = await api.menu('demo');
+        setMenu(data);
       } catch {
-        // Fallback
+        // Fallback demo menu if not logged as owner
+        setMenu({
+          restaurant_id: 1,
+          public_code: 'DEMO-KITCHEN',
+          nome_ristorante: 'Ristorante Pizzeria Bellini',
+          citta: 'Milano',
+          indirizzo: 'Via Roma 12',
+          aggiornato_il: '2026-09-01',
+          piatti: [
+            {
+              id: 101,
+              nome_piatto: 'Spaghetti ai Frutti di Mare',
+              descrizione: 'Spaghetti trafilati al bronzo con cozze, vongole veraci, gamberi freschi e prezzemolo.',
+              prezzo_cents: 1600,
+              categoria: 'Primi',
+              allergeni_contenuti: ['molluschi', 'crostacei', 'cereali'],
+              allergeni_tracce: ['pesce'],
+            },
+            {
+              id: 102,
+              nome_piatto: 'Pizza Margherita DOC',
+              descrizione: 'Farina di grano tenero, pomodoro San Marzano DOP, mozzarella di bufala campana, basilico.',
+              prezzo_cents: 950,
+              categoria: 'Pizze',
+              allergeni_contenuti: ['cereali', 'latte'],
+              allergeni_tracce: ['soia'],
+            },
+            {
+              id: 103,
+              nome_piatto: 'Tiramisù Tradizionale',
+              descrizione: 'Savoiardi artigianali, caffè espresso, crema al mascarpone, uova fresche pastorizzate, cacao amaro.',
+              prezzo_cents: 650,
+              categoria: 'Dolci',
+              allergeni_contenuti: ['uova', 'latte', 'cereali'],
+              allergeni_tracce: ['frutta_a_guscio'],
+            },
+            {
+              id: 104,
+              nome_piatto: 'Insalata Greca con Feta',
+              descrizione: 'Pomodori ramati, cetrioli, olive kalamata, cipolla rossa di Tropea, formaggio Feta DOP, origano.',
+              prezzo_cents: 1100,
+              categoria: 'Contorni',
+              allergeni_contenuti: ['latte'],
+              allergeni_tracce: [],
+            },
+          ],
+        });
       } finally {
         setLoading(false);
       }
     }
-    void fetchMenu();
+    void fetchOwnerMenu();
   }, []);
 
   const dishes = useMemo(() => menu?.piatti || [], [menu]);
 
   const stations = useMemo(() => {
-    const set = new Set<string>();
-    dishes.forEach((d: Piatto) => {
-      if (d.categoria) set.add(d.categoria.trim());
-    });
-    return Array.from(set);
+    const list = dishes.map((d) => d.categoria).filter(Boolean) as string[];
+    return Array.from(new Set(list));
   }, [dishes]);
 
   const filteredDishes = useMemo(() => {
     if (selectedStation === 'tutte') return dishes;
-    return dishes.filter((d: Piatto) => d.categoria?.trim() === selectedStation);
+    return dishes.filter((p) => p.categoria === selectedStation);
   }, [dishes, selectedStation]);
 
   const handleRunAiAutoTagger = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const suggestions = autoDetectMenuAllergens(dishes);
-    setAiSuggestions(suggestions);
+    const results = autoDetectMenuAllergens(dishes);
+    setAiSuggestions(results);
     setAiModalVisible(true);
   };
 
@@ -137,34 +126,28 @@ export default function KitchenSafetySheetScreen() {
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen
-        options={{
-          headerTitle: isIt ? 'Kitchen Safety & B2B Hub' : 'Kitchen Safety Sheet',
-          headerTitleStyle: { fontFamily: font.bold, fontSize: 18, color: '#1E1B4B' },
-          headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12, paddingVertical: 4 }}>
-              <Ionicons name="chevron-back" size={24} color="#1E1B4B" />
-            </Pressable>
-          ),
-          headerRight: () => (
-            <Pressable onPress={handleExportAllergenBook} hitSlop={8} style={styles.topActionBtn}>
-              <Ionicons name="print-outline" size={18} color="#1E1B4B" />
-            </Pressable>
-          ),
-        }}
+      <ScreenTopHeader
+        title={isIt ? 'Kitchen Safety & B2B Hub' : 'Kitchen Safety Sheet'}
+        rightElement={
+          <Pressable onPress={handleExportAllergenBook} hitSlop={8} style={styles.topActionBtn}>
+            <Ionicons name="print-outline" size={18} color="#23212C" />
+          </Pressable>
+        }
       />
 
-      <View style={[styles.container, { paddingTop: insets.top + 48 }]}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-          {/* QUICK B2B TOOLS BANNER */}
-          <View style={styles.b2bActionCard}>
-            <View style={styles.b2bHead}>
-              <Ionicons name="shield-checkmark" size={22} color="#2563EB" />
-              <View style={{ flex: 1 }}>
-                <AppText variant="title" style={{ fontSize: 15, color: '#1E1B4B' }}>
+      <View style={styles.container}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
+          {/* QUICK B2B HERO CARD COSMIC + VANILLA */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroTopRow}>
+              <View style={styles.heroIconBadge}>
+                <Ionicons name="shield-checkmark-outline" size={22} color="#F1FEC8" />
+              </View>
+              <View style={styles.heroTextContainer}>
+                <AppText variant="bodyBold" style={styles.heroTitle}>
                   {menu?.nome_ristorante || 'Il Tuo Locale'} · Scheda Cucina
                 </AppText>
-                <AppText variant="caption" color="#64748B">
+                <AppText variant="caption" style={styles.heroSubtitle}>
                   {isIt ? 'Controllo HACCP & Protocolli Anti-Contaminazione' : 'HACCP Protocols & Chef Safety'}
                 </AppText>
               </View>
@@ -172,16 +155,16 @@ export default function KitchenSafetySheetScreen() {
 
             <View style={styles.b2bBtnRow}>
               <Pressable style={styles.aiTagBtn} onPress={handleRunAiAutoTagger}>
-                <Ionicons name="flash" size={15} color="#FFFFFF" />
-                <AppText variant="caption" style={{ color: '#FFFFFF', fontWeight: '800' }}>
-                  {isIt ? '⚡ AI Auto-Tagger' : '⚡ AI Auto-Tagger'}
+                <Ionicons name="flash-outline" size={15} color="#23212C" />
+                <AppText variant="caption" style={{ color: '#23212C', fontWeight: '800' }}>
+                  {isIt ? 'AI Auto-Tagger' : 'AI Auto-Tagger'}
                 </AppText>
               </Pressable>
 
               <Pressable style={styles.aslExportBtn} onPress={handleExportAllergenBook}>
-                <Ionicons name="document-text" size={15} color="#1E1B4B" />
-                <AppText variant="caption" style={{ color: '#1E1B4B', fontWeight: '800' }}>
-                  {isIt ? '📄 Libro Allergeni ASL' : '📄 Official Book'}
+                <Ionicons name="document-text-outline" size={15} color="#F1FEC8" />
+                <AppText variant="caption" style={{ color: '#F1FEC8', fontWeight: '800' }}>
+                  {isIt ? 'Libro Allergeni ASL' : 'Official Book'}
                 </AppText>
               </Pressable>
             </View>
@@ -197,7 +180,7 @@ export default function KitchenSafetySheetScreen() {
               }}
             >
               <AppText style={[styles.filterChipText, selectedStation === 'tutte' && styles.filterChipTextActive]}>
-                🍽️ {isIt ? 'Tutte le portate' : 'All dishes'} ({dishes.length})
+                {isIt ? 'Tutte le portate' : 'All dishes'} ({dishes.length})
               </AppText>
             </Pressable>
             {stations.map((st) => {
@@ -229,24 +212,24 @@ export default function KitchenSafetySheetScreen() {
                 <View key={piatto.id} style={styles.dishSafetyCard}>
                   <View style={styles.dishHeader}>
                     <View style={{ flex: 1 }}>
-                      <AppText variant="title" style={{ fontSize: 16, color: '#1E1B4B' }}>
+                      <AppText variant="title" style={{ fontSize: 16, color: '#23212C' }}>
                         {piatto.nome_piatto}
                       </AppText>
                       {piatto.categoria ? (
-                        <AppText variant="caption" color="#64748B" style={{ fontWeight: '600' }}>
-                          🏷️ {piatto.categoria}
+                        <AppText variant="caption" color="#64748B" style={{ fontWeight: '600', marginTop: 2 }}>
+                          {piatto.categoria}
                         </AppText>
                       ) : null}
                     </View>
 
                     {piatto.kitchen_protocol_confirmed === 1 ? (
                       <View style={styles.protocolBadge}>
-                        <Ionicons name="shield-checkmark" size={12} color="#059669" />
+                        <Ionicons name="shield-checkmark-outline" size={12} color="#059669" />
                         <AppText style={styles.protocolBadgeText}>CUCINA SICURA</AppText>
                       </View>
                     ) : (
                       <View style={styles.protocolBadgeWarn}>
-                        <Ionicons name="alert" size={12} color="#D97706" />
+                        <Ionicons name="alert-circle-outline" size={12} color="#D97706" />
                         <AppText style={styles.protocolBadgeWarnText}>STANDARD</AppText>
                       </View>
                     )}
@@ -261,7 +244,7 @@ export default function KitchenSafetySheetScreen() {
                   {/* CONTAINED ALLERGENS CHIPS */}
                   <View style={styles.allergenSection}>
                     <AppText variant="caption" style={styles.allergenTitle}>
-                      🔴 {isIt ? 'Allergeni Presenti:' : 'Allergens Contained:'}
+                      {isIt ? 'Allergeni Presenti:' : 'Allergens Contained:'}
                     </AppText>
                     <View style={styles.allergenChipsRow}>
                       {contained.length > 0 ? (
@@ -274,7 +257,7 @@ export default function KitchenSafetySheetScreen() {
                         ))
                       ) : (
                         <AppText variant="caption" color="#059669" style={{ fontWeight: '700' }}>
-                          🟢 Nessun allergene UE dichiarato
+                          Nessun allergene UE dichiarato
                         </AppText>
                       )}
                     </View>
@@ -284,7 +267,7 @@ export default function KitchenSafetySheetScreen() {
                   {traces.length > 0 && (
                     <View style={styles.allergenSection}>
                       <AppText variant="caption" style={styles.allergenTitle}>
-                        🟡 {isIt ? 'Possibili Tracce:' : 'Possible Traces:'}
+                        {isIt ? 'Possibili Tracce:' : 'Possible Traces:'}
                       </AppText>
                       <View style={styles.allergenChipsRow}>
                         {traces.map((a: string) => (
@@ -300,8 +283,8 @@ export default function KitchenSafetySheetScreen() {
 
                   {/* KITCHEN SANIFICATION INSTRUCTIONS */}
                   <View style={styles.chefInstructionBox}>
-                    <Ionicons name="restaurant" size={14} color="#4338CA" />
-                    <AppText variant="caption" color="#3730A3" style={{ flex: 1, fontWeight: '600' }}>
+                    <Ionicons name="restaurant-outline" size={14} color="#23212C" />
+                    <AppText variant="caption" color="#23212C" style={{ flex: 1, fontWeight: '600' }}>
                       {isIt
                         ? 'Istruzione Brigata: Utilizzare pinze sanificate e padella dedicata in caso di comanda con allergie.'
                         : 'Kitchen Rule: Use sanitized pan and dedicated utensils for allergic guest.'}
@@ -320,13 +303,13 @@ export default function KitchenSafetySheetScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHead}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="flash" size={20} color="#F59E0B" />
-                <AppText variant="title" style={{ color: '#1E1B4B' }}>
+                <Ionicons name="flash-outline" size={20} color="#23212C" />
+                <AppText variant="title" style={{ color: '#23212C' }}>
                   {isIt ? 'Rilevamento AI Allergeni Menù' : 'AI Allergen Tagging'}
                 </AppText>
               </View>
               <Pressable onPress={() => setAiModalVisible(false)} hitSlop={8}>
-                <Ionicons name="close" size={22} color="#1E1B4B" />
+                <Ionicons name="close-outline" size={22} color="#23212C" />
               </Pressable>
             </View>
 
@@ -339,14 +322,14 @@ export default function KitchenSafetySheetScreen() {
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
               {aiSuggestions.map((item) => (
                 <View key={item.id} style={styles.aiSuggestionCard}>
-                  <AppText variant="bodyBold" style={{ color: '#1E1B4B' }}>
+                  <AppText variant="bodyBold" style={{ color: '#23212C' }}>
                     {item.nome_piatto}
                   </AppText>
                   <View style={styles.aiTagsRow}>
                     {item.suggestedAllergens.map((alg) => (
                       <View key={alg} style={styles.aiTagPill}>
                         <AppText style={styles.aiTagPillText}>
-                          ✓ {getAllergenName(alg, isIt ? 'it' : 'en')}
+                          {getAllergenName(alg, isIt ? 'it' : 'en')}
                         </AppText>
                       </View>
                     ))}
@@ -366,7 +349,7 @@ export default function KitchenSafetySheetScreen() {
                 );
               }}
             >
-              <AppText variant="bodyBold" color="#FFFFFF">
+              <AppText variant="bodyBold" color="#23212C">
                 {isIt ? 'Conferma e Applica Tutti al Menù' : 'Confirm and Apply All'}
               </AppText>
             </Pressable>
@@ -381,36 +364,73 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  scrollContent: {
+    gap: 14,
+    paddingTop: 4,
+  },
+  navBackBtn: {
+    paddingRight: 12,
+    paddingVertical: 4,
   },
   topActionBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  b2bActionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 14,
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    gap: 12,
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 3,
   },
-  b2bHead: {
+
+  // HERO SUMMARY CARD COSMIC + VANILLA
+  heroCard: {
+    backgroundColor: '#23212C',
+    borderRadius: 24,
+    padding: 20,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.2)',
+    shadowColor: '#23212C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  heroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
+  },
+  heroIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(241, 254, 200, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.3)',
+  },
+  heroTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 16.5,
+  },
+  heroSubtitle: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 12,
+    lineHeight: 16,
   },
   b2bBtnRow: {
     flexDirection: 'row',
@@ -422,8 +442,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#2563EB',
-    paddingVertical: 10,
+    backgroundColor: '#F1FEC8',
+    paddingVertical: 11,
     borderRadius: 12,
   },
   aslExportBtn: {
@@ -432,17 +452,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#F1F5F9',
-    paddingVertical: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingVertical: 11,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   filterScroll: {
-    marginBottom: 12,
+    marginBottom: 2,
   },
   filterScrollContent: {
     gap: 6,
+    paddingVertical: 2,
   },
   filterChip: {
     paddingHorizontal: 12,
@@ -453,16 +474,17 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   filterChipActive: {
-    backgroundColor: '#1E1B4B',
-    borderColor: '#1E1B4B',
+    backgroundColor: '#23212C',
+    borderColor: '#23212C',
   },
   filterChipText: {
     fontSize: 12,
     fontFamily: font.semibold,
-    color: '#4B5563',
+    color: '#475569',
   },
   filterChipTextActive: {
-    color: '#FFFFFF',
+    color: '#F1FEC8',
+    fontWeight: '700',
   },
   dishList: {
     gap: 12,
@@ -471,7 +493,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: 16,
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 6,
@@ -521,6 +545,7 @@ const styles = StyleSheet.create({
   allergenTitle: {
     fontWeight: '800',
     color: '#475569',
+    fontSize: 11.5,
   },
   allergenChipsRow: {
     flexDirection: 'row',
@@ -557,14 +582,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     padding: 10,
-    borderRadius: 10,
+    borderRadius: 12,
     marginTop: 4,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(35, 33, 44, 0.65)',
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -594,20 +621,22 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   aiTagPill: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F1FEC8',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#E2F4A6',
   },
   aiTagPillText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#1D4ED8',
+    color: '#23212C',
   },
   aiApplyBtn: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#F1FEC8',
+    borderWidth: 1,
+    borderColor: '#E2F4A6',
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',

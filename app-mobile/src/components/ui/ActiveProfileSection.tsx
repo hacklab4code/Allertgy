@@ -58,7 +58,7 @@ export function ActiveProfileSection({
   selfName,
   isIt = true,
 }: Props) {
-  const { setSubProfiles, setActiveProfileId } = useSession();
+  const { setSubProfiles, setActiveProfileId, profilePhotoUrl } = useSession();
   const labels = isIt ? RELATION_LABELS_IT : RELATION_LABELS_EN;
 
   const familyProfiles = useMemo(
@@ -176,15 +176,21 @@ export function ActiveProfileSection({
       <GlassCard
         style={{
           borderLeftWidth: 3,
-          borderLeftColor: hasAllergens ? colors.greenBorder : colors.yellow,
+          borderLeftColor: hasAllergens ? colors.brand : colors.border,
         }}
       >
         <View style={styles.cardHead}>
-          <AvatarBubble emoji={avatar.emoji} color={avatar.color} active size={56} />
+          <AvatarBubble
+            imageUrl={isSelf ? profilePhotoUrl : (activeFamily?.photo_uri || activeFamily?.image_url)}
+            emoji={avatar.emoji}
+            color={avatar.color}
+            active
+            size={56}
+          />
           <View style={styles.cardMeta}>
             <AppText variant="title">{displayName}</AppText>
             <View style={styles.relationPill}>
-              <Ionicons name="person" size={12} color={colors.brand} />
+              <Ionicons name="person-outline" size={12} color={colors.brand} />
               <AppText variant="caption" color={colors.brand}>{relationLabel}</AppText>
             </View>
           </View>
@@ -216,7 +222,7 @@ export function ActiveProfileSection({
             label={t.editAllergies}
             onPress={openAllergies}
             variant="soft"
-            icon="shield-checkmark"
+            icon="shield-checkmark-outline"
             fullWidth={false}
             style={styles.actionBtn}
           />
@@ -261,7 +267,7 @@ export function ActiveProfileSection({
         }}
       >
         <View style={styles.addIcon}>
-          <Ionicons name="add" size={20} color={colors.brand} />
+          <Ionicons name="add-outline" size={20} color={colors.brand} />
         </View>
         <View style={{ flex: 1 }}>
           <AppText variant="bodyBold" color={colors.brand}>{t.addPerson}</AppText>
@@ -309,9 +315,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderWidth: 1,
   },
-  chipLieve: { backgroundColor: colors.yellowSoft, borderColor: colors.yellow },
-  chipModerata: { backgroundColor: colors.amberBg, borderColor: colors.amber },
-  chipGrave: { backgroundColor: colors.redSoft, borderColor: colors.red },
+  chipLieve: { backgroundColor: '#FEFCE8', borderColor: '#FACC15' },
+  chipModerata: { backgroundColor: '#FFF7ED', borderColor: '#FB923C' },
+  chipGrave: { backgroundColor: '#FEF2F2', borderColor: '#F87171' },
   actions: {
     flexDirection: 'row',
     flexWrap: 'wrap',

@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
 import { colors, spacing, WIREFRAME_MODE } from '../../theme';
+import { useIsDarkMode } from '../../hooks/useAppTheme';
 import { wireBox } from '../../wireframe';
 import { AppText } from './AppText';
 import { SurfaceCard } from './SurfaceCard';
@@ -25,11 +26,12 @@ export function Section({
   card = false,
   padded = true,
   style,
-  tone = 'onLight',
+  tone = 'auto',
 }: Props) {
-  const isDark = tone === 'onDark';
-  const titleColor = isDark ? '#FFFFFF' : colors.textMuted;
-  const subtitleColor = isDark ? 'rgba(255, 255, 255, 0.85)' : colors.textSecondary;
+  const isDarkMode = useIsDarkMode();
+  const effectiveDark = tone === 'onDark' || isDarkMode;
+  const titleColor = effectiveDark ? '#F1FEC8' : '#475569';
+  const subtitleColor = effectiveDark ? '#E2E8F0' : colors.textSecondary;
 
   const resolvedAction = typeof action === 'function'
     ? action({ ink: titleColor, inkMuted: subtitleColor, action: colors.brand })
@@ -37,7 +39,7 @@ export function Section({
 
   const list = children ? (
     card ? (
-      <SurfaceCard padded={padded} style={styles.card}>
+      <SurfaceCard padded={false} style={styles.card}>
         <View style={styles.list}>{children}</View>
       </SurfaceCard>
     ) : (
@@ -54,7 +56,7 @@ export function Section({
             color={titleColor}
             style={[
               styles.title,
-              isDark && {
+              effectiveDark && {
                 textShadowColor: 'rgba(0, 0, 0, 0.45)',
                 textShadowOffset: { width: 0, height: 1 },
                 textShadowRadius: 4,
@@ -79,7 +81,7 @@ export function Section({
 
 const styles = StyleSheet.create({
   wrap: {
-    gap: 12,
+    gap: 8,
     alignSelf: 'stretch',
     width: '100%',
   },
@@ -87,7 +89,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
     gap: spacing.md,
   },
   titleBlock: {
@@ -95,11 +97,11 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   title: {
-    fontSize: 11,
-    lineHeight: 14,
-    letterSpacing: 1.4,
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
-    fontWeight: '700',
+    fontWeight: '800',
   },
   subtitle: {
     fontSize: 12,
@@ -107,7 +109,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   card: {
-    paddingVertical: 12,
+    paddingVertical: 4,
     paddingHorizontal: 12,
     borderRadius: 20,
   },

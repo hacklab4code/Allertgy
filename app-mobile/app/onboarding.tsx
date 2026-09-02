@@ -1,7 +1,7 @@
 import { Stack, router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
-import { OnboardingSlides, type OnboardingSlide } from '../src/components/ui/OnboardingSlides';
+import { OnboardingSlides, type OnboardingSlide, Screen, ScreenTopHeader } from '../src/components/ui';
 import { useTranslation } from '../src/constants/translations';
 import { useSession } from '../src/store/session';
 import { colors } from '../src/theme';
@@ -16,7 +16,7 @@ export default function OnboardingScreen() {
     if (isOwner) {
       return [
         {
-          icon: 'storefront',
+          icon: 'storefront-outline',
           iconColor: colors.green,
           iconBg: colors.greenSoft,
           badge: t('tour_owner_badge_1'),
@@ -24,7 +24,7 @@ export default function OnboardingScreen() {
           text: t('tour_owner_1_text'),
         },
         {
-          icon: 'restaurant',
+          icon: 'restaurant-outline',
           iconColor: colors.brand,
           iconBg: colors.brand50,
           badge: t('tour_owner_badge_2'),
@@ -32,7 +32,7 @@ export default function OnboardingScreen() {
           text: t('tour_owner_2_text'),
         },
         {
-          icon: 'qr-code',
+          icon: 'qr-code-outline',
           iconColor: colors.brand,
           iconBg: colors.brand100,
           badge: t('tour_owner_badge_3'),
@@ -40,7 +40,7 @@ export default function OnboardingScreen() {
           text: t('tour_owner_3_text'),
         },
         {
-          icon: 'rocket',
+          icon: 'rocket-outline',
           iconColor: colors.brand,
           iconBg: colors.brandTertiary,
           badge: t('tour_owner_badge_4'),
@@ -51,7 +51,7 @@ export default function OnboardingScreen() {
     }
     return [
       {
-        icon: 'home',
+        icon: 'home-outline',
         iconColor: colors.brand,
         iconBg: colors.brand50,
         badge: t('tour_customer_badge_1'),
@@ -59,7 +59,7 @@ export default function OnboardingScreen() {
         text: t('tour_customer_1_text'),
       },
       {
-        icon: 'map',
+        icon: 'map-outline',
         iconColor: colors.green,
         iconBg: colors.greenSoft,
         badge: t('tour_customer_badge_2'),
@@ -67,7 +67,7 @@ export default function OnboardingScreen() {
         text: t('tour_customer_2_text'),
       },
       {
-        icon: 'scan',
+        icon: 'scan-outline',
         iconColor: colors.brand,
         iconBg: colors.brand100,
         badge: t('tour_customer_badge_3'),
@@ -75,7 +75,7 @@ export default function OnboardingScreen() {
         text: t('tour_customer_3_text'),
       },
       {
-        icon: 'person-circle',
+        icon: 'person-circle-outline',
         iconColor: colors.brand,
         iconBg: colors.surfaceSecondary,
         badge: t('tour_customer_badge_4'),
@@ -91,13 +91,11 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: isOwner ? t('tour_owner_header') : t('tour_customer_header'),
-          headerBackVisible: false,
-          headerRight: () => <LanguageFlagsRow inHeader />,
-        }}
+    <Screen edges={false} ambient>
+      <ScreenTopHeader
+        title={isOwner ? t('tour_owner_header') : t('tour_customer_header')}
+        showBack={false}
+        rightElement={<LanguageFlagsRow inHeader />}
       />
       <OnboardingSlides
         slides={slides}
@@ -110,6 +108,6 @@ export default function OnboardingScreen() {
         finishLabel={isOwner ? t('tour_owner_finish') : t('tour_customer_finish')}
         skipLabel={t('tour_skip')}
       />
-    </>
+    </Screen>
   );
 }

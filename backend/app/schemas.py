@@ -42,6 +42,11 @@ class ChangePasswordIn(BaseModel):
     new_password: str = Field(min_length=8)
 
 
+class DeleteAccountIn(BaseModel):
+    password: Optional[str] = None
+    confirm: bool = True
+
+
 class ProfileUpdateIn(BaseModel):
     display_name: Optional[str] = Field(default=None, max_length=100)
 

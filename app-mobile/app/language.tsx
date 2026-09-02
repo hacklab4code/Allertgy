@@ -4,7 +4,7 @@ import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LANGUAGES } from '../src/constants/languages';
 import { useSession } from '../src/store/session';
-import { AppText, DebossedInput, Screen, Section } from '../src/components/ui';
+import { AppText, DebossedInput, Screen, ScreenTopHeader, Section } from '../src/components/ui';
 import { colors, radius, spacing, MIN_TOUCH_TARGET } from '../src/theme';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -40,7 +40,7 @@ export default function LanguageScreen() {
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen options={{ title: 'Lingua / Language' }} />
+      <ScreenTopHeader title="Lingua / Language" />
       <Section
         title="Language / Lingua"
         subtitle={`Scegli tra ${LANGUAGES.length} lingue · Choose from ${LANGUAGES.length} languages`}
@@ -86,7 +86,7 @@ export default function LanguageScreen() {
               </View>
               {selected ? (
                 <View style={styles.checkBadge}>
-                  <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                  <Ionicons name="checkmark-outline" size={16} color="#FFFFFF" />
                 </View>
               ) : null}
             </Pressable>

@@ -34,7 +34,7 @@ export const SmallCard: React.FC<SmallCardProps> = ({
       {/* Badge Rating - Posizionato esattamente nello "scavo" */}
       <View style={styles.mcRatingBadge}>
         <Text style={styles.mcRatingText}>{rating.toFixed(1)}</Text>
-        <Ionicons name="star" size={12} color="white" />
+        <Ionicons name="star-outline" size={12} color="white" />
       </View>
 
       {/* Titolo */}

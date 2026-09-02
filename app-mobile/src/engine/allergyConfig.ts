@@ -14,15 +14,15 @@ export const CRITERIO_LABELS_EN: Record<AllergyCriterio, string> = {
 };
 
 export const INTENSITY_LABELS_IT: Record<AllergyIntensity, string> = {
-  lieve: 'Lieve',
-  moderata: 'Moderata',
-  grave: 'Grave / Anafilassi',
+  lieve: 'Lieve (Giallo)',
+  moderata: 'Media (Arancione)',
+  grave: 'Grave (Rosso)',
 };
 
 export const INTENSITY_LABELS_EN: Record<AllergyIntensity, string> = {
-  lieve: 'Mild',
-  moderata: 'Moderate',
-  grave: 'Severe / Anaphylaxis',
+  lieve: 'Mild (Yellow)',
+  moderata: 'Moderate (Orange)',
+  grave: 'Severe (Red)',
 };
 
 export function criterioShortLabel(criterio: AllergyCriterio | undefined, isIt: boolean): string {
@@ -35,7 +35,7 @@ export function criterioShortLabel(criterio: AllergyCriterio | undefined, isIt: 
 export function intensityShortLabel(intensity: AllergyIntensity | undefined, isIt: boolean): string {
   if (intensity === 'lieve') return isIt ? 'Lieve' : 'Mild';
   if (intensity === 'grave') return isIt ? 'Grave' : 'Severe';
-  return isIt ? 'Mod.' : 'Mod.';
+  return isIt ? 'Media' : 'Mod.';
 }
 
 /** Long-press: scegli se impostare intensità o criterio (forma). */
@@ -49,8 +49,8 @@ export function promptAllergyConfig(opts: {
   Alert.alert(
     isIt ? `Configura: ${name}` : `Configure: ${name}`,
     isIt
-      ? 'Imposta intensità (lieve = giallo) e criterio di forma. Es. uova “solo crudo”: avvisa in giallo se presente, perché magari tolleri la maionese ma non la frittata — o viceversa.'
-      : 'Set severity (mild = yellow) and form criterion. E.g. eggs “raw only”: warn in yellow if present, because you may tolerate mayo but not omelette — or vice versa.',
+      ? 'Imposta intensità (lieve = giallo, media = arancione, grave = rosso) e criterio di forma.'
+      : 'Set severity (mild = yellow, moderate = orange, severe = red) and form criterion.',
     [
       {
         text: isIt ? 'Intensità…' : 'Severity…',
@@ -59,10 +59,10 @@ export function promptAllergyConfig(opts: {
             isIt ? `Intensità: ${name}` : `Severity: ${name}`,
             isIt ? 'Quanto è grave questa allergia?' : 'How severe is this allergy?',
             [
-              { text: isIt ? 'Lieve (giallo)' : 'Mild (yellow)', onPress: () => onIntensity('lieve') },
-              { text: isIt ? 'Moderata' : 'Moderate', onPress: () => onIntensity('moderata') },
+              { text: isIt ? 'Lieve (Giallo)' : 'Mild (Yellow)', onPress: () => onIntensity('lieve') },
+              { text: isIt ? 'Media (Arancione)' : 'Moderate (Orange)', onPress: () => onIntensity('moderata') },
               {
-                text: isIt ? 'Grave / Anafilassi' : 'Severe / Anaphylaxis',
+                text: isIt ? 'Grave (Rosso)' : 'Severe (Red)',
                 onPress: () => onIntensity('grave'),
                 style: 'destructive',
               },

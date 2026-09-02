@@ -79,8 +79,8 @@ export function PuffyButton({
       <Pressable
         disabled={disabled || loading}
         style={[styles.btn, { backgroundColor: p.bg, borderColor: p.border }]}
-        onPressIn={() => { scale.value = withSpring(0.91, { damping: 18, stiffness: 380 }); }}
-        onPressOut={() => { scale.value = withSpring(1, { damping: 11, stiffness: 280 }); }}
+        onPressIn={() => { scale.value = withSpring(0.965, { damping: 18, stiffness: 360, mass: 0.6 }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 16, stiffness: 300, mass: 0.6 }); }}
         onPress={() => {
           if (disabled || loading) return;
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

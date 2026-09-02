@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '../src/store/session';
-import { AppText, Screen, SurfaceButton } from '../src/components/ui';
+import { AppText, Screen, ScreenTopHeader, SurfaceButton } from '../src/components/ui';
 import { colors, font, radius, spacing } from '../src/theme';
 import {
   WALLPAPER_THEMES,
@@ -91,25 +91,36 @@ export default function LockscreenIceScreen() {
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen
-        options={{
-          headerTitle: isIt ? 'Sfondo Schermata di Blocco ICE' : 'Lock Screen ICE Wallpaper',
-          headerTitleStyle: { fontFamily: font.bold, fontSize: 18, color: '#1E1B4B' },
-          headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12, paddingVertical: 4 }}>
-              <Ionicons name="chevron-back" size={24} color="#1E1B4B" />
-            </Pressable>
-          ),
-          headerRight: () => (
-            <Pressable onPress={handleShare} hitSlop={8} style={styles.topActionBtn}>
-              <Ionicons name="share-outline" size={18} color="#1E1B4B" />
-            </Pressable>
-          ),
-        }}
+      <ScreenTopHeader
+        title={isIt ? 'Sfondo Schermata di Blocco ICE' : 'Lock Screen ICE Wallpaper'}
+        rightElement={
+          <Pressable onPress={handleShare} hitSlop={8} style={styles.topActionBtn}>
+            <Ionicons name="share-outline" size={18} color="#23212C" />
+          </Pressable>
+        }
       />
 
-      <View style={[styles.container, { paddingTop: insets.top + 48 }]}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+      <View style={styles.container}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
+          {/* HERO SUMMARY CARD COSMIC + VANILLA */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroTopRow}>
+              <View style={styles.heroIconBadge}>
+                <Ionicons name="phone-portrait-outline" size={22} color="#F1FEC8" />
+              </View>
+              <View style={styles.heroTextContainer}>
+                <AppText variant="bodyBold" style={styles.heroTitle}>
+                  {isIt ? 'Schermata di Blocco ICE' : 'Lock Screen ICE Wallpaper'}
+                </AppText>
+                <AppText variant="caption" style={styles.heroSubtitle}>
+                  {isIt
+                    ? 'Crea un wallpaper di sicurezza con contatti e posizione adrenalina visibile ai soccorritori anche a telefono bloccato.'
+                    : 'Create a medical lock screen wallpaper visible to first responders even when device is locked.'}
+                </AppText>
+              </View>
+            </View>
+          </View>
+
           {/* PROFILE SELECTOR */}
           {subProfiles.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.profileScroll} contentContainerStyle={styles.profileScrollContent}>
@@ -120,8 +131,9 @@ export default function LockscreenIceScreen() {
                   setActiveProfileId(null);
                 }}
               >
+                <Ionicons name="person-outline" size={13} color={!activeProfileId ? '#F1FEC8' : '#64748B'} />
                 <AppText style={[styles.profilePillText, !activeProfileId && styles.profilePillTextActive]}>
-                  👤 {email ? email.split('@')[0] : 'Io'}
+                  {email ? email.split('@')[0] : 'Io'}
                 </AppText>
               </Pressable>
               {subProfiles.map((p) => {
@@ -135,8 +147,9 @@ export default function LockscreenIceScreen() {
                       setActiveProfileId(p.id);
                     }}
                   >
+                    <Ionicons name="person-outline" size={13} color={isSelected ? '#F1FEC8' : '#64748B'} />
                     <AppText style={[styles.profilePillText, isSelected && styles.profilePillTextActive]}>
-                      👶 {p.name}
+                      {p.name}
                     </AppText>
                   </Pressable>
                 );
@@ -169,7 +182,7 @@ export default function LockscreenIceScreen() {
           {/* CUSTOMIZATION CARD */}
           <View style={styles.configCard}>
             <AppText variant="caption" style={styles.inputLabel}>
-              {isIt ? '📍 Posizione Adrenalina / Farmaci (es. Zaino, borsa)' : 'Adrenaline / Meds Location'}
+              {isIt ? 'Posizione Adrenalina / Farmaci (es. Zaino, borsa)' : 'Adrenaline / Meds Location'}
             </AppText>
             <TextInput
               style={styles.input}
@@ -180,7 +193,7 @@ export default function LockscreenIceScreen() {
             />
 
             <AppText variant="caption" style={styles.inputLabel}>
-              {isIt ? '🩸 Gruppo Sanguigno (opzionale)' : 'Blood Type (optional)'}
+              {isIt ? 'Gruppo Sanguigno (opzionale)' : 'Blood Type (optional)'}
             </AppText>
             <TextInput
               style={styles.input}
@@ -195,7 +208,7 @@ export default function LockscreenIceScreen() {
           <View style={[styles.phoneMockup, { backgroundColor: themeConfig.bgColor, borderColor: themeConfig.border }]}>
             {/* Status & Clock area (simulating lockscreen layout) */}
             <View style={styles.clockArea}>
-              <Ionicons name="lock-closed" size={16} color={themeConfig.headerColor} />
+              <Ionicons name="lock-closed-outline" size={16} color={themeConfig.headerColor} />
               <Text style={[styles.mockTime, { color: themeConfig.textColor }]}>09:41</Text>
               <Text style={[styles.mockDate, { color: themeConfig.textMuted }]}>
                 {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -206,12 +219,12 @@ export default function LockscreenIceScreen() {
             <View style={[styles.iceCard, { backgroundColor: themeConfig.cardBg, borderColor: themeConfig.border }]}>
               <View style={styles.iceCardHead}>
                 <View style={[styles.sosBadge, { backgroundColor: themeConfig.accentBadge }]}>
-                  <Ionicons name="medical" size={13} color="#FFFFFF" />
+                  <Ionicons name="medical-outline" size={13} color="#FFFFFF" />
                   <Text style={styles.sosBadgeText}>ICE · SOCCORSO MEDICO</Text>
                 </View>
                 {bloodType ? (
                   <View style={styles.bloodBadge}>
-                    <Text style={[styles.bloodText, { color: themeConfig.headerColor }]}>🩸 {bloodType}</Text>
+                    <Text style={[styles.bloodText, { color: themeConfig.headerColor }]}>{bloodType}</Text>
                   </View>
                 ) : null}
               </View>
@@ -224,7 +237,7 @@ export default function LockscreenIceScreen() {
 
               <View style={styles.iceSection}>
                 <Text style={[styles.iceSectionLabel, { color: themeConfig.headerColor }]}>
-                  ⚠️ ALLERGIE GRAVI / RISCHIO ANAFILASSI:
+                  ALLERGIE GRAVI / RISCHIO ANAFILASSI:
                 </Text>
                 <View style={styles.allergenPillWrap}>
                   {activeAllergies.length > 0 ? (
@@ -243,7 +256,7 @@ export default function LockscreenIceScreen() {
 
               <View style={styles.iceSection}>
                 <Text style={[styles.iceSectionLabel, { color: themeConfig.headerColor }]}>
-                  💊 AUTOINIETTORE ADRENALINA:
+                  AUTOINIETTORE ADRENALINA:
                 </Text>
                 <Text style={[styles.iceValue, { color: themeConfig.textColor }]}>
                   {adrenalineLocation || 'Nello zaino / borsa'}
@@ -252,7 +265,7 @@ export default function LockscreenIceScreen() {
 
               <View style={styles.iceSection}>
                 <Text style={[styles.iceSectionLabel, { color: themeConfig.headerColor }]}>
-                  📞 CONTATTO D'EMERGENZA:
+                  CONTATTO D'EMERGENZA:
                 </Text>
                 <Text style={[styles.iceValueBold, { color: themeConfig.textColor }]}>
                   {emergencyContactName || 'Referente Famiglia'} · {emergencyContactPhone || 'Tel. registrato'}
@@ -261,18 +274,17 @@ export default function LockscreenIceScreen() {
             </View>
 
             <Text style={[styles.bottomHint, { color: themeConfig.textMuted }]}>
-              💡 Visibile ai soccorritori anche a telefono bloccato
+              Visibile ai soccorritori anche a telefono bloccato
             </Text>
           </View>
 
           {/* ACTION BUTTON */}
-          <SurfaceButton
-            label={isIt ? 'Condividi o Salva Sfondo' : 'Share or Save Wallpaper'}
-            onPress={handleShare}
-            variant="primary"
-            icon="share"
-            style={{ marginTop: spacing.md }}
-          />
+          <Pressable style={styles.shareCtaBtn} onPress={handleShare}>
+            <Ionicons name="share-outline" size={18} color="#23212C" />
+            <AppText variant="bodyBold" color="#23212C">
+              {isIt ? 'Condividi o Salva Sfondo' : 'Share or Save Wallpaper'}
+            </AppText>
+          </Pressable>
         </ScrollView>
       </View>
     </Screen>
@@ -283,6 +295,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  scrollContent: {
+    gap: 14,
+    paddingTop: 4,
+  },
+  navBackBtn: {
+    paddingRight: 12,
+    paddingVertical: 4,
   },
   topActionBtn: {
     width: 36,
@@ -291,20 +312,65 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
+
+  // HERO SUMMARY CARD COSMIC + VANILLA
+  heroCard: {
+    backgroundColor: '#23212C',
+    borderRadius: 24,
+    padding: 20,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.2)',
+    shadowColor: '#23212C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  heroIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(241, 254, 200, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.3)',
+  },
+  heroTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 16.5,
+  },
+  heroSubtitle: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+
   profileScroll: {
-    marginBottom: 12,
+    marginBottom: 2,
   },
   profileScrollContent: {
     gap: 8,
+    paddingVertical: 2,
   },
   profilePill: {
-    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: radius.pill,
     backgroundColor: '#FFFFFF',
@@ -312,21 +378,21 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   profilePillActive: {
-    backgroundColor: '#1E1B4B',
-    borderColor: '#1E1B4B',
+    backgroundColor: '#23212C',
+    borderColor: '#23212C',
   },
   profilePillText: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontFamily: font.semibold,
-    color: '#4B5563',
+    color: '#475569',
   },
   profilePillTextActive: {
-    color: '#FFFFFF',
+    color: '#F1FEC8',
+    fontWeight: '700',
   },
   themeRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 12,
   },
   themeBtn: {
     flex: 1,
@@ -338,9 +404,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   themeBtnActive: {
-    backgroundColor: '#1E1B4B',
+    backgroundColor: '#23212C',
+    borderColor: '#23212C',
   },
   themeDot: {
     width: 8,
@@ -349,18 +417,19 @@ const styles = StyleSheet.create({
   },
   themeText: {
     fontSize: 11,
-    color: '#4B5563',
+    color: '#475569',
   },
   themeTextActive: {
-    color: '#FFFFFF',
+    color: '#F1FEC8',
     fontWeight: '700',
   },
   configCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 14,
-    shadowColor: '#000',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
@@ -368,7 +437,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontWeight: '700',
-    color: '#4B5563',
+    color: '#475569',
     marginBottom: 4,
     marginTop: 6,
   },
@@ -380,7 +449,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 13.5,
-    color: '#1E1B4B',
+    color: '#23212C',
     fontFamily: font.regular,
   },
   phoneMockup: {
@@ -388,7 +457,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     padding: 18,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.18,
     shadowRadius: 16,
@@ -488,5 +557,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     marginBottom: 4,
+  },
+  shareCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#F1FEC8',
+    borderWidth: 1,
+    borderColor: '#E2F4A6',
+    paddingVertical: 14,
+    borderRadius: 16,
+    marginTop: 8,
+    shadowColor: '#F1FEC8',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
 });

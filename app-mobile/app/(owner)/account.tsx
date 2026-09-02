@@ -117,35 +117,37 @@ export default function OwnerAccount() {
       </CollapseSection>
 
       <CollapseSection
-        icon="construct"
+        icon="construct-outline"
         title="Strumenti"
         preview="QR, stats, piano, boost"
         expanded={growthExpanded}
         onToggle={() => setGrowthExpanded((v) => !v)}
       >
-        <SettingsRow icon="qr-code" title="QR code tavoli" subtitle="Codice e locandina per i clienti" onPress={() => router.push('/(owner)/qr')} />
+        <SettingsRow icon="qr-code-outline" title="QR code tavoli" subtitle="Codice e locandina per i clienti" onPress={() => router.push('/(owner)/qr')} />
         <SettingsDivider />
-        <SettingsRow icon="print" title="Registro Allergeni PDF" subtitle="Modulo ufficiale UE 1169/2011" onPress={() => router.push('/(owner)/registro')} />
+        <SettingsRow icon="restaurant-outline" title="Scheda Sicurezza Cucina & AI" subtitle="AI Auto-Tagger e Libro Allergeni ASL" onPress={() => router.push('/kitchen-safety-sheet')} />
         <SettingsDivider />
-        <SettingsRow icon="bar-chart" title="Statistiche di ricerca" subtitle="Visite menù ed allergeni cercati dai clienti" onPress={() => router.push('/(owner)/statistiche')} />
+        <SettingsRow icon="print-outline" title="Registro Allergeni PDF" subtitle="Modulo ufficiale UE 1169/2011" onPress={() => router.push('/(owner)/registro')} />
         <SettingsDivider />
-        <SettingsRow icon="card" title="Piano e fatturazione" subtitle="Gestione abbonamento e ricevute Stripe" onPress={() => router.push('/(owner)/piano')} />
+        <SettingsRow icon="bar-chart-outline" title="Statistiche di ricerca" subtitle="Visite menù ed allergeni cercati dai clienti" onPress={() => router.push('/(owner)/statistiche')} />
         <SettingsDivider />
-        <SettingsRow icon="megaphone" title="Boost e notifiche push" subtitle="Promozioni in evidenza e messaggi ai follower" onPress={() => router.push('/(owner)/crescita')} />
+        <SettingsRow icon="card-outline" title="Piano e fatturazione" subtitle="Gestione abbonamento e ricevute Stripe" onPress={() => router.push('/(owner)/piano')} />
         <SettingsDivider />
-        <SettingsRow icon="star" title="Recensioni ospiti" subtitle="Leggi e rispondi ai commenti dei clienti" onPress={() => router.push('/(owner)/recensioni')} />
+        <SettingsRow icon="megaphone-outline" title="Boost e notifiche push" subtitle="Promozioni in evidenza e messaggi ai follower" onPress={() => router.push('/(owner)/crescita')} />
+        <SettingsDivider />
+        <SettingsRow icon="star-outline" title="Recensioni ospiti" subtitle="Leggi e rispondi ai commenti dei clienti" onPress={() => router.push('/(owner)/recensioni')} />
       </CollapseSection>
 
       {/* Assistenza */}
       <CollapseSection
-        icon="help-circle"
+        icon="help-circle-outline"
         title="Assistenza & Supporto"
         preview="supporto@allertgy.it"
         expanded={supportExpanded}
         onToggle={() => setSupportExpanded((v) => !v)}
       >
         <SettingsRow
-          icon="mail"
+          icon="mail-outline"
           title="Invia una mail al supporto"
           subtitle="supporto@allertgy.it"
           onPress={() => Linking.openURL('mailto:supporto@allertgy.it')}
@@ -157,7 +159,7 @@ export default function OwnerAccount() {
           DATI ACCOUNT
         </AppText>
         <SettingsRow
-          icon="person"
+          icon="person-outline"
           title="Nome, email e password"
           subtitle="Modifica i tuoi dati di accesso"
           onPress={() => router.push('/account-settings')}

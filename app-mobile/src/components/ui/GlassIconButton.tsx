@@ -116,12 +116,12 @@ export function GlassIconButton({
     <AnimatedPressable
       onPress={handlePress}
       onPressIn={() => {
-        opacity.value = withSpring(0.82, { damping: 20, stiffness: 420 });
-        scale.value = withSpring(0.88, { damping: 15, stiffness: 400 });
+        opacity.value = withSpring(0.86, { damping: 22, stiffness: 450 });
+        scale.value = withSpring(0.93, { damping: 18, stiffness: 420 });
       }}
       onPressOut={() => {
-        opacity.value = withSpring(1, { damping: 16, stiffness: 280 });
-        scale.value = withSpring(1, { damping: 12, stiffness: 300 });
+        opacity.value = withSpring(1, { damping: 18, stiffness: 320 });
+        scale.value = withSpring(1, { damping: 14, stiffness: 320 });
       }}
       hitSlop={8}
       accessibilityRole="button"
@@ -234,11 +234,11 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: -1,
-    right: -1,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     paddingHorizontal: 3,
     backgroundColor: colors.red,
     alignItems: 'center',
@@ -248,9 +248,9 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   badgeText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
-    lineHeight: 11,
+    lineHeight: 12,
   },
   wire: {
     borderWidth: 1,

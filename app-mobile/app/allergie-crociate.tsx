@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '../src/store/session';
-import { AppText, Screen } from '../src/components/ui';
+import { AppText, NavHeaderBackButton, Screen, ScreenTopHeader } from '../src/components/ui';
 import { colors, font, radius, spacing } from '../src/theme';
 import {
   CROSS_REACTIVITY_DATABASE,
@@ -45,28 +45,39 @@ export default function AllergieCrociateScreen() {
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen
-        options={{
-          headerTitle: isIt ? 'Allergie Crociate & Pollini' : 'Pollen-Food Cross Allergies',
-          headerTitleStyle: { fontFamily: font.bold, fontSize: 18, color: '#1E1B4B' },
-          headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12, paddingVertical: 4 }}>
-              <Ionicons name="chevron-back" size={24} color="#1E1B4B" />
-            </Pressable>
-          ),
-        }}
+      <ScreenTopHeader
+        title={isIt ? 'Allergie Crociate & Pollini' : 'Pollen-Food Cross Allergies'}
       />
 
-      <View style={[styles.container, { paddingTop: insets.top + 48 }]}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+      <View style={styles.container}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
+          {/* HERO SUMMARY CARD COSMIC + VANILLA */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroTopRow}>
+              <View style={styles.heroIconBadge}>
+                <Ionicons name="flower-outline" size={22} color="#F1FEC8" />
+              </View>
+              <View style={styles.heroTextContainer}>
+                <AppText variant="bodyBold" style={styles.heroTitle}>
+                  {isIt ? 'Cross-Reattività & Sindrome Orale' : 'Pollen-Food Syndrome'}
+                </AppText>
+                <AppText variant="caption" style={styles.heroSubtitle}>
+                  {isIt
+                    ? 'Verifica quali alimenti condividono proteine simili con i pollini a cui sei allergico.'
+                    : 'Check which foods share homologous proteins with your pollen allergens.'}
+                </AppText>
+              </View>
+            </View>
+          </View>
+
           {/* SEARCH BAR */}
           <View style={styles.searchBar}>
-            <Ionicons name="search" size={18} color="#94A3B8" />
+            <Ionicons name="search-outline" size={18} color="#94A3B8" />
             <TextInput
               style={styles.searchInput}
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder={isIt ? 'Cerca polline, frutto o proteina (es. Mela, Betulla, LTP)...' : 'Search pollen, food or protein...'}
+              placeholder={isIt ? 'Cerca polline, frutto o proteina (es. Mela, Betulla)...' : 'Search pollen, food or protein...'}
               placeholderTextColor="#94A3B8"
               clearButtonMode="while-editing"
             />
@@ -82,7 +93,7 @@ export default function AllergieCrociateScreen() {
               }}
             >
               <AppText style={[styles.filterChipText, selectedFamilyId === 'all' && styles.filterChipTextActive]}>
-                🌟 {isIt ? 'Tutte le famiglie' : 'All'}
+                {isIt ? 'Tutte le famiglie' : 'All'}
               </AppText>
             </Pressable>
             {CROSS_REACTIVITY_DATABASE.map((f) => {
@@ -97,7 +108,7 @@ export default function AllergieCrociateScreen() {
                   }}
                 >
                   <AppText style={[styles.filterChipText, isSel && styles.filterChipTextActive]}>
-                    {f.inhalantEmoji} {f.inhalantName.split('&')[0].trim()}
+                    {f.inhalantName.split('&')[0].trim()}
                   </AppText>
                 </Pressable>
               );
@@ -106,7 +117,7 @@ export default function AllergieCrociateScreen() {
 
           {/* INFO CALLOUT BANNER */}
           <View style={styles.infoBanner}>
-            <Ionicons name="flower-outline" size={22} color="#059669" />
+            <Ionicons name="leaf-outline" size={20} color="#059669" />
             <AppText variant="caption" color="#065F46" style={{ flex: 1, lineHeight: 16 }}>
               {isIt
                 ? 'La Sindrome Orale Allergica (OAS) si manifesta quando il sistema immunitario confonde le proteine dei pollini con quelle di alcuni frutti o vegetali.'
@@ -119,15 +130,15 @@ export default function AllergieCrociateScreen() {
             {filteredFamilies.map((fam) => (
               <View key={fam.id} style={styles.familyCard}>
                 <View style={styles.familyCardHead}>
-                  <View style={styles.emojiCircle}>
-                    <Text style={{ fontSize: 24 }}>{fam.inhalantEmoji}</Text>
+                  <View style={styles.iconCircle}>
+                    <Ionicons name="flower-outline" size={20} color="#23212C" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <AppText variant="title" style={{ fontSize: 16, color: '#1E1B4B' }}>
+                    <AppText variant="title" style={{ fontSize: 16, color: '#23212C' }}>
                       {fam.inhalantName}
                     </AppText>
-                    <AppText variant="caption" color="#6366F1" style={{ fontWeight: '700' }}>
-                      🧬 {fam.proteinFamily}
+                    <AppText variant="caption" color="#23212C" style={{ fontWeight: '700', marginTop: 1 }}>
+                      {fam.proteinFamily}
                     </AppText>
                   </View>
                 </View>
@@ -138,6 +149,11 @@ export default function AllergieCrociateScreen() {
 
                 {/* THERMOLABILITY ADVICE BOX */}
                 <View style={[styles.adviceBox, fam.thermolabile ? styles.adviceBoxSafe : styles.adviceBoxRisk]}>
+                  <Ionicons
+                    name={fam.thermolabile ? 'shield-checkmark-outline' : 'warning-outline'}
+                    size={14}
+                    color={fam.thermolabile ? '#166534' : '#991B1B'}
+                  />
                   <AppText variant="caption" style={[styles.adviceText, fam.thermolabile ? styles.adviceTextSafe : styles.adviceTextRisk]}>
                     {fam.cookingSafetyAdvice}
                   </AppText>
@@ -180,7 +196,60 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 16,
+    paddingTop: 8,
   },
+  scrollContent: {
+    gap: 14,
+    paddingTop: 4,
+  },
+  navBackBtn: {
+    paddingRight: 12,
+    paddingVertical: 4,
+  },
+
+  // HERO SUMMARY CARD COSMIC + VANILLA
+  heroCard: {
+    backgroundColor: '#23212C',
+    borderRadius: 24,
+    padding: 20,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.2)',
+    shadowColor: '#23212C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  heroIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(241, 254, 200, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.3)',
+  },
+  heroTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 16.5,
+  },
+  heroSubtitle: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -189,10 +258,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    shadowColor: '#000',
+    shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 3,
@@ -201,14 +269,15 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 13.5,
-    color: '#1E1B4B',
+    color: '#23212C',
     fontFamily: font.regular,
   },
   filterScroll: {
-    marginBottom: 12,
+    marginBottom: 2,
   },
   filterScrollContent: {
     gap: 6,
+    paddingVertical: 2,
   },
   filterChip: {
     paddingHorizontal: 12,
@@ -219,16 +288,17 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   filterChipActive: {
-    backgroundColor: '#1E1B4B',
-    borderColor: '#1E1B4B',
+    backgroundColor: '#23212C',
+    borderColor: '#23212C',
   },
   filterChipText: {
     fontSize: 12,
     fontFamily: font.semibold,
-    color: '#4B5563',
+    color: '#475569',
   },
   filterChipTextActive: {
-    color: '#FFFFFF',
+    color: '#F1FEC8',
+    fontWeight: '700',
   },
   infoBanner: {
     backgroundColor: '#ECFDF5',
@@ -239,7 +309,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 14,
   },
   familiesList: {
     gap: 14,
@@ -248,7 +317,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 16,
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -260,10 +331,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  emojiCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
@@ -271,6 +342,9 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   adviceBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     borderRadius: 12,
     padding: 10,
     marginTop: 4,
@@ -285,6 +359,7 @@ const styles = StyleSheet.create({
     borderColor: '#FECACA',
   },
   adviceText: {
+    flex: 1,
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 16,
@@ -299,6 +374,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#64748B',
     marginTop: 6,
+    fontSize: 11.5,
     letterSpacing: 0.4,
   },
   foodsGrid: {

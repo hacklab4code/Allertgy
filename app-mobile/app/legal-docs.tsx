@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { api } from '../src/api/client';
-import { AppText, GlassScreenScroll, Screen, Section } from '../src/components/ui';
+import { AppText, GlassScreenScroll, Screen, ScreenTopHeader, Section } from '../src/components/ui';
 import { colors, radius, spacing } from '../src/theme';
 
 interface LegalDoc { doc: string; title: string; version: string; content_markdown: string }
@@ -32,7 +32,7 @@ export default function LegalDocs() {
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen options={{ title: 'Documenti legali' }} />
+      <ScreenTopHeader title="Documenti legali" />
       <GlassScreenScroll headerFloat={false} showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
         {error ? <AppText variant="caption" color={colors.red}>{error}</AppText> : null}
         {docs.length === 0 && !error ? <ActivityIndicator color={colors.brand} style={{ marginTop: spacing.lg }} /> : null}
@@ -76,6 +76,12 @@ export default function LegalDocs() {
             </View>
           </Section>
         ) : null}
+
+        <View style={{ alignItems: 'center', marginTop: spacing.md, paddingBottom: spacing.lg }}>
+          <AppText variant="caption" color={colors.onSurfaceMuted} style={{ fontSize: 11, fontWeight: '600' }}>
+            © {new Date().getFullYear()} AllerTgy · Creata da hacklab.digital
+          </AppText>
+        </View>
       </GlassScreenScroll>
     </Screen>
   );

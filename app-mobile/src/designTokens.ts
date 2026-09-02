@@ -178,19 +178,61 @@ export function normalizeSemaforoStatus(status?: string | null): SemaforoStatus 
   return 'neutral';
 }
 
-/** Brand Action standard (Cosmic + Vanilla) */
+/** Brand Action standard (Cosmic #23212C + Vanilla #F1FEC8) */
 export const BRAND_TOKENS = {
   primary: '#23212C',
-  dark: '#1A1822',
-  hover: '#2E2B3A',
-  light: '#3D384D',
+  primaryHover: '#191820',
+  dark: '#191820',
+  darker: '#121118',
+  hover: '#191820',
+  light: '#F1FEC8',
+  surface: '#F7FEE7',
   soft: '#F1FEC8',
-  border: '#E6DFF5',
+  border: '#E2F4A6',
+  borderStrong: '#23212C',
   text: '#23212C',
   ink: '#23212C',
   cosmic: '#23212C',
   vanilla: '#F1FEC8',
   lavender: '#F1FEC8',
+  premiumGradient: ['#121118', '#23212C', '#353344'] as const,
+  vanillaGradient: ['#F1FEC8', '#E6F8AB', '#D8F18C'] as const,
+} as const;
+
+/** Token Esatti Glassmorphism da css.glass */
+export const CSS_GLASS = {
+  background: 'rgba(255, 255, 255, 0.2)',
+  borderRadius: 16,
+  boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
+  backdropFilter: 'blur(5px)',
+  webkitBackdropFilter: 'blur(5px)',
+  border: '1px solid rgba(255, 255, 255, 0.3)',
+  blurIntensity: 60,
+} as const;
+
+export const COSMIC_GLASS = {
+  hex: '#23212C',
+  rgb: '35, 33, 44',
+  background: 'rgba(35, 33, 44, 0.82)',
+  border: 'rgba(255, 255, 255, 0.15)',
+  borderHighlight: 'rgba(241, 254, 200, 0.35)',
+  borderRadius: 16,
+  boxShadow: '0 4px 30px rgba(0, 0, 0, 0.15)',
+  blur: '5px',
+  blurIntensity: 60,
+} as const;
+
+export const VANILLA_GLASS = {
+  hex: '#F1FEC8',
+  rgb: '241, 254, 200',
+  background: 'rgba(241, 254, 200, 0.60)',
+  border: 'rgba(255, 255, 255, 0.40)',
+  borderDark: 'rgba(35, 33, 44, 0.08)',
+  borderHighlight: 'rgba(255, 255, 255, 0.85)',
+  borderRadius: 16,
+  boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
+  blur: '5px',
+  blurIntensity: 60,
 } as const;
 
 /** Esporta il JSON grezzo per tooling / documentazione */

@@ -61,13 +61,17 @@ app = FastAPI(
 if settings.is_production:
     app.add_middleware(SecurityHeadersMiddleware)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_kwargs = {
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+if "*" in settings.cors_origins_list or settings.cors_origins.strip() == "*":
+    cors_kwargs["allow_origin_regex"] = r"^https?://.*"
+else:
+    cors_kwargs["allow_origins"] = settings.cors_origins_list
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 # /static è SOLO per immagini pubbliche già pubblicate (foto menù/piatti).
 # Foto profilo e documenti medici vivono nello storage privato (R2 o

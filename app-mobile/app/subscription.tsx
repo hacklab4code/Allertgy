@@ -13,6 +13,8 @@ import {
   ErrorStateCard,
   GlassCard,
   GlassScreenScroll,
+  Screen,
+  ScreenTopHeader,
   SurfaceButton,
 } from '../src/components/ui';
 import { useSession } from '../src/store/session';
@@ -93,10 +95,10 @@ export default function Subscription() {
   const statusLabel = STATUS_LABEL[status]?.[isIt ? 'it' : 'en'] ?? status;
 
   return (
-    <GlassScreenScroll headerFloat={false}>
-      <Stack.Screen options={{ title: isIt ? 'Piano e abbonamento' : 'Plan & subscription' }} />
-
-      <View style={styles.heading}>
+    <Screen edges={false} ambient>
+      <ScreenTopHeader title={isIt ? 'Piano e abbonamento' : 'Plan & subscription'} />
+      <GlassScreenScroll headerFloat={false}>
+        <View style={styles.heading}>
         <AppText variant="eyebrow" color={colors.textSecondary} style={styles.eyebrow}>
           {isIt ? 'IL TUO PIANO' : 'YOUR PLAN'}
         </AppText>
@@ -200,7 +202,8 @@ export default function Subscription() {
           </AppText>
         </>
       )}
-    </GlassScreenScroll>
+      </GlassScreenScroll>
+    </Screen>
   );
 }
 

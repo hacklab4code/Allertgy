@@ -27,7 +27,9 @@ export RCT_METRO_PORT=8081
 export CI=false
 export EXPO_NO_TELEMETRY=1
 export npm_config_cache="$ROOT/app-mobile/.npm_cache"
-# Worker: lascia che metro.config.js scelga (4–6). Evita --max-workers 2
-# che rende il first bundle lentissimo sul Mac.
 echo "[run-expo] Metro su http://${IP}:8081  API=http://${IP}:8000"
-exec npx expo start --dev-client --lan --port 8081
+CLIENT_FLAG="--go"
+if [ "${ALLERTGY_DEV_CLIENT:-0}" = "1" ]; then
+  CLIENT_FLAG="--dev-client"
+fi
+exec npx expo start $CLIENT_FLAG --lan --port 8081

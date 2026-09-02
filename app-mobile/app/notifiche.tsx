@@ -1,20 +1,21 @@
 import { Stack, router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import { useNotifStore } from '../src/store/notifications';
 import type { AppNotification } from '../src/api/client';
-import { AppText, ErrorStateCard, GlassScreenScroll, Screen } from '../src/components/ui';
+import { AppText, ErrorStateCard, Screen, ScreenTopHeader, SurfaceButton } from '../src/components/ui';
 import { useSession } from '../src/store/session';
-import { colors, radius, spacing } from '../src/theme';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+import { colors, font, radius } from '../src/theme';
 
 interface NotificationTheme {
   icon: keyof typeof Ionicons.glyphMap;
@@ -22,7 +23,7 @@ interface NotificationTheme {
   body: string;
   code?: string;
   categoryLabel: string;
-  gradientColors: [string, string];
+  iconBg: string;
   iconColor: string;
   accentBorderColor: string;
   actionLabel?: string;
@@ -40,103 +41,103 @@ function present(n: AppNotification): NotificationTheme {
   switch (n.type) {
     case 'menu_updated':
       return {
-        icon: 'restaurant',
+        icon: 'restaurant-outline',
         title: 'Menù aggiornato',
-        body: 'Un locale tra i tuoi preferiti ha pubblicato un nuovo menù. Controlla il semaforo!',
+        body: 'Un locale tra i tuoi preferiti ha pubblicato un nuovo menù. Controlla il semaforo allergeni!',
         code,
         categoryLabel: 'MENÙ',
-        gradientColors: ['#FFF3E0', '#FFE0B2'],
-        iconColor: '#E65100',
-        accentBorderColor: '#FF9800',
+        iconBg: '#FFFBEB',
+        iconColor: '#D97706',
+        accentBorderColor: '#FDE68A',
         actionLabel: 'Vedi Menù',
       };
     case 'review_reply':
       return {
-        icon: 'chatbubbles',
+        icon: 'chatbubbles-outline',
         title: 'Risposta alla tua recensione',
-        body: 'Il ristoratore ha risposto alla tua recensione.',
+        body: 'Il ristoratore ha risposto alla tua recensione sul locale.',
         code,
         categoryLabel: 'RECENSIONE',
-        gradientColors: ['#E3F2FD', '#BBDEFB'],
-        iconColor: '#1565C0',
-        accentBorderColor: '#2196F3',
+        iconBg: '#EFF6FF',
+        iconColor: '#2563EB',
+        accentBorderColor: '#BFDBFE',
         actionLabel: 'Leggi risposta',
       };
     case 'review_received':
       return {
-        icon: 'star',
-        title: 'Nuova recensione',
+        icon: 'star-outline',
+        title: 'Nuova recensione ricevuta',
         body: payload.author_name
           ? `${payload.author_name} ha lasciato una recensione sul tuo locale.`
           : 'Hai ricevuto una nuova recensione sul tuo locale.',
         code,
         categoryLabel: 'RECENSIONE',
-        gradientColors: ['#FFF8E1', '#FFECB3'],
-        iconColor: '#F57F17',
-        accentBorderColor: '#FFC107',
+        iconBg: '#FEF3C7',
+        iconColor: '#B45309',
+        accentBorderColor: '#FDE68A',
         actionLabel: 'Vedi recensioni',
       };
     case 'promo':
     case 'broadcast':
       return {
-        icon: 'megaphone',
+        icon: 'megaphone-outline',
         title: payload.title || 'Novità dal locale',
-        body: payload.body || 'Hai una nuova comunicazione.',
+        body: payload.body || 'Hai una nuova comunicazione importante dal ristorante.',
         code: payload.public_code || code,
-        categoryLabel: 'PROMO',
-        gradientColors: ['#F3E5F5', '#E1BEE7'],
-        iconColor: '#6A1B9A',
-        accentBorderColor: '#AB47BC',
+        categoryLabel: 'COMUNICAZIONE',
+        iconBg: '#F5F3FF',
+        iconColor: '#7C3AED',
+        accentBorderColor: '#DDD6FE',
         actionLabel: 'Scopri offerta',
       };
     case 'profile_share':
       return {
-        icon: 'share-social',
+        icon: 'share-social-outline',
         title: 'Profilo allergie condiviso',
-        body: `${payload.owner_display_name || 'Un contatto'} ha condiviso il profilo «${payload.label || 'Allergie'}».`,
+        body: `${payload.owner_display_name || 'Un contatto'} ha condiviso con te il profilo «${payload.label || 'Allergie'}».`,
         code: payload.token as string | undefined,
         categoryLabel: 'PROFILO',
-        gradientColors: ['#EDE7F6', '#D1C4E9'],
-        iconColor: '#4527A0',
-        accentBorderColor: '#7E57C2',
+        iconBg: '#F1FEC8',
+        iconColor: '#23212C',
+        accentBorderColor: '#E2F4A6',
         actionLabel: 'Vedi profilo',
       };
     case 'referral_reward':
       return {
-        icon: 'gift',
-        title: 'Plus Famiglia omaggio!',
+        icon: 'gift-outline',
+        title: 'Plus Famiglia in omaggio!',
         body: payload.restaurant_name
           ? `Hai portato ${payload.restaurant_name} su AllerTgy: il piano Plus Famiglia è attivo gratis per te.`
           : 'Hai portato un ristoratore su AllerTgy: il piano Plus Famiglia è attivo gratis per te.',
         categoryLabel: 'PREMIO',
-        gradientColors: ['#E8F5E9', '#C8E6C9'],
-        iconColor: '#2E7D32',
-        accentBorderColor: '#66BB6A',
+        iconBg: '#ECFDF5',
+        iconColor: '#059669',
+        accentBorderColor: '#A7F3D0',
         actionLabel: 'Il tuo account',
       };
     case 'referral_welcome_pro':
       return {
-        icon: 'rocket',
+        icon: 'rocket-outline',
         title: 'Pro omaggio 30 giorni!',
         body: payload.restaurant_name
           ? `${payload.restaurant_name} ha il piano Pro gratis per 30 giorni grazie al codice invito.`
           : 'Il tuo locale ha il piano Pro gratis per 30 giorni grazie al codice invito.',
-        categoryLabel: 'PRO 30G',
-        gradientColors: ['#FBE9E7', '#FFCCBC'],
-        iconColor: '#D84315',
-        accentBorderColor: '#FF7043',
+        categoryLabel: 'PRO',
+        iconBg: '#FFF7ED',
+        iconColor: '#EA580C',
+        accentBorderColor: '#FED7AA',
         actionLabel: 'Gestisci piano',
       };
     default:
       return {
-        icon: 'notifications',
-        title: payload.title || 'Notifica',
+        icon: 'notifications-outline',
+        title: payload.title || 'Nuovo Avviso',
         body: payload.body || n.type,
         code,
-        categoryLabel: 'NOTIFICA',
-        gradientColors: ['#F0F0FF', '#E0E0FF'],
-        iconColor: colors.brand,
-        accentBorderColor: colors.brand,
+        categoryLabel: 'AVVISO',
+        iconBg: '#F8FAFC',
+        iconColor: '#23212C',
+        accentBorderColor: '#E2E8F0',
         actionLabel: 'Dettagli',
       };
   }
@@ -169,55 +170,45 @@ function NotifRow({ n, onOpen }: { n: AppNotification; onOpen: (n: AppNotificati
       ]}
       onPress={() => onOpen(n)}
     >
-      {isUnread && <View style={[styles.unreadAccentBar, { backgroundColor: p.accentBorderColor }]} />}
-
       <View style={styles.cardContent}>
-        {/* Icon Avatar Gradient */}
-        <LinearGradient
-          colors={p.gradientColors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.avatarGradient}
-        >
-          <Ionicons name={p.icon} size={22} color={p.iconColor} />
-        </LinearGradient>
+        {/* Icon Avatar Box */}
+        <View style={[styles.avatarBox, { backgroundColor: p.iconBg, borderColor: p.accentBorderColor }]}>
+          <Ionicons name={p.icon} size={20} color={p.iconColor} />
+        </View>
 
         {/* Text & Meta */}
         <View style={styles.cardMain}>
           <View style={styles.rowTop}>
-            <View style={[styles.categoryBadge, { backgroundColor: `${p.iconColor}14` }]}>
-              <AppText
-                variant="caption"
-                style={{ color: p.iconColor, fontWeight: '700', fontSize: 10, letterSpacing: 0.4 }}
-              >
+            <View style={[styles.categoryBadge, { backgroundColor: p.iconBg, borderColor: p.accentBorderColor }]}>
+              <AppText variant="caption" style={[styles.categoryBadgeText, { color: p.iconColor }]}>
                 {p.categoryLabel}
               </AppText>
             </View>
 
             <View style={styles.timeAgoWrap}>
-              <Ionicons name="time-outline" size={11} color={colors.textMuted} />
-              <AppText variant="caption" color={colors.textMuted} style={{ fontSize: 11 }}>
+              <Ionicons name="time-outline" size={12} color="#94A3B8" />
+              <AppText variant="caption" color="#94A3B8" style={styles.timeAgoText}>
                 {timeAgo(n.created_at)}
               </AppText>
             </View>
 
-            {isUnread && <View style={[styles.unreadBadgeDot, { backgroundColor: p.iconColor }]} />}
+            {isUnread && <View style={styles.unreadDot} />}
           </View>
 
           <AppText variant="bodyBold" style={[styles.titleText, isUnread && styles.titleUnread]}>
             {p.title}
           </AppText>
 
-          <AppText variant="caption" color={colors.onSurfaceMuted} style={styles.bodyText} numberOfLines={3}>
+          <AppText variant="caption" color="#64748B" style={styles.bodyText} numberOfLines={3}>
             {p.body}
           </AppText>
 
           {p.actionLabel && (
             <View style={styles.actionRow}>
-              <AppText variant="caption" style={{ color: p.iconColor, fontWeight: '700', fontSize: 12 }}>
+              <AppText variant="caption" style={[styles.actionLabelText, { color: p.iconColor }]}>
                 {p.actionLabel}
               </AppText>
-              <Ionicons name="chevron-forward" size={13} color={p.iconColor} />
+              <Ionicons name="chevron-forward-outline" size={13} color={p.iconColor} />
             </View>
           )}
         </View>
@@ -226,7 +217,8 @@ function NotifRow({ n, onOpen }: { n: AppNotification; onOpen: (n: AppNotificati
   );
 }
 
-export default function Notifiche() {
+export default function NotificheScreen() {
+  const insets = useSafeAreaInsets();
   const { items, unread, loading, error, refresh, markRead, markAllRead } = useNotifStore();
   const { role } = useSession();
   const [filter, setFilter] = useState<FilterMode>('all');
@@ -238,7 +230,7 @@ export default function Notifiche() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await refresh();
     setRefreshing(false);
   }, [refresh]);
@@ -258,7 +250,7 @@ export default function Notifiche() {
   }, [filter, items, readItems, unreadItems]);
 
   const open = (n: AppNotification) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const p = present(n);
     if (!n.read_at) markRead(n.id);
     if (n.type === 'profile_share' && p.code) {
@@ -291,305 +283,443 @@ export default function Notifiche() {
   };
 
   const setFilterMode = (mode: FilterMode) => {
-    Haptics.selectionAsync();
+    void Haptics.selectionAsync();
     setFilter(mode);
   };
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen
-        options={{
-          title: 'Notifiche',
-          headerBackTitle: 'Indietro',
-          headerRight:
-            unread > 0
-              ? () => (
-                  <Pressable
-                    onPress={() => {
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                      markAllRead();
-                    }}
-                    hitSlop={10}
-                    style={styles.markAllBtn}
-                  >
-                    <Ionicons name="checkmark-done-outline" size={15} color={colors.brand} />
-                    <AppText variant="caption" color={colors.brand} style={styles.markAllText}>
-                      Segna lette
-                    </AppText>
-                  </Pressable>
-                )
-              : undefined,
-        }}
+      <ScreenTopHeader
+        title="Centro Notifiche"
+        rightElement={
+          unread > 0 ? (
+            <Pressable
+              onPress={() => {
+                void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                markAllRead();
+              }}
+              hitSlop={10}
+              style={styles.markAllBtn}
+            >
+              <Ionicons name="checkmark-done-outline" size={15} color="#23212C" />
+              <AppText variant="caption" style={styles.markAllText}>
+                Segna lette
+              </AppText>
+            </Pressable>
+          ) : null
+        }
       />
 
-      <GlassScreenScroll
-        headerFloat={false}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.container}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.brand}
-            colors={[colors.brand]}
-          />
-        }
-      >
-        {/* Filter Pills */}
-        {items.length > 0 && (
-          <View style={styles.filterBar}>
-            <Pressable
-              onPress={() => setFilterMode('all')}
-              style={[styles.filterPill, filter === 'all' && styles.filterPillActive]}
-            >
-              <AppText
-                variant="caption"
-                style={[styles.filterText, filter === 'all' && styles.filterTextActive]}
-              >
-                Tutte
-              </AppText>
-              <View style={[styles.filterBadge, filter === 'all' && styles.filterBadgeActive]}>
-                <AppText
-                  variant="caption"
-                  style={[styles.filterBadgeText, filter === 'all' && styles.filterBadgeTextActive]}
-                >
-                  {items.length}
+      <View style={styles.container}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#23212C"
+              colors={['#23212C']}
+            />
+          }
+        >
+          {/* 1. HERO SUMMARY CARD COSMIC + VANILLA */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroTopRow}>
+              <View style={styles.heroIconBadge}>
+                <Ionicons name="notifications-outline" size={22} color="#F1FEC8" />
+              </View>
+              <View style={styles.heroTextContainer}>
+                <AppText variant="bodyBold" style={styles.heroTitle}>
+                  Avvisi & Aggiornamenti
+                </AppText>
+                <AppText variant="caption" style={styles.heroSubtitle}>
+                  Novità su menù preferiti, recensioni e profili condivisi.
                 </AppText>
               </View>
-            </Pressable>
+            </View>
 
-            <Pressable
-              onPress={() => setFilterMode('unread')}
-              style={[styles.filterPill, filter === 'unread' && styles.filterPillActive]}
-            >
-              <AppText
-                variant="caption"
-                style={[styles.filterText, filter === 'unread' && styles.filterTextActive]}
-              >
-                Non lette
-              </AppText>
-              {unreadItems.length > 0 && (
-                <View
-                  style={[
-                    styles.filterBadge,
-                    styles.unreadFilterBadge,
-                    filter === 'unread' && styles.filterBadgeActive,
-                  ]}
+            {/* QUICK STATS */}
+            <View style={styles.statsContainer}>
+              <View style={styles.statBox}>
+                <Ionicons name="mail-unread-outline" size={14} color="#F1FEC8" />
+                <AppText variant="caption" style={styles.statLabel}>
+                  Non lette: <AppText variant="caption" style={styles.statValue}>{unread}</AppText>
+                </AppText>
+              </View>
+
+              <View style={styles.statBox}>
+                <Ionicons name="documents-outline" size={14} color="rgba(255,255,255,0.7)" />
+                <AppText variant="caption" style={styles.statLabel}>
+                  Totale: <AppText variant="caption" style={styles.statValue}>{items.length}</AppText>
+                </AppText>
+              </View>
+
+              {unread > 0 && (
+                <Pressable
+                  style={styles.heroActionBtn}
+                  onPress={() => {
+                    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    markAllRead();
+                  }}
                 >
+                  <Ionicons name="checkmark-done-outline" size={14} color="#23212C" />
+                  <AppText variant="caption" style={styles.heroActionBtnText}>
+                    Segna tutte lette
+                  </AppText>
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          {/* 2. FILTER PILLS BAR */}
+          {items.length > 0 && (
+            <View style={styles.filterBar}>
+              <Pressable
+                onPress={() => setFilterMode('all')}
+                style={[styles.filterPill, filter === 'all' && styles.filterPillActive]}
+              >
+                <Ionicons
+                  name="albums-outline"
+                  size={13}
+                  color={filter === 'all' ? '#F1FEC8' : '#64748B'}
+                />
+                <AppText
+                  variant="caption"
+                  style={[styles.filterText, filter === 'all' && styles.filterTextActive]}
+                >
+                  Tutte
+                </AppText>
+                <View style={[styles.filterBadge, filter === 'all' && styles.filterBadgeActive]}>
                   <AppText
                     variant="caption"
-                    style={[styles.filterBadgeText, filter === 'unread' && styles.filterBadgeTextActive]}
+                    style={[styles.filterBadgeText, filter === 'all' && styles.filterBadgeTextActive]}
                   >
-                    {unreadItems.length}
+                    {items.length}
                   </AppText>
                 </View>
-              )}
-            </Pressable>
+              </Pressable>
 
-            <Pressable
-              onPress={() => setFilterMode('read')}
-              style={[styles.filterPill, filter === 'read' && styles.filterPillActive]}
-            >
-              <AppText
-                variant="caption"
-                style={[styles.filterText, filter === 'read' && styles.filterTextActive]}
+              <Pressable
+                onPress={() => setFilterMode('unread')}
+                style={[styles.filterPill, filter === 'unread' && styles.filterPillActive]}
               >
-                Archivio
-              </AppText>
-              <View style={[styles.filterBadge, filter === 'read' && styles.filterBadgeActive]}>
+                <Ionicons
+                  name="mail-unread-outline"
+                  size={13}
+                  color={filter === 'unread' ? '#F1FEC8' : '#64748B'}
+                />
                 <AppText
                   variant="caption"
-                  style={[styles.filterBadgeText, filter === 'read' && styles.filterBadgeTextActive]}
+                  style={[styles.filterText, filter === 'unread' && styles.filterTextActive]}
                 >
-                  {readItems.length}
+                  Non lette
                 </AppText>
-              </View>
-            </Pressable>
-          </View>
-        )}
+                {unreadItems.length > 0 && (
+                  <View
+                    style={[
+                      styles.filterBadge,
+                      styles.unreadFilterBadge,
+                      filter === 'unread' && styles.filterBadgeActive,
+                    ]}
+                  >
+                    <AppText
+                      variant="caption"
+                      style={[styles.filterBadgeText, filter === 'unread' && styles.filterBadgeTextActive]}
+                    >
+                      {unreadItems.length}
+                    </AppText>
+                  </View>
+                )}
+              </Pressable>
 
-        {/* Content list */}
-        {loading && items.length === 0 ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator color={colors.brand} size="large" />
-            <AppText variant="caption" color={colors.onSurfaceMuted} style={{ marginTop: spacing.xs }}>
-              Caricamento notifiche...
-            </AppText>
-          </View>
-        ) : error ? (
-          <ErrorStateCard
-            message="Impossibile caricare le notifiche. Controlla la connessione."
-            retryLabel="Riprova"
-            onRetry={refresh}
-            style={{ marginTop: spacing.lg }}
-          />
-        ) : filteredItems.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <LinearGradient
-              colors={['#F3E8FF', '#E9D5FF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.emptyIconWrap}
-            >
-              <Ionicons name="notifications-off-outline" size={36} color={colors.brand} />
-            </LinearGradient>
-            <AppText variant="title" style={{ textAlign: 'center' }}>
-              {filter === 'unread'
-                ? 'Nessuna notifica non letta'
-                : filter === 'read'
-                ? 'Nessuna notifica in archivio'
-                : 'Nessuna notifica'}
-            </AppText>
-            <AppText variant="caption" color={colors.onSurfaceMuted} style={styles.emptySubtext}>
-              {filter === 'unread'
-                ? 'Sei perfettamente in pari! Tutte le comunicazioni importanti sono state lette.'
-                : 'Qui troverai gli avvisi sui tuoi locali preferiti, aggiornamenti dei menù e novità dal tuo profilo.'}
-            </AppText>
-          </View>
-        ) : (
-          <View style={styles.list}>
-            {filteredItems.map((n) => (
-              <NotifRow key={n.id} n={n} onOpen={open} />
-            ))}
-          </View>
-        )}
-      </GlassScreenScroll>
+              <Pressable
+                onPress={() => setFilterMode('read')}
+                style={[styles.filterPill, filter === 'read' && styles.filterPillActive]}
+              >
+                <Ionicons
+                  name="archive-outline"
+                  size={13}
+                  color={filter === 'read' ? '#F1FEC8' : '#64748B'}
+                />
+                <AppText
+                  variant="caption"
+                  style={[styles.filterText, filter === 'read' && styles.filterTextActive]}
+                >
+                  Archivio
+                </AppText>
+                <View style={[styles.filterBadge, filter === 'read' && styles.filterBadgeActive]}>
+                  <AppText
+                    variant="caption"
+                    style={[styles.filterBadgeText, filter === 'read' && styles.filterBadgeTextActive]}
+                  >
+                    {readItems.length}
+                  </AppText>
+                </View>
+              </Pressable>
+            </View>
+          )}
+
+          {/* 3. CONTENT / LISTA NOTIFICHE */}
+          {loading && items.length === 0 ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator color="#23212C" size="large" />
+              <AppText variant="caption" color="#64748B" style={{ marginTop: 8 }}>
+                Caricamento notifiche in corso...
+              </AppText>
+            </View>
+          ) : error ? (
+            <ErrorStateCard
+              message="Impossibile caricare le notifiche. Controlla la connessione."
+              retryLabel="Riprova"
+              onRetry={refresh}
+              style={{ marginTop: 12 }}
+            />
+          ) : filteredItems.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIconWrap}>
+                <Ionicons name="notifications-off-outline" size={38} color="#23212C" />
+              </View>
+              <AppText variant="title" style={styles.emptyTitle}>
+                {filter === 'unread'
+                  ? 'Nessuna notifica non letta'
+                  : filter === 'read'
+                  ? 'Nessuna notifica in archivio'
+                  : 'Nessuna notifica presente'}
+              </AppText>
+              <AppText variant="caption" color="#64748B" style={styles.emptySubtext}>
+                {filter === 'unread'
+                  ? 'Tutto in ordine! Tutte le comunicazioni importanti sono state lette.'
+                  : 'Qui troverai gli avvisi sui locali preferiti, aggiornamenti dei menù e novità dal tuo profilo.'}
+              </AppText>
+            </View>
+          ) : (
+            <View style={styles.list}>
+              {filteredItems.map((n) => (
+                <NotifRow key={n.id} n={n} onOpen={open} />
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl + 32,
-    gap: spacing.md,
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  scrollContent: {
+    gap: 14,
+    paddingTop: 4,
+  },
+  navBackBtn: {
+    paddingRight: 12,
+    paddingVertical: 4,
   },
   markAllBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(109, 40, 217, 0.08)',
+    backgroundColor: '#F1FEC8',
+    borderWidth: 1,
+    borderColor: '#E2F4A6',
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: radius.pill,
     marginRight: 4,
   },
   markAllText: {
-    fontWeight: '700',
-    fontSize: 12,
+    fontWeight: '800',
+    fontSize: 11.5,
+    color: '#23212C',
   },
+
+  // HERO CARD
+  heroCard: {
+    backgroundColor: '#23212C',
+    borderRadius: 24,
+    padding: 20,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.2)',
+    shadowColor: '#23212C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  heroIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(241, 254, 200, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.3)',
+  },
+  heroTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+  },
+  heroSubtitle: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+  },
+  statLabel: {
+    fontSize: 11.5,
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+  statValue: {
+    fontWeight: '700',
+    color: '#F1FEC8',
+  },
+  heroActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1FEC8',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    marginLeft: 'auto',
+  },
+  heroActionBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#23212C',
+  },
+
+  // FILTER BAR
   filterBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.xs,
+    gap: 8,
+    marginVertical: 2,
   },
   filterPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E2E8F0',
   },
   filterPillActive: {
-    backgroundColor: colors.brand,
-    borderColor: colors.brand,
+    backgroundColor: '#23212C',
+    borderColor: '#23212C',
   },
   filterText: {
     fontWeight: '600',
-    color: colors.onSurfaceMuted,
-    fontSize: 13,
+    color: '#64748B',
+    fontSize: 12,
   },
   filterTextActive: {
-    color: colors.white,
+    color: '#F1FEC8',
     fontWeight: '700',
   },
   filterBadge: {
-    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     paddingHorizontal: 6,
     paddingVertical: 1,
-    borderRadius: 10,
+    borderRadius: 8,
   },
   unreadFilterBadge: {
-    backgroundColor: colors.brand50,
+    backgroundColor: '#F1FEC8',
   },
   filterBadgeActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: 'rgba(241, 254, 200, 0.25)',
   },
   filterBadgeText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
-    color: colors.onSurfaceMuted,
+    color: '#64748B',
   },
   filterBadgeTextActive: {
-    color: colors.white,
+    color: '#F1FEC8',
   },
-  loadingBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xxl,
-  },
+
+  // NOTIFICATION CARDS
   list: {
     gap: 12,
   },
   cardContainer: {
-    borderRadius: radius.lg,
-    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    shadowColor: colors.shadow,
+    borderColor: '#E2E8F0',
+    shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
-    elevation: 1,
+    elevation: 2,
   },
   cardUnread: {
     backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(109, 40, 217, 0.25)',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 2,
+    borderColor: '#CBD5E1',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
   cardRead: {
-    opacity: 0.92,
+    backgroundColor: '#F8FAFC',
+    opacity: 0.9,
   },
   cardPressed: {
     transform: [{ scale: 0.995 }],
     opacity: 0.88,
   },
-  unreadAccentBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    zIndex: 2,
-  },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    padding: 14,
+    padding: 16,
     gap: 12,
   },
-  avatarGradient: {
-    width: 46,
-    height: 46,
+  avatarBox: {
+    width: 44,
+    height: 44,
     borderRadius: 14,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
   },
   cardMain: {
     flex: 1,
-    gap: 3,
+    gap: 4,
   },
   rowTop: {
     flexDirection: 'row',
@@ -599,8 +729,14 @@ const styles = StyleSheet.create({
   },
   categoryBadge: {
     paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingVertical: 2.5,
     borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  categoryBadgeText: {
+    fontWeight: '700',
+    fontSize: 10,
+    letterSpacing: 0.4,
   },
   timeAgoWrap: {
     flexDirection: 'row',
@@ -608,24 +744,28 @@ const styles = StyleSheet.create({
     gap: 3,
     marginLeft: 'auto',
   },
-  unreadBadgeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  timeAgoText: {
+    fontSize: 11,
+  },
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#23212C',
+    marginLeft: 2,
   },
   titleText: {
-    fontSize: 15,
-    color: colors.onSurface,
-    lineHeight: 20,
+    fontSize: 14.5,
+    color: '#334155',
+    lineHeight: 19,
   },
   titleUnread: {
     fontWeight: '800',
-    color: colors.ink,
+    color: '#23212C',
   },
   bodyText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.onSurfaceMuted,
+    fontSize: 12.5,
+    lineHeight: 17,
   },
   actionRow: {
     flexDirection: 'row',
@@ -633,28 +773,52 @@ const styles = StyleSheet.create({
     gap: 3,
     marginTop: 4,
   },
+  actionLabelText: {
+    fontWeight: '700',
+    fontSize: 11.5,
+  },
+
+  // LOADING & EMPTY STATES
+  loadingBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
   emptyCard: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.xl,
-    marginTop: spacing.md,
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: radius.xl,
+    padding: 32,
+    marginTop: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.xs,
+    borderColor: '#E2E8F0',
+    gap: 8,
+    shadowColor: '#23212C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
   },
   emptyIconWrap: {
     width: 72,
     height: 72,
     borderRadius: 36,
+    backgroundColor: '#F1FEC8',
+    borderWidth: 1,
+    borderColor: '#E2F4A6',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    color: '#23212C',
+    fontSize: 16,
   },
   emptySubtext: {
     textAlign: 'center',
     maxWidth: 280,
     lineHeight: 18,
+    fontSize: 12.5,
   },
 });

@@ -24,7 +24,7 @@ import { useSession } from '../store/session';
 const FALLBACK =
   'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=900&q=80';
 
-const PHOTO_RADIUS = 24;
+const PHOTO_RADIUS = 18;
 
 type Outline = 'white' | 'none' | 'glass';
 
@@ -233,7 +233,7 @@ export default React.memo(function RestaurantCard({
                 accessibilityLabel="Preferito"
               >
                 <Ionicons
-                  name={isFavorite ? 'heart' : 'heart-outline'}
+                  name="heart-outline"
                   size={small ? 15 : 17}
                   color={isFavorite ? '#FF5252' : '#FFFFFF'}
                 />
@@ -293,7 +293,7 @@ export default React.memo(function RestaurantCard({
 
               {hasRating && ratingAvg != null ? (
                 <View style={styles.ratingInline}>
-                  <Ionicons name="star" size={12} color="#F59E0B" />
+                  <Ionicons name="star-outline" size={12} color="#F59E0B" />
                   <Text style={styles.ratingText}>{ratingValue}</Text>
                 </View>
               ) : null}
@@ -303,14 +303,14 @@ export default React.memo(function RestaurantCard({
           {/* Offerta o Tag Sicurezza Minimale */}
           {offerText ? (
             <View style={styles.offerTag}>
-              <Ionicons name="pricetag" size={10} color="#2563EB" />
+              <Ionicons name="pricetag-outline" size={10} color="#2563EB" />
               <Text style={styles.offerTagText} numberOfLines={1}>
                 {offerText}
               </Text>
             </View>
           ) : displaySafetyTag ? (
             <View style={styles.safetyTag}>
-              <Ionicons name="shield-checkmark" size={10} color="#059669" />
+              <Ionicons name="shield-checkmark-outline" size={10} color="#059669" />
               <Text style={styles.safetyTagText} numberOfLines={1}>
                 {displaySafetyTag}
               </Text>

@@ -60,7 +60,7 @@ export const RestaurantCardNativeWind = ({
           className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/30 items-center justify-center"
         >
           <Ionicons
-            name={isFavorite ? 'heart' : 'heart-outline'}
+            name="heart-outline"
             size={14}
             color="#ff5252"
           />
@@ -118,7 +118,7 @@ export const RestaurantCardNativeWind = ({
             </Text>
           ) : <View />}
           <View className="flex-row items-center bg-[#FFF8E7] px-1.5 py-0.5 rounded-md">
-            <Ionicons name="star" size={10} color="#F59E0B" />
+            <Ionicons name="star-outline" size={10} color="#F59E0B" />
             <Text className="text-[11px] font-bold text-[#D97706] ml-1">{rating}</Text>
           </View>
         </View>

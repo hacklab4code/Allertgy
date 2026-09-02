@@ -33,22 +33,26 @@ I loghi, le denominazioni commerciali, le fotografie e i menù caricati dai Rist
 TERMS_MARKDOWN = """
 # Termini e Condizioni Generali di Servizio
 
-**1. Oggetto del Servizio** — AllerTgy è una piattaforma tecnologica che connette consumatori con allergie o intolleranze alimentari e attività di ristorazione. La piattaforma fornisce un sistema visivo di comparazione allergenica ("il semaforo": 🟢 nessun allergene dichiarato, 🟡 possibili tracce / attenzione, 🔴 allergene presente dichiarato).
+**1. Oggetto del Servizio** — AllerTgy è una piattaforma tecnologica e applicazione software di ausilio informativo che connette consumatori con allergie o intolleranze alimentari e attività di ristorazione / prodotti alimentari. La piattaforma fornisce un sistema visivo di comparazione allergenica ("il semaforo": 🟢 nessun allergene dichiarato, 🟡 possibili tracce / attenzione, 🔴 allergene presente dichiarato).
 
 **2. Definizioni**
-- *Cliente/Utente*: persona fisica che utilizza l'applicazione per consultare menù e gestire il proprio profilo allergenico.
-- *Ristoratore/Esercente*: utente professionale titolare o gestore di un locale, responsabile esclusivo dell'inserimento dei dati del menù.
-- *Contenuti del Locale*: piatti, ingredienti, allergeni dichiarati, prezzi, foto e orari pubblicati dall'Esercente.
+- *Cliente/Utente*: persona fisica che utilizza l'applicazione per consultare menù, scansionare prodotti e gestire il proprio profilo allergenico a titolo personale e informativo.
+- *Ristoratore/Esercente*: utente professionale titolare o gestore di un locale, responsabile esclusivo dell'inserimento, accuratezza e conformità legale dei dati del menù e degli allergeni.
+- *Contenuti del Locale e Prodotti*: piatti, ingredienti, allergeni dichiarati, prezzi, foto e dati nutrizionali pubblicati dagli esercenti o ricavati da banche dati aperte di terze parti (es. OpenFoodFacts).
 
-**3. Natura del Servizio e Limiti di Responsabilità** — AllerTgy è un **servizio informativo di supporto**. Non costituisce un dispositivo medico, non formula diagnosi né terapie sanitarie e **non sostituisce mai la comunicazione diretta e verbale con il personale del ristorante prima di ordinare**. Il semaforo indica unicamente la corrispondenza logica tra il profilo inserito dall'utente e gli allergeni **espressamente dichiarati dal ristoratore**. AllerTgy non garantisce l'assenza assoluta di contaminazioni crociate all'interno delle cucine né variazioni estemporanee di ricetta.
+**3. Natura del Servizio e Totale Esclusione di Responsabilità Sanitaria** — AllerTgy è un **mero servizio tecnologico ed informativo di supporto**.
+- **NON È UN DISPOSITIVO MEDICO (Medical Device)** ai sensi del Regolamento (UE) 2017/745, non formula diagnosi né terapie sanitarie e non prescrive diete cliniche.
+- **NON SOSTITUISCE IN ALCUN MODO la comunicazione verbale diretta con il personale del ristorante prima di ordinare o consumare alimenti.**
+- Il semaforo e le risultanze dello scanner costituiscono una pura elaborazione algoritmica basata su dati forniti da terzi (ristoratori o banche dati codici a barre). AllerTgy non ha il controllo delle cucine, delle linee di produzione industriale o dei processi di stoccaggio e non garantisce in nessun caso l'assenza assoluta di contaminazioni crociate (cross-contamination) o variazioni estemporanee di ricetta.
 
-**4. Obblighi dell'Utente (Cliente)** — L'Utente si impegna a:
+**4. Obblighi e Responsabilità Esclusiva dell'Utente** — L'Utente riconosce ed accetta che la salvaguardia della propria salute rimane sotto la propria esclusiva responsabilità. In particolare, l'Utente si impegna a:
 - Fornire informazioni veritiere e mantenere aggiornato il proprio profilo allergenico.
-- **Comunicare SEMPRE le proprie allergie e intolleranze al personale di sala prima di consumare qualsiasi alimento o bevanda**, anche in presenza di semaforo verde.
+- **Comunicare SEMPRE e in ogni circostanza le proprie allergie, patologie e intolleranze al personale del locale prima di consumare qualsiasi alimento o bevanda**, a prescindere dal colore del semaforo o dall'esito della scansione.
+- Portare sempre con sé i dispositivi medici salvavita (es. autoiniettore di adrenalina) prescritti dal proprio medico curante in caso di allergie gravi o anafilassi.
 - Custodire le proprie credenziali di accesso in modo sicuro e riservato.
 
 **5. Obblighi del Ristoratore (Regolamento UE 1169/2011)** — Il Ristoratore dichiara e garantisce che:
-- Tutte le informazioni sugli allergeni inserite sono accurate, aggiornate e conformi al Regolamento UE 1169/2011 e al piano HACCP del locale.
+- Tutte le informazioni sugli allergeni inserite sono accurate, verificate, aggiornate e conformi al Regolamento UE 1169/2011 e al piano di autocontrollo HACCP del locale.
 - Ogni variazione di ricetta, fornitore o ingrediente comporterà l'immediato aggiornamento del menù su AllerTgy.
 - La generazione del menù tramite scansione automatizzata o AI richiede sempre la revisione e approvazione manuale dell'esercente prima della pubblicazione.
 
@@ -56,9 +60,13 @@ TERMS_MARKDOWN = """
 
 **7. Proprietà Intellettuale** — Il software, il marchio, l'algoritmo del semaforo e i contenuti editoriali di AllerTgy appartengono in via esclusiva ad AllerTgy.
 
-**8. Limitazione di Responsabilità** — Nei limiti inderogabili di legge, AllerTgy declina ogni responsabilità per danni alla salute derivanti da: dati inesatti o omessi dal ristoratore; mancata segnalazione verbale al personale da parte del cliente; contaminazioni accidentali in cucina; mancato rispetto del Disclaimer di sicurezza.
+**8. Limitazione Totale di Responsabilità e Manleva** — Nei limiti massimi inderogabili consentiti dalla legge applicabile:
+- AllerTgy, i suoi sviluppatori, amministratori e collaboratori sono espressamente manlevati e sollevati da qualsiasi responsabilità diretta o indiretta per: danni biologici, lesioni personali, reazioni anafilattiche, intossicazioni o danni di qualsivoglia natura derivanti dall'ingestione di cibi o bevande; dati inesatti, omessi o non aggiornati dai ristoratori o da banche dati terze; errata comprensione o mancata segnalazione verbale da parte dell'utente; malfunzionamenti tecnici o interruzioni del servizio.
+- L'utente accetta che l'utilizzo di AllerTgy avviene interamente a proprio rischio e pericolo.
 
-**9. Legge Applicabile e Foro Competente** — Il contratto è regolato dalla legge italiana. Per gli utenti consumatori è competente il foro di residenza o domicilio del consumatore. Per i rapporti commerciali con i ristoratori (B2B) è competente in via esclusiva il Foro della sede legale di AllerTgy.
+**9. Cancellazione dell'Account e Diritto all'Oblio (GDPR & Linee Guida Apple)** — L'Utente ha il diritto di cancellare in qualsiasi momento e con effetto immediato il proprio account e tutti i dati personali e sanitari associati tramite l'apposita funzione presente all'interno dell'applicazione (sezione Impostazioni Account).
+
+**10. Legge Applicabile e Foro Competente** — Il contratto è regolato dalla legge italiana. Per gli utenti consumatori è competente il foro di residenza o domicilio del consumatore. Per i rapporti commerciali con i ristoratori (B2B) è competente in via esclusiva il Foro della sede legale di AllerTgy.
 """
 
 PRIVACY_MARKDOWN = """
@@ -104,27 +112,32 @@ La gestione autonoma di un profilo con dati sanitari è riservata a utenti con a
 """
 
 SAFETY_MARKDOWN = """
-# Disclaimer di Sicurezza, Salute e Tutela Medica
+# Disclaimer di Sicurezza, Salute e Totale Esclusione di Responsabilità
 
 ### ⚠️ ALLERTGY NON È UN DISPOSITIVO MEDICO
-AllerTgy è uno strumento software di supporto e consultazione. Non fornisce consulenza medica, non effettua diagnosi e non può sostituire il giudizio clinico di un medico specialista.
+AllerTgy è un software di ausilio informativo e consultazione digitale. **Non fornisce consulenza medica, non effettua diagnosi cliniche, non prescrive trattamenti e non sostituisce in alcun modo il parere, la diagnosi o la cura di un medico specialista.**
 
-### 🍽️ RESPONSABILITÀ DEI DATI DEL MENÙ
-Le informazioni sugli ingredienti e sugli allergeni di ciascun piatto sono **dichiarate sotto l'esclusiva responsabilità del Ristoratore** ai sensi del Reg. UE 1169/2011. AllerTgy non ha il controllo diretto delle cucine e non può escludere contaminazioni crociate accidentali o modifiche dell'ultimo minuto non registrate.
+### 🍽️ RESPONSABILITÀ ESCLUSIVA DEI DATI E DELLE CUCINE
+Le informazioni sugli ingredienti e sugli allergeni di ciascun piatto sono **dichiarate sotto l'esclusiva responsabilità del Ristoratore** ai sensi del Reg. UE 1169/2011 o estratte da database di terze parti per i prodotti confezionati.
+- AllerTgy non prepara alimenti, non gestisce le cucine e non verifica fisicamente gli ingredienti o le linee produttive.
+- **Nessuna garanzia contro contaminazioni crociate:** Anche in locali attenti possono verificarsi contaminazioni crociate volatili o da contatto durante le preparazioni culinarie.
 
-### 🚥 IL SEMAFORO ALLERTGY
-- 🟢 **Verde (Nessun allergene dichiarato):** Il piatto non contiene gli allergeni specificati nel tuo profilo in base a quanto inserito dal ristorante. **Non garantisce il rischio zero: comunica sempre le tue allergie al personale.**
-- 🟡 **Giallo (Possibili tracce / Attenzione):** Il piatto potrebbe presentare rischi di contaminazione crociata dichiarati dal locale. Chiedi chiarimenti prima di ordinare.
-- 🔴 **Rosso (Allergene presente):** Il piatto contiene uno o più allergeni non compatibili con il tuo profilo. Evita il consumo.
+### 🚥 IL SEMAFORO ALLERTGY È UN PROMEMORIA LOGICO
+- 🟢 **Verde (Nessun allergene dichiarato nel sistema):** Il piatto non presenta gli allergeni selezionati nel tuo profilo in base ai dati comunicati dall'esercente. **NON GARANTISCE IL RISCHIO ZERO.**
+- 🟡 **Giallo (Possibili tracce / Attenzione / Criterio parziale):** Rischio di contaminazione crociata dichiarata o forma di alimento da chiarire. Chiedi tassativamente al personale prima di ordinare.
+- 🔴 **Rosso (Allergene presente dichiarato):** Il piatto contiene ingredienti incompatibili con il tuo profilo. Evita il consumo.
 
-### 🗣️ COMUNICAZIONE OBBLIGATORIA AL PERSONALE
-**Prima di ordinare, comunica SEMPRE le tue allergie o intolleranze al personale di sala**, accertandoti delle modalità di preparazione del cibo.
+### 🗣️ COMUNICAZIONE VERBALE OBBLIGATORIA
+**Prima di ordinare o consumare qualsiasi cibo o bevanda, devi SEMPRE e COMUNQUE avvisare esplicitamente il personale di sala e di cucina delle tue allergie e intolleranze alimentari.**
 
 ### 🚨 GESTIONE DELLE EMERGENZE
-In caso di reazione allergica o anafilassi:
-1. **Contatta immediatamente il Numero Unico di Emergenza 112**.
-2. Utilizza tempestivamente i dispositivi medici salvavita prescritti dal tuo medico (es. autoiniettore di adrenalina).
-3. AllerTgy non gestisce chiamate di soccorso né monitora emergenze sanitarie.
+In caso di sospetta ingestione accidentale, sintomi allergici o anafilassi:
+1. **Contatta immediatamente il Numero Unico di Emergenza 112 (o 118 / 911 all'estero)**.
+2. Utilizza tempestivamente i presidi salvavita prescritti dal tuo allergologo (es. autoiniettore di adrenalina).
+3. AllerTgy non effettua monitoraggio di emergenze e non trasmette chiamate ai soccorsi sanitari.
+
+### 🛡️ ACCETTAZIONE DEL RISCHIO E MANLEVA
+L'uso dell'applicazione AllerTgy implica la piena e incondizionata accettazione del fatto che la verifica finale della commestibilità del cibo spetta unicamente all'utente e all'esercente. AllerTgy declina ogni responsabilità per qualsiasi danno diretto, indiretto o conseguente alla salute derivante dall'uso dell'app.
 """
 
 OWNER_DECLARATION_MARKDOWN = """

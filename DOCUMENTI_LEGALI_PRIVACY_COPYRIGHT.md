@@ -8,17 +8,17 @@ Documento di riferimento contenente tutti i testi legali, le informative sulla p
 
 ### 1.1 Nota di Copyright (Footer Web, App Store e Splash Screen)
 ```text
-© 2026 AllerTgy. Tutti i diritti riservati.
-Marchio registrato e software proprietario.
+© 2026 AllerTgy · Ideata e creata da hacklab.digital (https://hacklab.digital).
+Tutti i diritti riservati. Marchio e software proprietario.
 ```
 
 ### 1.2 Testo Esteso di Proprietà Intellettuale
 ```markdown
 ### Diritti d'Autore e Proprietà Intellettuale
 
-Tutti i contenuti presenti su AllerTgy (inclusi, a titolo esemplificativo ma non esaustivo: codice sorgente, architettura software, algoritmi di matching del semaforo allergenico, design dell'interfaccia utente (UI/UX), elementi grafici, icone, loghi, marchi, testi descrittivi e banche dati) sono di esclusiva proprietà di AllerTgy o dei rispettivi aventi diritto e sono protetti dalle leggi italiane ed internazionali sul diritto d'autore, sui marchi e sui brevetti (Legge 22 aprile 1941 n. 633 e D.Lgs. 10 febbraio 2005 n. 30 - Codice della Proprietà Industriale).
+Tutti i contenuti presenti su AllerTgy (inclusi, a titolo esemplificativo ma non esaustivo: codice sorgente, architettura software, algoritmi di matching del semaforo allergenico, design dell'interfaccia utente (UI/UX), elementi grafici, icone, loghi, marchi, testi descrittivi e banche dati) sono stati ideati, creati e sviluppati da **hacklab.digital** e sono di esclusiva proprietà di **hacklab.digital** e AllerTgy o dei rispettivi aventi diritto, protetti dalle leggi italiane ed internazionali sul diritto d'autore, sui marchi e sui brevetti (Legge 22 aprile 1941 n. 633 e D.Lgs. 10 febbraio 2005 n. 30 - Codice della Proprietà Industriale).
 
-È severamente vietata la riproduzione, duplicazione, decompilazione (reverse engineering), distribuzione, vendita, estrazione di dati non autorizzata (web scraping o data mining) o qualsiasi uso commerciale non espressamente autorizzato per iscritto dai titolari di AllerTgy.
+È severamente vietata la riproduzione, duplicazione, decompilazione (reverse engineering), distribuzione, vendita, estrazione di dati non autorizzata (web scraping o data mining) o qualsiasi uso commerciale non espressamente autorizzato per iscritto da hacklab.digital.
 
 I contenuti caricati dai Ristoratori (denominazione del locale, loghi aziendali, descrizioni dei piatti, menù e fotografie degli alimenti) restano di titolarità dei rispettivi esercenti, i quali concedono ad AllerTgy una licenza gratuita, non esclusiva e mondiale limitata all'erogazione, promozione e visualizzazione dei servizi della piattaforma.
 ```

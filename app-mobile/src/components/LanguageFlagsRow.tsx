@@ -84,7 +84,7 @@ export default function LanguageFlagsRow({ compact = true, inHeader = false }: P
                   ) : null}
                 </View>
                 {selected ? (
-                  <Ionicons name="checkmark-circle" size={22} color={colors.brand} />
+                  <Ionicons name="checkmark-circle-outline" size={22} color={colors.brand} />
                 ) : null}
               </Pressable>
             );

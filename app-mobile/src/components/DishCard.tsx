@@ -1,7 +1,7 @@
 import React from 'react';
 import { Alert, Image, StyleSheet, Text, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import type { EsitoSemaforo } from '../engine/semaforo';
 import type { Piatto } from '../types';
@@ -14,7 +14,7 @@ export type VerdictType = 'SAFE' | 'WARN' | 'RISK';
 const VERDICT_CONFIG = {
   SAFE: {
     label: 'Idoneo',
-    icon: 'check-circle' as const,
+    icon: 'checkmark-circle-outline' as const,
     color: '#10B981',
     softBg: '#ECFDF5',
     border: '#6EE7B7',
@@ -22,7 +22,7 @@ const VERDICT_CONFIG = {
   },
   WARN: {
     label: 'Attenzione',
-    icon: 'alert-triangle' as const,
+    icon: 'alert-circle-outline' as const,
     color: '#F59E0B',
     softBg: '#FFFBEB',
     border: '#FCD34D',
@@ -30,7 +30,7 @@ const VERDICT_CONFIG = {
   },
   RISK: {
     label: 'Non idoneo',
-    icon: 'x-octagon' as const,
+    icon: 'close-circle-outline' as const,
     color: '#EF4444',
     softBg: '#FEF2F2',
     border: '#FCA5A5',
@@ -49,7 +49,7 @@ export interface DishCardProps {
   };
 }
 
-export default function DishCard({
+export default React.memo(function DishCard({
   piatto,
   esito,
   restaurantCode,
@@ -153,7 +153,7 @@ export default function DishCard({
               </Text>
               {isVegan && (
                 <View style={styles.veganBadge}>
-                  <MaterialCommunityIcons name="leaf" size={11} color="#065F46" />
+                  <Ionicons name="leaf-outline" size={12} color="#065F46" />
                   <Text style={styles.veganText}>Vegan</Text>
                 </View>
               )}
@@ -181,7 +181,7 @@ export default function DishCard({
           {/* Badge Tavolata Famiglia se attivo */}
           {tavolataInfo && (tavolataInfo.idonei.length > 0 || tavolataInfo.nonIdonei.length > 0) ? (
             <View style={[styles.tavolataBadge, tavolataInfo.nonIdonei.length > 0 ? styles.tavolataBadgeWarn : styles.tavolataBadgeOk]}>
-              <Feather name={tavolataInfo.nonIdonei.length > 0 ? "alert-circle" : "users"} size={11} color={tavolataInfo.nonIdonei.length > 0 ? "#B91C1C" : "#047857"} />
+              <Ionicons name={tavolataInfo.nonIdonei.length > 0 ? "alert-circle-outline" : "people-outline"} size={13} color={tavolataInfo.nonIdonei.length > 0 ? "#B91C1C" : "#047857"} />
               <Text style={[styles.tavolataBadgeText, { color: tavolataInfo.nonIdonei.length > 0 ? "#B91C1C" : "#047857" }]} numberOfLines={1}>
                 {tavolataInfo.nonIdonei.length > 0
                   ? `⚠️ Vietato per: ${tavolataInfo.nonIdonei.join(', ')}`
@@ -199,7 +199,7 @@ export default function DishCard({
                 { backgroundColor: config.softBg, borderColor: config.border },
               ]}
             >
-              <Feather name={config.icon} size={12} color={config.color} />
+              <Ionicons name={config.icon} size={13} color={config.color} />
               <Text style={[styles.verdictLabel, { color: config.textColor }]}>
                 {config.label}
               </Text>
@@ -236,7 +236,7 @@ export default function DishCard({
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   cardContainer: {

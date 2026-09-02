@@ -11,7 +11,7 @@ export const TAB_BAR_FLOAT_OFFSET = 0;
 /** Legacy — tab gooey non usa più ScanSphere */
 export const SCAN_SPHERE_SIZE = 60;
 /** Spazio verticale riservato alla barra SOS / titolo / notifiche */
-export const HEADER_FLOAT_CLEARANCE = 72;
+export const HEADER_FLOAT_CLEARANCE = 78;
 
 /** Altezza unica barra di ricerca (Home, Locali, …) */
 export const SEARCH_BAR_HEIGHT = 52;

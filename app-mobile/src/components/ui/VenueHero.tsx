@@ -333,10 +333,11 @@ export function VenueHero({
                     : undefined
                 }
               >
-                <Image
-                  source={require('../../../assets/pin_posizione.png')}
-                  style={styles.cityPin}
-                  resizeMode="contain"
+                <Ionicons
+                  name="location-outline"
+                  size={14}
+                  color="#FFFFFF"
+                  style={{ marginRight: 3 }}
                 />
                 <Text style={styles.metaTextOnMedia} numberOfLines={1}>{city}</Text>
               </TouchableOpacity>
@@ -382,7 +383,7 @@ export function VenueHero({
 
         {showMenuControls && allergiesEmpty && onSetAllergies ? (
           <TouchableOpacity style={styles.allergyWarn} onPress={onSetAllergies} activeOpacity={0.9}>
-            <Ionicons name="warning" size={16} color={colors.amberText} />
+            <Ionicons name="warning-outline" size={16} color={colors.amberText} />
             <Text style={styles.allergyWarnText} numberOfLines={2}>
               {isIt ? 'Imposta le allergie per un semaforo personale' : 'Set allergies for a personal traffic light'}
             </Text>

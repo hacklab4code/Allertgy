@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '../src/store/session';
-import { AppText, Screen, SurfaceButton } from '../src/components/ui';
+import { AppText, NavHeaderBackButton, Screen, ScreenTopHeader, SurfaceButton } from '../src/components/ui';
 import { colors, font, radius, spacing } from '../src/theme';
 import {
   loadPantryItems,
@@ -110,38 +110,30 @@ export default function DispensaScreen() {
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen
-        options={{
-          headerTitle: isIt ? 'Dispensa & Scadenze' : 'Pantry & Expiry',
-          headerTitleStyle: { fontFamily: font.bold, fontSize: 18, color: '#1E1B4B' },
-          headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12, paddingVertical: 4 }}>
-              <Ionicons name="chevron-back" size={24} color="#1E1B4B" />
+      <ScreenTopHeader
+        title={isIt ? 'Dispensa & Scadenze' : 'Pantry & Expiry'}
+        rightElement={
+          activeTab === 'pantry' ? (
+            <Pressable onPress={() => router.push('/scanner')} hitSlop={8} style={styles.topActionBtn}>
+              <Ionicons name="scan-outline" size={18} color="#23212C" />
             </Pressable>
-          ),
-          headerRight: () => (
-            activeTab === 'pantry' ? (
-              <Pressable onPress={() => router.push('/scanner')} hitSlop={8} style={styles.topActionBtn}>
-                <Ionicons name="scan" size={18} color="#1E1B4B" />
-              </Pressable>
-            ) : (
-              <Pressable
-                onPress={() => {
-                  const defaultDate = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                  setMedDateDraft(defaultDate);
-                  setMedModalVisible(true);
-                }}
-                hitSlop={8}
-                style={styles.topActionBtn}
-              >
-                <Ionicons name="add" size={22} color="#1E1B4B" />
-              </Pressable>
-            )
-          ),
-        }}
+          ) : (
+            <Pressable
+              onPress={() => {
+                const defaultDate = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                setMedDateDraft(defaultDate);
+                setMedModalVisible(true);
+              }}
+              hitSlop={8}
+              style={styles.topActionBtn}
+            >
+              <Ionicons name="add-outline" size={22} color="#23212C" />
+            </Pressable>
+          )
+        }
       />
 
-      <View style={[styles.container, { paddingTop: insets.top + 48 }]}>
+      <View style={styles.container}>
         {/* SEGMENTED TAB SWITCHER */}
         <View style={styles.tabSwitcher}>
           <Pressable
@@ -151,7 +143,7 @@ export default function DispensaScreen() {
               setActiveTab('pantry');
             }}
           >
-            <Ionicons name="cube-outline" size={16} color={activeTab === 'pantry' ? '#1E1B4B' : '#6B6690'} />
+            <Ionicons name="cube-outline" size={15} color={activeTab === 'pantry' ? '#F1FEC8' : '#64748B'} />
             <AppText variant="bodyBold" style={[styles.tabBtnText, activeTab === 'pantry' && styles.tabBtnTextActive]}>
               {isIt ? 'Dispensa di Casa' : 'Safe Pantry'} ({pantryItems.length})
             </AppText>
@@ -164,7 +156,7 @@ export default function DispensaScreen() {
               setActiveTab('meds');
             }}
           >
-            <Ionicons name="medical-outline" size={16} color={activeTab === 'meds' ? '#1E1B4B' : '#6B6690'} />
+            <Ionicons name="medical-outline" size={15} color={activeTab === 'meds' ? '#F1FEC8' : '#64748B'} />
             <AppText variant="bodyBold" style={[styles.tabBtnText, activeTab === 'meds' && styles.tabBtnTextActive]}>
               {isIt ? 'Farmaci & Adrenalina' : 'Meds & EpiPen'} ({medsList.length})
             </AppText>
@@ -172,7 +164,7 @@ export default function DispensaScreen() {
         </View>
 
         {activeTab === 'pantry' ? (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
             {/* SUBPROFILE FILTER */}
             {subProfiles.length > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterScrollContent}>
@@ -183,8 +175,9 @@ export default function DispensaScreen() {
                     setSelectedProfileFilter(null);
                   }}
                 >
+                  <Ionicons name="people-outline" size={13} color={selectedProfileFilter === null ? '#F1FEC8' : '#64748B'} />
                   <AppText style={[styles.filterChipText, selectedProfileFilter === null && styles.filterChipTextActive]}>
-                    👨‍👩‍👧‍👦 {isIt ? 'Tutta la famiglia' : 'All family'}
+                    {isIt ? 'Tutta la famiglia' : 'All family'}
                   </AppText>
                 </Pressable>
                 {subProfiles.map((p) => {
@@ -198,8 +191,9 @@ export default function DispensaScreen() {
                         setSelectedProfileFilter(p.id);
                       }}
                     >
+                      <Ionicons name="person-outline" size={13} color={isSelected ? '#F1FEC8' : '#64748B'} />
                       <AppText style={[styles.filterChipText, isSelected && styles.filterChipTextActive]}>
-                        👶 {p.name}
+                        {p.name}
                       </AppText>
                     </Pressable>
                   );
@@ -209,22 +203,21 @@ export default function DispensaScreen() {
 
             {filteredPantry.length === 0 ? (
               <View style={styles.emptyCard}>
-                <Ionicons name="basket-outline" size={48} color="#94A3B8" />
-                <AppText variant="title" style={{ marginTop: 12, color: '#1E1B4B' }}>
+                <Ionicons name="basket-outline" size={42} color="#94A3B8" />
+                <AppText variant="title" style={{ marginTop: 12, color: '#23212C' }}>
                   {isIt ? 'Dispensa vuota' : 'Pantry is empty'}
                 </AppText>
-                <AppText variant="caption" color="#6B6690" style={{ textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>
+                <AppText variant="caption" color="#64748B" style={{ textAlign: 'center', marginTop: 4, paddingHorizontal: 16 }}>
                   {isIt
                     ? 'Scansiona prodotti al supermercato e aggiungili alla dispensa per sapere sempre cosa hai di sicuro a casa.'
                     : 'Scan products at the grocery store and add them here to know what safe food you have at home.'}
                 </AppText>
-                <SurfaceButton
-                  label={isIt ? 'Scansiona un prodotto' : 'Scan a product'}
-                  onPress={() => router.push('/scanner')}
-                  variant="primary"
-                  icon="scan"
-                  style={{ marginTop: 18 }}
-                />
+                <Pressable style={styles.scanCtaBtn} onPress={() => router.push('/scanner')}>
+                  <Ionicons name="scan-outline" size={18} color="#23212C" />
+                  <AppText variant="bodyBold" color="#23212C">
+                    {isIt ? 'Scansiona un prodotto' : 'Scan a product'}
+                  </AppText>
+                </Pressable>
               </View>
             ) : (
               <View style={styles.pantryGrid}>
@@ -237,15 +230,15 @@ export default function DispensaScreen() {
                         <Ionicons name="cube-outline" size={24} color="#94A3B8" />
                       )}
                       <View style={[styles.statusBadge, { backgroundColor: item.status === 'verde' ? '#10B981' : '#F59E0B' }]}>
-                        <Ionicons name={item.status === 'verde' ? 'checkmark' : 'alert'} size={10} color="#FFFFFF" />
+                        <Ionicons name={item.status === 'verde' ? 'checkmark-outline' : 'alert-outline'} size={10} color="#FFFFFF" />
                       </View>
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <AppText variant="bodyBold" numberOfLines={1} style={{ color: '#1E1B4B' }}>
+                      <AppText variant="bodyBold" numberOfLines={1} style={{ color: '#23212C' }}>
                         {item.name}
                       </AppText>
-                      <AppText variant="caption" color="#6B6690" numberOfLines={1}>
+                      <AppText variant="caption" color="#64748B" numberOfLines={1}>
                         {item.brand || item.barcode}
                       </AppText>
                     </View>
@@ -259,14 +252,24 @@ export default function DispensaScreen() {
             )}
           </ScrollView>
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-            <View style={styles.medsBanner}>
-              <Ionicons name="shield-checkmark" size={20} color="#2563EB" />
-              <AppText variant="caption" color="#1E40AF" style={{ flex: 1, lineHeight: 16 }}>
-                {isIt
-                  ? 'Gli autoiniettori di adrenalina e i farmaci salvavita hanno una scadenza critica (di solito 12-18 mesi). Tienili sempre monitorati.'
-                  : 'Adrenaline auto-injectors and emergency meds have critical expiry dates. Keep them tracked here.'}
-              </AppText>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
+            {/* HERO WARNING BOX */}
+            <View style={styles.medsHeroCard}>
+              <View style={styles.heroTopRow}>
+                <View style={styles.heroIconBadge}>
+                  <Ionicons name="medical-outline" size={22} color="#F1FEC8" />
+                </View>
+                <View style={styles.heroTextContainer}>
+                  <AppText variant="bodyBold" style={styles.heroTitle}>
+                    {isIt ? 'Monitor Scadenze Farmaci' : 'Medical Expiry Monitor'}
+                  </AppText>
+                  <AppText variant="caption" style={styles.heroSubtitle}>
+                    {isIt
+                      ? 'Gli autoiniettori di adrenalina e i farmaci salvavita hanno una scadenza critica. Tienili sempre monitorati.'
+                      : 'Adrenaline auto-injectors and emergency meds have critical expiry dates. Keep them tracked here.'}
+                  </AppText>
+                </View>
+              </View>
             </View>
 
             <View style={styles.medsList}>
@@ -287,13 +290,13 @@ export default function DispensaScreen() {
                   <View key={med.id} style={styles.medCard}>
                     <View style={styles.medCardHead}>
                       <View style={styles.medIconWrap}>
-                        <Ionicons name="medical" size={18} color="#DC2626" />
+                        <Ionicons name="medical-outline" size={18} color="#DC2626" />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <AppText variant="bodyBold" style={{ color: '#1E1B4B' }}>
+                        <AppText variant="bodyBold" style={{ color: '#23212C' }}>
                           {med.name}
                         </AppText>
-                        <AppText variant="caption" color="#6B6690">
+                        <AppText variant="caption" color="#64748B">
                           {isIt ? 'Assegnato a:' : 'Assigned to:'} {med.assignedTo} · Scadenza: {med.expiryDate}
                         </AppText>
                       </View>
@@ -304,7 +307,7 @@ export default function DispensaScreen() {
 
                     <View style={[styles.medStatusPill, { backgroundColor: badgeBg }]}>
                       <Ionicons
-                        name={isExpired ? 'alert-circle' : isExpiringSoon ? 'time-outline' : 'checkmark-circle'}
+                        name={isExpired ? 'alert-circle-outline' : isExpiringSoon ? 'time-outline' : 'checkmark-circle-outline'}
                         size={14}
                         color={badgeText}
                       />
@@ -314,26 +317,31 @@ export default function DispensaScreen() {
                     </View>
 
                     {med.notes && (
-                      <AppText variant="caption" color="#4B5563" style={styles.medNotesText}>
-                        💡 {med.notes}
-                      </AppText>
+                      <View style={styles.medNotesRow}>
+                        <Ionicons name="information-circle-outline" size={14} color="#64748B" />
+                        <AppText variant="caption" color="#475569" style={styles.medNotesText}>
+                          {med.notes}
+                        </AppText>
+                      </View>
                     )}
                   </View>
                 );
               })}
             </View>
 
-            <SurfaceButton
-              label={isIt ? 'Aggiungi Farmaco / Autoiniettore' : 'Add Medicine / Auto-Injector'}
+            <Pressable
+              style={styles.addMedBtn}
               onPress={() => {
                 const defaultDate = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
                 setMedDateDraft(defaultDate);
                 setMedModalVisible(true);
               }}
-              variant="secondary"
-              icon="add"
-              style={{ marginTop: spacing.md }}
-            />
+            >
+              <Ionicons name="add-outline" size={18} color="#23212C" />
+              <AppText variant="bodyBold" color="#23212C">
+                {isIt ? 'Aggiungi Farmaco / Autoiniettore' : 'Add Medicine / Auto-Injector'}
+              </AppText>
+            </Pressable>
           </ScrollView>
         )}
       </View>
@@ -343,11 +351,11 @@ export default function DispensaScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHead}>
-              <AppText variant="title" style={{ color: '#1E1B4B' }}>
+              <AppText variant="title" style={{ color: '#23212C' }}>
                 {isIt ? 'Nuovo Promemoria Farmaco' : 'New Medicine Reminder'}
               </AppText>
               <Pressable onPress={() => setMedModalVisible(false)} hitSlop={8}>
-                <Ionicons name="close" size={22} color="#1E1B4B" />
+                <Ionicons name="close-outline" size={22} color="#23212C" />
               </Pressable>
             </View>
 
@@ -379,13 +387,14 @@ export default function DispensaScreen() {
                 placeholderTextColor="#94A3B8"
               />
 
-              <AppText variant="caption" style={styles.inputLabel}>{isIt ? 'Note (Lotto, Posizione)' : 'Notes'}</AppText>
+              <AppText variant="caption" style={styles.inputLabel}>{isIt ? 'Note & Istruzioni' : 'Notes & Instructions'}</AppText>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { height: 64 }]}
                 value={medNotesDraft}
                 onChangeText={setMedNotesDraft}
-                placeholder="es. Nello zaino di scuola"
+                placeholder="es. Nel cassetto della camera / portare sempre nello zaino"
                 placeholderTextColor="#94A3B8"
+                multiline
               />
             </ScrollView>
 
@@ -394,7 +403,7 @@ export default function DispensaScreen() {
                 <AppText variant="bodyBold" color="#64748B">{isIt ? 'Annulla' : 'Cancel'}</AppText>
               </Pressable>
               <Pressable style={[styles.modalBtn, styles.modalSaveBtn]} onPress={handleSaveMedReminder}>
-                <AppText variant="bodyBold" color="#FFFFFF">{isIt ? 'Salva Promemoria' : 'Save Reminder'}</AppText>
+                <AppText variant="bodyBold" color="#23212C">{isIt ? 'Salva Farmaco' : 'Save Medicine'}</AppText>
               </Pressable>
             </View>
           </View>
@@ -408,26 +417,37 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  scrollContent: {
+    gap: 14,
+    paddingTop: 4,
+  },
+  navBackBtn: {
+    paddingRight: 12,
+    paddingVertical: 4,
   },
   topActionBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#23212C',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowRadius: 5,
+    elevation: 3,
   },
   tabSwitcher: {
     flexDirection: 'row',
-    backgroundColor: '#ECEAF8',
+    backgroundColor: '#F1F5F9',
     borderRadius: radius.pill,
     padding: 3,
-    marginBottom: 14,
+    marginBottom: 10,
     gap: 4,
   },
   tabBtn: {
@@ -440,28 +460,33 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   tabBtnActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
+    backgroundColor: '#23212C',
+    shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.15,
     shadowRadius: 3,
     elevation: 2,
   },
   tabBtnText: {
-    fontSize: 13,
-    color: '#6B6690',
+    fontSize: 12.5,
+    color: '#64748B',
   },
   tabBtnTextActive: {
-    color: '#1E1B4B',
+    color: '#F1FEC8',
+    fontWeight: '700',
   },
   filterScroll: {
-    marginBottom: 12,
+    marginBottom: 2,
   },
   filterScrollContent: {
     gap: 8,
+    paddingVertical: 2,
   },
   filterChip: {
-    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: radius.pill,
     backgroundColor: '#FFFFFF',
@@ -469,24 +494,26 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   filterChipActive: {
-    backgroundColor: '#1E1B4B',
-    borderColor: '#1E1B4B',
+    backgroundColor: '#23212C',
+    borderColor: '#23212C',
   },
   filterChipText: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontFamily: font.semibold,
-    color: '#4B5563',
+    color: '#475569',
   },
   filterChipTextActive: {
-    color: '#FFFFFF',
+    color: '#F1FEC8',
+    fontWeight: '700',
   },
   emptyCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 28,
     alignItems: 'center',
-    marginTop: 20,
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
@@ -502,9 +529,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.03,
     shadowRadius: 4,
     elevation: 1,
   },
@@ -534,16 +563,46 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
   },
-  medsBanner: {
-    backgroundColor: '#EFF6FF',
+  medsHeroCard: {
+    backgroundColor: '#23212C',
+    borderRadius: 24,
+    padding: 20,
+    gap: 14,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
-    borderRadius: 16,
-    padding: 12,
+    borderColor: 'rgba(241, 254, 200, 0.2)',
+    shadowColor: '#23212C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  heroTopRow: {
     flexDirection: 'row',
-    gap: 10,
     alignItems: 'center',
-    marginBottom: 14,
+    gap: 12,
+  },
+  heroIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(241, 254, 200, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.3)',
+  },
+  heroTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 16.5,
+  },
+  heroSubtitle: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 12,
+    lineHeight: 16,
   },
   medsList: {
     gap: 12,
@@ -552,7 +611,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: 16,
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
@@ -581,13 +642,48 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: radius.pill,
   },
+  medNotesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   medNotesText: {
     fontSize: 12,
     lineHeight: 16,
   },
+  scanCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#F1FEC8',
+    borderWidth: 1,
+    borderColor: '#E2F4A6',
+    paddingVertical: 13,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    marginTop: 16,
+  },
+  addMedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#F1FEC8',
+    borderWidth: 1,
+    borderColor: '#E2F4A6',
+    paddingVertical: 14,
+    borderRadius: 16,
+    marginTop: 8,
+    shadowColor: '#F1FEC8',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(35, 33, 44, 0.65)',
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -604,7 +700,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontWeight: '700',
-    color: '#4B5563',
+    color: '#475569',
     marginBottom: 4,
     marginTop: 10,
   },
@@ -615,8 +711,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    fontSize: 14,
-    color: '#1E1B4B',
+    fontSize: 13.5,
+    color: '#23212C',
     fontFamily: font.regular,
   },
   modalActions: {
@@ -627,13 +723,15 @@ const styles = StyleSheet.create({
   modalBtn: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
   },
   modalCancelBtn: {
     backgroundColor: '#F1F5F9',
   },
   modalSaveBtn: {
-    backgroundColor: '#1E1B4B',
+    backgroundColor: '#F1FEC8',
+    borderWidth: 1,
+    borderColor: '#E2F4A6',
   },
 });

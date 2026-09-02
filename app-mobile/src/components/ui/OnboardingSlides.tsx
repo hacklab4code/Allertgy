@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from './AppText';
 import { SurfaceButton } from './SurfaceButton';
 import { Screen } from './Screen';
-import { colors, spacing, radius } from '../../theme';
+import { colors, spacing, radius, softShadow } from '../../theme';
 
 export type OnboardingSlide = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -45,7 +45,7 @@ export function OnboardingSlides({
   const isLast = step >= slides.length - 1;
 
   return (
-    <Screen edges={false} style={{ backgroundColor: colors.surface }}>
+    <Screen edges={false} ambient style={{ backgroundColor: colors.surface }}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         bounces={false}
@@ -63,29 +63,42 @@ export function OnboardingSlides({
 
         <View style={styles.progressRow}>
           {slides.map((_, i) => (
-            <View key={i} style={[styles.progressDot, i <= step && styles.progressDotActive]} />
+            <View
+              key={i}
+              style={[
+                styles.progressDot,
+                i === step ? styles.progressDotActive : i < step ? styles.progressDotPassed : undefined,
+              ]}
+            />
           ))}
         </View>
 
-        <AppText variant="caption" color={colors.onSurfaceMuted} style={styles.stepLabel}>
-          {step + 1} / {slides.length}
-        </AppText>
-
-        <View style={[styles.hero, { backgroundColor: current.iconBg ?? colors.surfaceSecondary }]}>
-          <Ionicons name={current.icon} size={64} color={current.iconColor ?? colors.brand} />
+        <View style={styles.stepBadge}>
+          <Ionicons name="sparkles-outline" size={12} color={colors.brand} />
+          <AppText variant="caption" color={colors.brand} style={styles.stepLabel}>
+            {step + 1} DI {slides.length}
+          </AppText>
         </View>
 
-        {current.badge ? (
-          <View style={styles.badge}>
-            <AppText variant="caption" color={colors.brand}>{current.badge}</AppText>
+        <View style={[styles.heroCard, softShadow(8)]}>
+          <View style={[styles.iconCircle, { backgroundColor: current.iconBg ?? colors.brand50 }]}>
+            <Ionicons name={current.icon} size={52} color={current.iconColor ?? colors.brand} />
           </View>
-        ) : null}
 
-        <AppText variant="h1" style={styles.title}>{current.title}</AppText>
-        <AppText variant="body" style={styles.text}>{current.text}</AppText>
+          {current.badge ? (
+            <View style={styles.badge}>
+              <AppText variant="caption" color={colors.brand} style={{ fontWeight: '800' }}>
+                {current.badge}
+              </AppText>
+            </View>
+          ) : null}
+
+          <AppText variant="h1" style={styles.title}>{current.title}</AppText>
+          <AppText variant="body" style={styles.text}>{current.text}</AppText>
+        </View>
       </ScrollView>
 
-      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
+      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
         <View style={styles.navRow}>
           {step > 0 ? (
             <SurfaceButton
@@ -101,9 +114,9 @@ export function OnboardingSlides({
           <SurfaceButton
             label={isLast ? finishLabel : nextLabel}
             onPress={() => (isLast ? onComplete() : onStepChange(step + 1))}
-            icon="arrow-forward"
+            icon="arrow-forward-outline"
             loading={busy}
-            style={{ flex: 1 }}
+            style={{ flex: 1.5 }}
           />
         </View>
       </View>
@@ -115,29 +128,65 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow: 1,
     padding: spacing.lg,
-    paddingTop: spacing.md,
+    paddingTop: spacing.sm,
     alignItems: 'center',
     gap: spacing.md,
   },
   skipBtn: { alignSelf: 'flex-end' },
-  progressRow: { flexDirection: 'row', gap: 6, marginTop: spacing.xs },
+  progressRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: spacing.xs,
+  },
   progressDot: {
-    width: 32,
+    width: 24,
     height: 4,
     borderRadius: 2,
     backgroundColor: colors.border,
   },
-  progressDotActive: { backgroundColor: colors.brand },
-  stepLabel: { marginBottom: spacing.xs },
-  hero: {
-    width: 140,
-    height: 140,
-    borderRadius: radius.lg,
+  progressDotPassed: {
+    backgroundColor: colors.brand100,
+  },
+  progressDotActive: {
+    width: 36,
+    backgroundColor: colors.brand,
+  },
+  stepBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.brand50,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.brand100,
+  },
+  stepLabel: {
+    fontWeight: '800',
+    fontSize: 10,
+    letterSpacing: 0.5,
+  },
+  heroCard: {
+    width: '100%',
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    marginTop: spacing.xs,
+  },
+  iconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: colors.border,
-    marginTop: spacing.sm,
+    borderColor: colors.brand100,
+    marginBottom: spacing.xs,
   },
   badge: {
     backgroundColor: colors.brand50,
@@ -145,10 +194,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.brandTertiary,
+    borderColor: colors.brand100,
   },
-  title: { textAlign: 'center' },
-  text: { textAlign: 'center', lineHeight: 24, maxWidth: 340 },
+  title: { textAlign: 'center', fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
+  text: { textAlign: 'center', lineHeight: 22, maxWidth: 320, fontSize: 13 },
   bottomBar: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
@@ -156,5 +205,5 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
-  navRow: { flexDirection: 'row', gap: spacing.sm },
+  navRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
 });

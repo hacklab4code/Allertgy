@@ -171,7 +171,7 @@ export default function Locali() {
             onPress={() => setShowAddModal(true)}
             activeOpacity={0.8}
           >
-            <Ionicons name="add" size={18} color="#FFFFFF" />
+            <Ionicons name="add-outline" size={18} color="#FFFFFF" />
             <AppText variant="caption" color="#FFFFFF" style={{ fontWeight: '800', fontSize: 11 }}>
               Locale
             </AppText>
@@ -269,7 +269,7 @@ export default function Locali() {
                 VETRINA E LEGALE
               </AppText>
               <SettingsRow
-                icon="storefront"
+                icon="storefront-outline"
                 title="Scheda pubblica"
                 subtitle={
                   schedaIncomplete
@@ -280,14 +280,14 @@ export default function Locali() {
               />
               <SettingsDivider />
               <SettingsRow
-                icon="document-text"
+                icon="document-text-outline"
                 title="Dati legali UE"
                 subtitle={legalOk ? 'P.IVA e referente HACCP ok' : 'P.IVA e referente da inserire'}
                 onPress={() => router.push('/(owner)/scheda?focus=legal')}
               />
               <SettingsDivider />
               <SettingsRow
-                icon="print"
+                icon="print-outline"
                 title="Registro Allergeni PDF"
                 subtitle={
                   pdfReprintNeeded

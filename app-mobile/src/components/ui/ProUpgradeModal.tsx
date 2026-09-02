@@ -49,11 +49,11 @@ export function ProUpgradeModal({
             style={[styles.headerGradient, { backgroundColor: '#2D124D' }]}
           >
             <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={12}>
-              <Ionicons name="close" size={24} color="#FFFFFF" />
+              <Ionicons name="close-outline" size={24} color="#FFFFFF" />
             </Pressable>
 
             <View style={styles.badgeRow}>
-              <Ionicons name="sparkles" size={20} color="#FFD700" />
+              <Ionicons name="sparkles-outline" size={20} color="#FFD700" />
               <Text style={styles.proBadgeText}>ALLERTGY PRO</Text>
             </View>
 

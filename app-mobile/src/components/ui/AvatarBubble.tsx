@@ -1,11 +1,14 @@
 import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, Image } from 'react-native';
 import { colors, WIREFRAME_MODE } from '../../theme';
 import { wireBox } from '../../wireframe';
 
 type Props = {
-  emoji: string;
-  color: string;
+  imageUrl?: string | null;
+  emoji?: string | { emoji?: string; color?: string };
+  customEmoji?: string | { emoji?: string; color?: string };
+  color?: string;
+  index?: number;
   size?: number;
   active?: boolean;
   showCheckmark?: boolean;
@@ -14,13 +17,32 @@ type Props = {
 
 /** Avatar bubble con supporto glow e badge di selezione attivo. */
 export function AvatarBubble({
-  emoji,
-  color,
+  imageUrl,
+  emoji: rawEmoji,
+  customEmoji,
+  color: rawColor,
+  index = 0,
   size = 64,
   active,
   showCheckmark = false,
   glow = false,
 }: Props) {
+  const fallback = avatarForIndex(index);
+  const passedObj =
+    (typeof customEmoji === 'object' && customEmoji !== null ? customEmoji : null)
+    || (typeof rawEmoji === 'object' && rawEmoji !== null ? rawEmoji : null);
+
+  const emoji =
+    (typeof customEmoji === 'string' && customEmoji.trim() ? customEmoji : null)
+    || (typeof rawEmoji === 'string' && rawEmoji.trim() ? rawEmoji : null)
+    || passedObj?.emoji
+    || fallback.emoji;
+
+  const color =
+    rawColor
+    || passedObj?.color
+    || fallback.color;
+
   if (WIREFRAME_MODE) {
     return (
       <View
@@ -29,7 +51,7 @@ export function AvatarBubble({
           { width: size, height: size, alignItems: 'center', justifyContent: 'center' },
         ]}
       >
-        <Text style={{ fontSize: 10, color: active ? '#FFF' : '#000' }}>{emoji}</Text>
+        <Text style={{ fontSize: 10, color: active ? '#FFF' : '#000' }}>{String(emoji || '👤')}</Text>
       </View>
     );
   }
@@ -52,7 +74,15 @@ export function AvatarBubble({
           active && glow && styles.glowStyle,
         ]}
       >
-        <Text style={{ fontSize: size * 0.46, textAlign: 'center' }}>{emoji}</Text>
+        {imageUrl ? (
+          <Image
+            source={{ uri: imageUrl }}
+            style={{ width: size, height: size, borderRadius: size / 2 }}
+            resizeMode="cover"
+          />
+        ) : (
+          <Text style={{ fontSize: size * 0.46, textAlign: 'center' }}>{String(emoji || '👤')}</Text>
+        )}
       </View>
       {active && showCheckmark && (
         <View

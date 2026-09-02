@@ -1,219 +1,212 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppText } from './ui/AppText';
-import { radius, colors } from '../theme';
+import { font } from '../theme';
+import { useSession } from '../store/session';
+import { useIsDarkMode } from '../hooks/useAppTheme';
+import { OFFICIAL_FOOD_RECALLS, checkUserRecalls } from '../services/recalls';
 
 type Props = {
   isIt?: boolean;
 };
 
-export default function HomeQuickActionHub({ isIt = true }: Props) {
+/**
+ * 1. Griglia con le 4 Azioni Rapide armonizzate su Cosmic Dark (#23212C) + Vanilla (#F1FEC8) e Outline Icons
+ */
+export const HomeQuickActions = React.memo(function HomeQuickActions({ isIt = true }: Props) {
+  const isDark = useIsDarkMode();
   const handleNav = (route: string) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(route as any);
   };
 
+  const actions = [
+    {
+      id: 'diario',
+      title: isIt ? 'Diario' : 'Diary',
+      sub: isIt ? 'Sintomi' : 'Symptoms',
+      route: '/diario-reazioni',
+      icon: 'book-outline' as const,
+    },
+    {
+      id: 'passaporto',
+      title: isIt ? 'Passaporto' : 'Passport',
+      sub: isIt ? 'Chef Pass' : 'Chef Pass',
+      route: '/allergy-card',
+      icon: 'card-outline' as const,
+    },
+    {
+      id: 'frasario',
+      title: isIt ? 'Frasario' : 'Phrasebook',
+      sub: isIt ? 'Offline' : 'Offline',
+      route: '/travel-hub',
+      icon: 'chatbubble-ellipses-outline' as const,
+    },
+    {
+      id: 'spesa',
+      title: isIt ? 'Lista Spesa' : 'Shopping',
+      sub: isIt ? 'Semaforo' : 'Safe List',
+      route: '/lista-spesa',
+      icon: 'cart-outline' as const,
+    },
+  ];
+
+  const renderActionCard = (act: (typeof actions)[0]) => (
+    <Pressable
+      key={act.id}
+      onPress={() => handleNav(act.route)}
+      style={({ pressed }) => [
+        styles.actionCard,
+        isDark && styles.actionCardDark,
+        pressed && styles.actionCardPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={act.title}
+    >
+      <View style={styles.cardInner}>
+        <View style={[styles.iconWrapper, isDark && styles.iconWrapperDark]}>
+          <Ionicons name={act.icon} size={22} color="#F1FEC8" />
+        </View>
+        <View style={styles.cardTextBox}>
+          <AppText
+            style={[styles.actionLabel, isDark && styles.actionLabelDark]}
+            numberOfLines={1}
+          >
+            {act.title}
+          </AppText>
+          <AppText
+            style={[styles.actionSubLabel, isDark && styles.actionSubLabelDark]}
+            numberOfLines={1}
+          >
+            {act.sub}
+          </AppText>
+        </View>
+      </View>
+    </Pressable>
+  );
+
   return (
-    <View style={styles.container}>
-      {/* 1. DUE GRANDI HERO CARDS D'AZIONE (Ristorante vs Spesa) */}
-      <View style={styles.heroActionRow}>
-        {/* Hero Card 1: Scanner Menù Ristorante */}
-        <Pressable
-          onPress={() => handleNav('/scanner')}
-          style={({ pressed }) => [styles.heroCard, pressed && styles.pressed]}
-          accessibilityRole="button"
-          accessibilityLabel={isIt ? 'Scansiona menù ristorante' : 'Scan restaurant menu'}
-        >
-          <LinearGradient
-            colors={['#3B82F6', '#1D4ED8']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroCardGradient}
-          >
-            <View style={styles.heroTopRow}>
-              <View style={styles.heroTag}>
-                <Ionicons name="restaurant" size={12} color="#FFFFFF" />
-                <AppText style={styles.heroTagText}>
-                  {isIt ? 'Al Tavolo' : 'Venue'}
-                </AppText>
-              </View>
-              <View style={styles.heroIconCircle}>
-                <Ionicons name="qr-code-outline" size={22} color="#FFFFFF" />
-              </View>
-            </View>
-
-            <View style={styles.heroBody}>
-              <AppText style={styles.heroTitle}>
-                {isIt ? 'Menù Locale' : 'Venue Menu'}
-              </AppText>
-              <AppText style={styles.heroSubtitle} numberOfLines={2}>
-                {isIt
-                  ? 'QR o PIN a 6 cifre con semaforo istantaneo'
-                  : 'QR or 6-digit PIN with live traffic lights'}
-              </AppText>
-            </View>
-
-            <View style={styles.heroActionBtn}>
-              <AppText style={styles.heroActionBtnText}>
-                {isIt ? 'Scansiona QR' : 'Scan QR'}
-              </AppText>
-              <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
-            </View>
-          </LinearGradient>
-        </Pressable>
-
-        {/* Hero Card 2: Scanner Barcode Spesa */}
-        <Pressable
-          onPress={() => handleNav('/scanner')}
-          style={({ pressed }) => [styles.heroCard, pressed && styles.pressed]}
-          accessibilityRole="button"
-          accessibilityLabel={isIt ? 'Scansiona codice a barre spesa' : 'Scan grocery barcode'}
-        >
-          <LinearGradient
-            colors={['#10B981', '#047857']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroCardGradient}
-          >
-            <View style={styles.heroTopRow}>
-              <View style={styles.heroTag}>
-                <Ionicons name="cart" size={12} color="#FFFFFF" />
-                <AppText style={styles.heroTagText}>
-                  {isIt ? 'Spesa' : 'Grocery'}
-                </AppText>
-              </View>
-              <View style={styles.heroIconCircle}>
-                <Ionicons name="barcode-outline" size={22} color="#FFFFFF" />
-              </View>
-            </View>
-
-            <View style={styles.heroBody}>
-              <AppText style={styles.heroTitle}>
-                {isIt ? 'Scanner Spesa' : 'Barcode Scan'}
-              </AppText>
-              <AppText style={styles.heroSubtitle} numberOfLines={2}>
-                {isIt
-                  ? 'Verifica allergeni ed EAN al supermercato'
-                  : 'Check allergens & ingredients at grocery'}
-              </AppText>
-            </View>
-
-            <View style={styles.heroActionBtn}>
-              <AppText style={styles.heroActionBtnText}>
-                {isIt ? 'Scansiona EAN' : 'Scan EAN'}
-              </AppText>
-              <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
-            </View>
-          </LinearGradient>
-        </Pressable>
+    <View style={styles.quickActionsContainer}>
+      {/* Intestazione Sezione */}
+      <View style={styles.headerRow}>
+        <AppText style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>
+          {isIt ? 'Azioni Rapide' : 'Quick Actions'}
+        </AppText>
       </View>
 
-      {/* 2. GRIGLIA 2x2 CARD SECONDARIE BEN SPAZIATE */}
-      <View style={styles.secondaryGrid}>
-        {/* Passaporto Chef */}
-        <Pressable
-          onPress={() => handleNav('/allergy-card')}
-          style={({ pressed }) => [styles.smallCard, pressed && styles.pressed]}
-        >
-          <View style={[styles.smallIconCircle, { backgroundColor: '#F3E8FF' }]}>
-            <Ionicons name="card-outline" size={20} color="#9333EA" />
-          </View>
-          <View style={styles.smallCardContent}>
-            <AppText style={styles.smallCardTitle}>
-              {isIt ? 'Chef Pass' : 'Chef Pass'}
-            </AppText>
-            <AppText style={styles.smallCardSub}>
-              {isIt ? 'Tessera 5 lingue' : '5-Language card'}
-            </AppText>
-          </View>
-          <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
-        </Pressable>
-
-        {/* Dispensa Casa */}
-        <Pressable
-          onPress={() => handleNav('/dispensa')}
-          style={({ pressed }) => [styles.smallCard, pressed && styles.pressed]}
-        >
-          <View style={[styles.smallIconCircle, { backgroundColor: '#E0F2FE' }]}>
-            <Ionicons name="cube-outline" size={20} color="#0284C7" />
-          </View>
-          <View style={styles.smallCardContent}>
-            <AppText style={styles.smallCardTitle}>
-              {isIt ? 'Dispensa Casa' : 'Safe Pantry'}
-            </AppText>
-            <AppText style={styles.smallCardSub}>
-              {isIt ? 'Scorte verificate' : 'Verified pantry'}
-            </AppText>
-          </View>
-          <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
-        </Pressable>
-
-        {/* Lista Spesa */}
-        <Pressable
-          onPress={() => handleNav('/lista-spesa')}
-          style={({ pressed }) => [styles.smallCard, pressed && styles.pressed]}
-        >
-          <View style={[styles.smallIconCircle, { backgroundColor: '#DCFCE7' }]}>
-            <Ionicons name="cart-outline" size={20} color="#16A34A" />
-          </View>
-          <View style={styles.smallCardContent}>
-            <AppText style={styles.smallCardTitle}>
-              {isIt ? 'Lista Spesa' : 'Grocery List'}
-            </AppText>
-            <AppText style={styles.smallCardSub}>
-              {isIt ? 'Cibi compatibili' : 'Safe items'}
-            </AppText>
-          </View>
-          <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
-        </Pressable>
-
-        {/* Diario Reazioni */}
-        <Pressable
-          onPress={() => handleNav('/diario-reazioni')}
-          style={({ pressed }) => [styles.smallCard, pressed && styles.pressed]}
-        >
-          <View style={[styles.smallIconCircle, { backgroundColor: '#FEF3C7' }]}>
-            <Ionicons name="book-outline" size={20} color="#D97706" />
-          </View>
-          <View style={styles.smallCardContent}>
-            <AppText style={styles.smallCardTitle}>
-              {isIt ? 'Diario Reazioni' : 'Reaction Log'}
-            </AppText>
-            <AppText style={styles.smallCardSub}>
-              {isIt ? 'Traccia sintomi' : 'Track symptoms'}
-            </AppText>
-          </View>
-          <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
-        </Pressable>
+      {/* Riga singola delle 4 Azioni Rapide con badge unificati Cosmic + Vanilla */}
+      <View style={styles.singleRow}>
+        {actions.map(renderActionCard)}
       </View>
+    </View>
+  );
+});
 
-      {/* 3. LIVE RECALLS BANNER (Richiami Ministeriali Cibo) */}
+/**
+ * 2. Card Allerte & Richiami Alimentari Ministero della Salute & RASFF (Design Rosso / Cosmic)
+ */
+export const HomeFoodRecallsCard = React.memo(function HomeFoodRecallsCard({ isIt = true }: Props) {
+  const isDark = useIsDarkMode();
+  const allergie = useSession((s) => s.allergie);
+
+  // Verifica se ci sono richiami urgenti corrispondenti agli allergeni dell'utente
+  const urgentCount = useMemo(() => {
+    if (!allergie || allergie.length === 0) return 0;
+    const matches = checkUserRecalls(OFFICIAL_FOOD_RECALLS, allergie);
+    return matches.filter((m) => m.matchedAllergen).length;
+  }, [allergie]);
+
+  const handleNav = (route: string) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(route as any);
+  };
+
+  const gradientColors: [string, string, ...string[]] = isDark
+    ? urgentCount > 0
+      ? ['rgba(225, 29, 72, 0.35)', 'rgba(159, 18, 57, 0.45)']
+      : ['rgba(255, 255, 255, 0.10)', 'rgba(255, 255, 255, 0.05)']
+    : urgentCount > 0
+      ? ['#FFF1F2', '#FFE4E6', '#FEE2E2']
+      : ['#FFF5F5', '#FFEBEF', '#FEDFE7'];
+
+  return (
+    <View style={styles.recallCardContainer}>
       <Pressable
         onPress={() => handleNav('/recalls')}
-        style={({ pressed }) => [styles.recallsBanner, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.cardWrapper,
+          pressed && styles.cardPressed,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isIt
+            ? `Allerte e Richiami Alimentari${urgentCount > 0 ? `, ${urgentCount} nuovi richiami rilevati` : ''}`
+            : `Food Recalls and Alerts${urgentCount > 0 ? `, ${urgentCount} new recalls found` : ''}`
+        }
       >
-        <View style={styles.recallsLeft}>
-          <View style={styles.recallIconWrapper}>
-            <Ionicons name="alert-circle" size={16} color="#DC2626" />
+        <LinearGradient
+          colors={gradientColors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            styles.alertCardGradient,
+            isDark && styles.alertCardGradientDark,
+            urgentCount > 0 && styles.alertCardUrgentBorder,
+          ]}
+        >
+          {/* Icona Allerta Outline */}
+          <View style={[styles.alertIconWrapper, isDark && styles.alertIconWrapperDark]}>
+            <Ionicons name="warning-outline" size={22} color={isDark ? '#FDA4AF' : '#E11D48'} />
           </View>
-          <View style={styles.recallsTextWrapper}>
-            <AppText style={styles.recallsTitle}>
-              {isIt ? 'Allerte & Richiami Alimentari' : 'Food Recalls & Alerts'}
-            </AppText>
-            <AppText style={styles.recallsSub}>
-              {isIt ? 'Banca dati Ministero della Salute & RASFF' : 'Ministry of Health & RASFF live alerts'}
+
+          {/* Testi Allerta & Richiami */}
+          <View style={styles.alertTextBox}>
+            <View style={styles.alertTitleRow}>
+              <AppText style={[styles.alertTitle, isDark && styles.alertTitleDark]} numberOfLines={1}>
+                {isIt ? 'Allerte & Richiami Cibo' : 'Food Recalls & Alerts'}
+              </AppText>
+              {urgentCount > 0 && (
+                <LinearGradient
+                  colors={['#EF4444', '#DC2626']}
+                  style={styles.alertCountBadge}
+                >
+                  <AppText style={styles.alertCountBadgeText}>
+                    {urgentCount}
+                  </AppText>
+                </LinearGradient>
+              )}
+            </View>
+            <AppText style={[styles.alertSubtitle, isDark && styles.alertSubtitleDark]} numberOfLines={1}>
+              {urgentCount > 0
+                ? (isIt
+                  ? `${urgentCount} ${urgentCount === 1 ? 'allerta' : 'allerte'} sui tuoi allergeni!`
+                  : `${urgentCount} ${urgentCount === 1 ? 'alert' : 'alerts'} for your allergens!`)
+                : (isIt ? 'Nessun richiamo attivo per i tuoi cibi' : 'No active alerts for your foods')}
             </AppText>
           </View>
-        </View>
-        <View style={styles.recallsBadge}>
-          <AppText style={styles.recallsBadgeText}>{isIt ? 'Verifica' : 'Check'}</AppText>
-          <Ionicons name="chevron-forward" size={12} color="#DC2626" />
-        </View>
+
+          {/* Freccia di Apertura */}
+          <View style={[styles.chevronButton, isDark && styles.chevronButtonDark]}>
+            <Ionicons name="chevron-forward" size={16} color={isDark ? '#FDA4AF' : '#E11D48'} />
+          </View>
+        </LinearGradient>
       </Pressable>
+    </View>
+  );
+});
+
+/**
+ * Hub completo Azioni Rapide + Richiami Cibo
+ */
+export default function HomeQuickActionHub({ isIt = true }: Props) {
+  return (
+    <View style={styles.container}>
+      <HomeQuickActions isIt={isIt} />
+      <HomeFoodRecallsCard isIt={isIt} />
     </View>
   );
 }
@@ -221,181 +214,227 @@ export default function HomeQuickActionHub({ isIt = true }: Props) {
 const styles = StyleSheet.create({
   container: {
     marginBottom: 16,
+    gap: 12,
+  },
+  quickActionsContainer: {
+    width: '100%',
+    alignSelf: 'stretch',
+    marginBottom: 18,
     gap: 10,
   },
-  heroActionRow: {
+  recallCardContainer: {
+    alignSelf: 'stretch',
+    marginBottom: 16,
+  },
+  headerRow: {
     flexDirection: 'row',
-    gap: 10,
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+    paddingHorizontal: 2,
   },
-  heroCard: {
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#23212C',
+    fontFamily: font.bold,
+    letterSpacing: -0.3,
+  },
+  singleRow: {
+    flexDirection: 'row',
+    width: '100%',
+    alignSelf: 'stretch',
+    gap: 8,
+    justifyContent: 'space-between',
+    alignItems: 'stretch',
+  },
+  actionCard: {
     flex: 1,
+    minWidth: 0,
+    backgroundColor: '#FFFFFF',
     borderRadius: 18,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#23212C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
     shadowRadius: 6,
+    elevation: 2,
+  },
+  actionCardPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.95 }],
+  },
+  cardInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    width: '100%',
+  },
+  iconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#23212C',
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTextBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingHorizontal: 2,
+    gap: 1,
+  },
+  actionLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#23212C',
+    fontFamily: font.bold,
+    textAlign: 'center',
+    letterSpacing: -0.2,
+  },
+  actionSubLabel: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: '#64748B',
+    textAlign: 'center',
+  },
+
+  /* Action Card Styling - Red Tinted Premium Design */
+  cardWrapper: {
+    borderRadius: 22,
+    shadowColor: '#E11D48',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
     elevation: 3,
   },
-  heroCardGradient: {
-    padding: 13,
-    minHeight: 146,
-    justifyContent: 'space-between',
+  cardPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.985 }],
   },
-  heroTopRow: {
+  alertCardGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    borderRadius: 22,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    gap: 12,
   },
-  heroTag: {
+  alertCardUrgentBorder: {
+    borderColor: '#FDA4AF',
+    shadowColor: '#DC2626',
+    shadowOpacity: 0.16,
+  },
+  alertIconWrapper: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFE4E6',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alertTextBox: {
+    flex: 1,
+    justifyContent: 'center',
+    minWidth: 0,
+  },
+  alertTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
+    gap: 8,
   },
-  heroTagText: {
-    fontSize: 10.5,
-    fontWeight: '700',
+  alertTitle: {
+    fontSize: 15.5,
+    fontWeight: '800',
+    color: '#23212C',
+    fontFamily: font.bold,
+    letterSpacing: -0.3,
+    flexShrink: 1,
+  },
+  alertCountBadge: {
+    backgroundColor: '#EF4444',
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  alertCountBadgeText: {
+    fontSize: 11.5,
+    fontWeight: '800',
     color: '#FFFFFF',
+    textAlign: 'center',
+    includeFontPadding: false,
   },
-  heroIconCircle: {
+  alertSubtitle: {
+    fontSize: 12.5,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  chevronButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: 'rgba(244, 63, 94, 0.12)',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 2,
   },
-  heroBody: {
-    marginVertical: 6,
-  },
-  heroTitle: {
-    fontSize: 15.5,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 2,
-  },
-  heroSubtitle: {
-    fontSize: 11,
-    lineHeight: 14.5,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
-  },
-  heroActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  heroActionBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
+  /* Dark Mode Modifiers */
+  sectionTitleDark: {
     color: '#FFFFFF',
   },
-  secondaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+  actionCardDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    shadowOpacity: 0.15,
   },
-  smallCard: {
-    width: '48.5%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#EDE8F5',
-    shadowColor: '#23212C',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 2,
-    gap: 8,
+  iconWrapperDark: {
+    backgroundColor: 'rgba(241, 254, 200, 0.15)',
+    borderColor: 'rgba(241, 254, 200, 0.35)',
   },
-  smallIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
+  actionLabelDark: {
+    color: '#FFFFFF',
   },
-  smallCardContent: {
-    flex: 1,
+  actionSubLabelDark: {
+    color: '#94A3B8',
   },
-  smallCardTitle: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#1F2937',
+  alertCardGradientDark: {
+    borderColor: 'rgba(255, 255, 255, 0.16)',
   },
-  smallCardSub: {
-    fontSize: 10,
-    color: '#6B7280',
-    fontWeight: '500',
+  alertIconWrapperDark: {
+    backgroundColor: 'rgba(225, 29, 72, 0.25)',
+    borderColor: 'rgba(253, 164, 175, 0.40)',
   },
-  recallsBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 14,
+  alertTitleDark: {
+    color: '#FFFFFF',
   },
-  recallsLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
+  alertSubtitleDark: {
+    color: '#CBD5E1',
   },
-  recallIconWrapper: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FEE2E2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recallsTextWrapper: {
-    flex: 1,
-  },
-  recallsTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#991B1B',
-  },
-  recallsSub: {
-    fontSize: 10,
-    color: '#B91C1C',
-    fontWeight: '500',
-  },
-  recallsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-  },
-  recallsBadgeText: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: '#DC2626',
-  },
-  pressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.98 }],
+  chevronButtonDark: {
+    backgroundColor: 'rgba(244, 63, 94, 0.22)',
+    borderColor: 'rgba(253, 164, 175, 0.35)',
   },
 });

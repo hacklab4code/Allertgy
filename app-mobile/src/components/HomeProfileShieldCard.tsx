@@ -1,480 +1,604 @@
-import React from 'react';
-import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import React, { useCallback, useEffect } from 'react';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+} from 'react-native-reanimated';
 import { AppText } from './ui/AppText';
-import { AvatarBubble } from './ui/AvatarBubble';
-import { colors, radius, spacing, font } from '../theme';
+import { BlurView } from 'expo-blur';
 import { useProfileSheet } from '../store/profileSheet';
-import { TRANSLATED_ALLERGENS } from '../engine/translations';
-import type { AllergyIntensity } from '../types';
+import { useSession } from '../store/session';
+import { meshScrollY } from '../hooks/useMeshInk';
+import { useIsDarkMode } from '../hooks/useAppTheme';
+import { font, spacing } from '../theme';
+import type { AllergyIntensity, AllergyCriterio } from '../types';
+import { getAllergenName, TRANSLATED_ALLERGENS } from '../engine/translations';
+
+const MATTEO_AVATAR_IMAGE = require('../../assets/avatar_matteo.png');
+const COSMIC_NEBULA_IMAGE = require('../../assets/cosmic_nebula_bg.jpg');
+
+const SHORT_NAMES_IT: Record<string, string> = {
+  glutine: 'Glutine',
+  latte: 'Latte',
+  uova: 'Uova',
+  arachidi: 'Arachidi',
+  frutta_a_guscio: 'Frutta a guscio',
+  crostacei: 'Crostacei',
+  pesce: 'Pesce',
+  soia: 'Soia',
+  sedano: 'Sedano',
+  senape: 'Senape',
+  sesamo: 'Sesamo',
+  solfiti: 'Solfiti',
+  lupini: 'Lupini',
+  molluschi: 'Molluschi',
+  mandorle: 'Mandorle',
+  nocciole: 'Nocciole',
+  noci: 'Noci',
+  pistacchi: 'Pistacchi',
+  anacardi: 'Anacardi',
+  pinoli: 'Pinoli',
+  fragole: 'Fragole',
+  pomodoro: 'Pomodoro',
+  nichel: 'Nichel',
+};
+
+const SHORT_NAMES_EN: Record<string, string> = {
+  glutine: 'Gluten',
+  latte: 'Milk',
+  uova: 'Eggs',
+  arachidi: 'Peanuts',
+  frutta_a_guscio: 'Tree Nuts',
+  crostacei: 'Crustaceans',
+  pesce: 'Fish',
+  soia: 'Soy',
+  sedano: 'Celery',
+  senape: 'Mustard',
+  sesamo: 'Sesame',
+  solfiti: 'Sulfites',
+  lupini: 'Lupins',
+  molluschi: 'Molluscs',
+};
+
+function getDisplayAllergenName(code: string, isIt: boolean): string {
+  const clean = (code || '').toLowerCase().trim();
+  if (isIt && SHORT_NAMES_IT[clean]) return SHORT_NAMES_IT[clean];
+  if (!isIt && SHORT_NAMES_EN[clean]) return SHORT_NAMES_EN[clean];
+  return getAllergenName(clean, isIt ? 'it' : 'en');
+}
+
+function getSeverityInfo(intensity: AllergyIntensity | undefined, isIt: boolean) {
+  switch (intensity) {
+    case 'grave':
+      return {
+        color: '#EF4444',
+        border: '#EF4444',
+        circleBg: '#DC2626',
+        glowColor: '#EF4444',
+        label: isIt ? 'Grave' : 'Severe',
+      };
+    case 'lieve':
+      return {
+        color: '#EAB308',
+        border: '#FACC15',
+        circleBg: '#CA8A04',
+        glowColor: '#EAB308',
+        label: isIt ? 'Lieve' : 'Mild',
+      };
+    case 'moderata':
+    default:
+      return {
+        color: '#F97316',
+        border: '#FB923C',
+        circleBg: '#EA580C',
+        glowColor: '#F97316',
+        label: isIt ? 'Media' : 'Moderate',
+      };
+  }
+}
 
 interface HomeProfileShieldCardProps {
   displayName: string | null;
   activeLabel: string;
-  activeAvatar: string;
+  activeAvatar: any;
   activeProfileIndex: number;
   allergie: readonly string[];
   allergyIntensities?: Record<string, AllergyIntensity>;
+  allergyCriteria?: Record<string, AllergyCriterio>;
   hasAllergie: boolean;
   isIt?: boolean;
 }
 
-export function HomeProfileShieldCard({
+export const HomeProfileShieldCard = React.memo(function HomeProfileShieldCard({
   displayName,
   activeLabel,
   activeAvatar,
-  activeProfileIndex,
-  allergie,
+  allergie = [],
   allergyIntensities = {},
-  hasAllergie,
+  hasAllergie = false,
   isIt = true,
 }: HomeProfileShieldCardProps) {
+  const insets = useSafeAreaInsets();
+  const isDark = useIsDarkMode();
   const openProfileSheet = useProfileSheet((s) => s.open);
+  const profilePhotoUrl = useSession((s) => s.profilePhotoUrl);
+  const activeProfileId = useSession((s) => s.activeProfileId);
 
-  const handleSwitchProfile = () => {
-    void Haptics.selectionAsync();
+  const handleSwitchProfile = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     openProfileSheet();
-  };
+  }, [openProfileSheet]);
 
-  const handleOpenAllergyManager = () => {
+  const handleOpenAllergies = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/allergie');
-  };
+  }, []);
 
-  const handleOpenChefPass = () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/allergy-card');
-  };
+  const profileName = activeLabel || displayName || (isIt ? 'Matteo' : 'Matteo');
 
-  const handleOpenEmergency = () => {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    router.push('/emergency');
-  };
+  const isCustomEmojiAvatar =
+    typeof activeAvatar === 'string' &&
+    activeAvatar !== '' &&
+    activeAvatar !== '🧔🏻‍♂️' &&
+    activeAvatar !== '👤';
 
-  const handleOpenDossier = () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/medical-dossier');
-  };
+  const allergyCount = allergie.length;
+
+  const contentFadeStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      meshScrollY.value,
+      [0, 95],
+      [1, 0.15],
+      Extrapolation.CLAMP,
+    );
+    const translateY = interpolate(
+      meshScrollY.value,
+      [0, 95],
+      [0, -10],
+      Extrapolation.CLAMP,
+    );
+    return {
+      opacity,
+      transform: [{ translateY }],
+    };
+  });
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#FFFFFF', '#FAF8FD']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.card}
+    <View style={styles.heroContainer}>
+      <View
+        style={[
+          styles.heroCard,
+          { paddingTop: insets.top + 68 },
+        ]}
       >
-        {/* Top Bar: Profile Identity & Profile Switcher */}
-        <View style={styles.topRow}>
+        {/* 1. Base Traslucida: Vanilla (Giorno) o Deep Cosmic (Notte) */}
+        <LinearGradient
+          colors={
+            isDark
+              ? ['rgba(23, 20, 32, 0.45)', 'rgba(35, 33, 44, 0.55)', 'rgba(45, 40, 59, 0.50)']
+              : ['rgba(241, 254, 200, 0.96)', 'rgba(238, 252, 192, 0.92)', 'rgba(230, 248, 175, 0.88)']
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+
+        {/* 2. Glow: Caldo Vanilla o Nebulare Viola/Indaco Notturno */}
+        <LinearGradient
+          colors={
+            isDark
+              ? ['rgba(99, 102, 241, 0.22)', 'rgba(192, 132, 252, 0.16)', 'transparent']
+              : ['rgba(255, 255, 255, 0.65)', 'rgba(241, 254, 200, 0.20)', 'transparent']
+          }
+          start={{ x: isDark ? 1 : 0.5, y: 0 }}
+          end={{ x: isDark ? 0 : 0.5, y: isDark ? 0.8 : 0.9 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+
+        {/* 3. Sfocatura Nativa BlurView (Glassmorphism da css.glass) */}
+        <BlurView
+          intensity={25}
+          tint={isDark ? 'dark' : 'light'}
+          style={StyleSheet.absoluteFill}
+        />
+
+        {/* 4. Tinta Glass Trasparente */}
+        <LinearGradient
+          colors={
+            isDark
+              ? ['rgba(35, 33, 44, 0.28)', 'rgba(35, 33, 44, 0.45)']
+              : ['rgba(241, 254, 200, 0.40)', 'rgba(232, 250, 180, 0.55)']
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+
+        {/* CONTENUTO HERO CON TRANSIZIONE FLUIDA IN SCROLL */}
+        <Animated.View style={contentFadeStyle}>
+          {/* RIGA 1: FOTO PROFILO A SINISTRA + "Ciao, Matteo!" A FIANCO */}
           <Pressable
             onPress={handleSwitchProfile}
-            style={({ pressed }) => [styles.profileSelector, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.profilePressable,
+              pressed && styles.buttonPressed,
+            ]}
             accessibilityRole="button"
-            accessibilityLabel={isIt ? 'Cambia profilo attivo' : 'Switch active profile'}
+            accessibilityLabel={isIt ? `Profilo di ${profileName}` : `Profile of ${profileName}`}
           >
-            <View style={styles.avatarWrapper}>
-              <AvatarBubble
-                index={activeProfileIndex}
-                size={38}
-                customEmoji={activeAvatar}
-              />
-              <View style={styles.activeDotBadge} />
-            </View>
-
-            <View style={styles.profileTextInfo}>
-              <View style={styles.nameRow}>
-                <AppText style={styles.profileName} numberOfLines={1}>
-                  {activeLabel}
-                </AppText>
-                <Ionicons name="chevron-down" size={14} color="#6B7280" />
+            <View style={styles.profileRow}>
+              {/* Foto profilo a sinistra */}
+              <View
+                style={[
+                  styles.avatarContainer,
+                  isDark && styles.avatarContainerDark,
+                ]}
+              >
+                {activeProfileId === null && profilePhotoUrl ? (
+                  <Image
+                    source={{ uri: profilePhotoUrl }}
+                    style={styles.avatarMatteoImage}
+                    resizeMode="cover"
+                  />
+                ) : isCustomEmojiAvatar ? (
+                  <Text style={styles.avatarEmojiText}>{typeof activeAvatar === 'string' ? activeAvatar : '👤'}</Text>
+                ) : (
+                  <Image
+                    source={MATTEO_AVATAR_IMAGE}
+                    style={styles.avatarMatteoImage}
+                    resizeMode="cover"
+                  />
+                )}
               </View>
-              <AppText style={styles.profileSubtitle}>
-                {isIt ? 'Profilo attivo' : 'Active profile'}
-              </AppText>
+
+              {/* Scritta Ciao, Matteo! + info profilo */}
+              <View style={styles.greetingTextBox}>
+                <Text
+                  style={[
+                    styles.greetingTitle,
+                    isDark && styles.greetingTitleDark,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {isIt ? `Ciao, ${profileName}!` : `Hello, ${profileName}!`}
+                </Text>
+                <View
+                  style={[
+                    styles.greetingSubtitleBadge,
+                    isDark && styles.greetingSubtitleBadgeDark,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.greetingSubtitle,
+                      isDark && styles.greetingSubtitleDark,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {allergyCount > 0
+                      ? isIt
+                        ? `${allergyCount} ${allergyCount === 1 ? 'allergia attiva' : 'allergie attive'}`
+                        : `${allergyCount} ${allergyCount === 1 ? 'active allergy' : 'active allergies'}`
+                      : isIt
+                        ? 'Nessuna allergia impostata'
+                        : 'No allergies configured'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Icona freccia per cambiare profilo */}
+              <View
+                style={[
+                  styles.profileSwitchIconBox,
+                  isDark && styles.profileSwitchIconBoxDark,
+                ]}
+              >
+                <Ionicons
+                  name="chevron-down"
+                  size={18}
+                  color={isDark ? 'rgba(241, 254, 200, 0.85)' : '#23212C'}
+                />
+              </View>
             </View>
           </Pressable>
 
-          {/* Shield Status Badge */}
-          <View style={[styles.shieldStatusBadge, hasAllergie ? styles.shieldActive : styles.shieldSetup]}>
-            <View style={[styles.pulseDot, hasAllergie ? styles.pulseGreen : styles.pulseAmber]} />
-            <AppText style={[styles.shieldStatusText, hasAllergie ? styles.textGreen : styles.textAmber]}>
-              {hasAllergie
-                ? isIt
-                  ? `${allergie.length} ${allergie.length === 1 ? 'allergia' : 'allergeni'}`
-                  : `${allergie.length} ${allergie.length === 1 ? 'allergen' : 'allergens'}`
-                : isIt
-                ? 'Nessuna allergia'
-                : 'No allergens'}
-            </AppText>
-          </View>
-        </View>
+          {/* RIGA 3: ALLERGIE DEL SOGGETTO (LOGO IN CERCHIO COLORATO) */}
+          <View style={styles.allergensContainer}>
+            {allergyCount > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.allergensScroll}
+              >
+                {allergie.map((code) => {
+                  const codeKey = (code || '').toLowerCase().trim();
+                  const name = getDisplayAllergenName(codeKey, isIt);
+                  const emoji = TRANSLATED_ALLERGENS[codeKey]?.emoji || '⚠️';
+                  const intensity = allergyIntensities?.[codeKey] || 'moderata';
+                  const sev = getSeverityInfo(intensity, isIt);
 
-        {/* Middle Row: Active Allergens Tag Cloud */}
-        <View style={styles.allergensSection}>
-          {hasAllergie ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.allergenChipsScroll}
-            >
-              {allergie.map((code) => {
-                const info = TRANSLATED_ALLERGENS[code] || {
-                  it: code.replace(/_/g, ' '),
-                  en: code.replace(/_/g, ' '),
-                  emoji: '⚠️',
-                };
-                const intensity = allergyIntensities[code];
-                const isSevere = intensity === 'grave';
+                  return (
+                    <Pressable
+                      key={codeKey}
+                      onPress={handleOpenAllergies}
+                      style={({ pressed }) => [
+                        styles.allergenOrbItem,
+                        pressed && styles.buttonPressed,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${name} (${sev.label})`}
+                    >
+                      {/* CERCHIO CON IL COLORE DELLA GRAVITÀ CHE RACCHIUDE IL LOGO/EMOJI */}
+                      <View
+                        style={[
+                          styles.allergenCircleOrb,
+                          {
+                            borderColor: sev.border,
+                            backgroundColor: sev.circleBg,
+                            shadowColor: sev.glowColor,
+                          },
+                        ]}
+                      >
+                        <Text style={styles.allergenCircleEmoji}>{emoji}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
 
-                return (
-                  <Pressable
-                    key={code}
-                    onPress={handleOpenAllergyManager}
-                    style={({ pressed }) => [
-                      styles.allergenChip,
-                      isSevere && styles.severeChip,
-                      pressed && styles.pressed,
+                {/* Pulsante rapido gestione allergie */}
+                <Pressable
+                  onPress={handleOpenAllergies}
+                  style={({ pressed }) => [
+                    styles.allergenOrbItem,
+                    pressed && styles.buttonPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={isIt ? 'Gestisci allergie' : 'Manage allergies'}
+                >
+                  <View
+                    style={[
+                      styles.manageCircleOrb,
+                      isDark && styles.manageCircleOrbDark,
                     ]}
                   >
-                    <AppText style={styles.allergenEmoji}>{info.emoji}</AppText>
-                    <AppText style={[styles.allergenName, isSevere && styles.severeText]} numberOfLines={1}>
-                      {isIt ? info.it : info.en}
-                    </AppText>
-                    {isSevere ? (
-                      <View style={styles.severeBadge}>
-                        <AppText style={styles.severeBadgeText}>
-                          {isIt ? 'Grave' : 'Severe'}
-                        </AppText>
-                      </View>
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-
+                    <Ionicons
+                      name="options-outline"
+                      size={16}
+                      color={isDark ? '#FFFFFF' : '#23212C'}
+                    />
+                  </View>
+                </Pressable>
+              </ScrollView>
+            ) : (
               <Pressable
-                onPress={handleOpenAllergyManager}
-                style={({ pressed }) => [styles.addChip, pressed && styles.pressed]}
+                onPress={handleOpenAllergies}
+                style={({ pressed }) => [
+                  styles.emptyAllergensPill,
+                  isDark && styles.emptyAllergensPillDark,
+                  pressed && styles.buttonPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={isIt ? 'Configura allergie' : 'Configure allergies'}
               >
-                <Ionicons name="add" size={14} color="#6366F1" />
-                <AppText style={styles.addChipText}>{isIt ? 'Modifica' : 'Edit'}</AppText>
+                <Text style={styles.emptyAllergenEmoji}>🛡️</Text>
+                <Text
+                  style={[
+                    styles.emptyAllergenText,
+                    isDark && styles.emptyAllergenTextDark,
+                  ]}
+                >
+                  {isIt ? 'Tocca per impostare le allergie del profilo' : 'Tap to configure profile allergies'}
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(35, 33, 44, 0.70)'}
+                />
               </Pressable>
-            </ScrollView>
-          ) : (
-            <Pressable
-              onPress={handleOpenAllergyManager}
-              style={({ pressed }) => [styles.emptyAllergensBanner, pressed && styles.pressed]}
-            >
-              <Ionicons name="shield-checkmark-outline" size={18} color="#6366F1" />
-              <AppText style={styles.emptyAllergensText}>
-                {isIt
-                  ? 'Configura le tue allergie per attivare il semaforo sicuro'
-                  : 'Configure your allergies to activate safe traffic lights'}
-              </AppText>
-              <Ionicons name="chevron-forward" size={14} color="#6366F1" />
-            </Pressable>
-          )}
-        </View>
-
-        {/* Bottom Quick Tools Bar */}
-        <View style={styles.toolsBar}>
-          <Pressable
-            onPress={handleOpenChefPass}
-            style={({ pressed }) => [styles.toolButton, styles.chefPassBtn, pressed && styles.pressed]}
-          >
-            <LinearGradient
-              colors={['#4F46E5', '#7C3AED']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.chefPassGradient}
-            >
-              <Ionicons name="card" size={16} color="#FFFFFF" />
-              <AppText style={styles.chefPassText}>
-                {isIt ? 'Chef Pass 🪪' : 'Chef Pass 🪪'}
-              </AppText>
-              <View style={styles.langPill}>
-                <AppText style={styles.langPillText}>5 LINGUE</AppText>
-              </View>
-            </LinearGradient>
-          </Pressable>
-
-          <Pressable
-            onPress={handleOpenDossier}
-            style={({ pressed }) => [styles.toolButton, styles.secondaryToolBtn, pressed && styles.pressed]}
-          >
-            <Ionicons name="document-text-outline" size={15} color="#4B5563" />
-            <AppText style={styles.secondaryToolText}>
-              {isIt ? 'Referti AI' : 'Medical PDF'}
-            </AppText>
-          </Pressable>
-
-          <Pressable
-            onPress={handleOpenEmergency}
-            style={({ pressed }) => [styles.toolButton, styles.sosToolBtn, pressed && styles.pressed]}
-          >
-            <Ionicons name="medical" size={14} color="#EF4444" />
-            <AppText style={styles.sosToolText}>SOS</AppText>
-          </Pressable>
-        </View>
-      </LinearGradient>
+            )}
+          </View>
+        </Animated.View>
+      </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: 14,
+  heroContainer: {
+    marginHorizontal: -spacing.lg,
+    marginTop: 0,
+    marginBottom: 16,
   },
-  card: {
-    borderRadius: 20,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#E8E2F2',
-    shadowColor: '#23212C',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  profileSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  avatarWrapper: {
-    position: 'relative',
-  },
-  activeDotBadge: {
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#10B981',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  profileTextInfo: {
-    justifyContent: 'center',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  profileName: {
-    fontSize: 16,
-    lineHeight: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  profileSubtitle: {
-    fontSize: 11,
-    lineHeight: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  shieldStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  shieldActive: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
-  },
-  shieldSetup: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FDE68A',
-  },
-  pulseDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  pulseGreen: {
-    backgroundColor: '#10B981',
-  },
-  pulseAmber: {
-    backgroundColor: '#F59E0B',
-  },
-  shieldStatusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  textGreen: {
-    color: '#065F46',
-  },
-  textAmber: {
-    color: '#92400E',
-  },
-  allergensSection: {
-    marginBottom: 12,
-  },
-  allergenChipsScroll: {
-    gap: 6,
-    paddingRight: 4,
-  },
-  allergenChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#F3F0FA',
-    borderWidth: 1,
-    borderColor: '#E3DCF2',
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-  },
-  severeChip: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FCA5A5',
-  },
-  allergenEmoji: {
-    fontSize: 13,
-  },
-  allergenName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  severeText: {
-    color: '#991B1B',
-  },
-  severeBadge: {
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  severeBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  addChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#EEF2FF',
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-  },
-  addChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4F46E5',
-  },
-  emptyAllergensBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
-  },
-  emptyAllergensText: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 16,
-    color: '#3730A3',
-    fontWeight: '500',
-  },
-  toolsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F0FA',
-  },
-  toolButton: {
-    borderRadius: 12,
+  heroCard: {
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    paddingHorizontal: 18,
+    paddingBottom: 22,
     overflow: 'hidden',
   },
-  chefPassBtn: {
-    flex: 1.4,
+  profilePressable: {
+    width: '100%',
+    marginBottom: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 0,
+    backgroundColor: 'transparent',
   },
-  chefPassGradient: {
+  profileRow: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  avatarContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1.5,
+    borderColor: 'rgba(35, 33, 44, 0.25)',
+    overflow: 'hidden',
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    paddingHorizontal: 10,
+    backgroundColor: 'transparent',
+    flexShrink: 0,
   },
-  chefPassText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  avatarMatteoImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
-  langPill: {
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 6,
+  avatarEmojiText: {
+    fontSize: 26,
   },
-  langPillText: {
-    fontSize: 8.5,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.4,
-  },
-  secondaryToolBtn: {
+  greetingTextBox: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginLeft: 12,
     justifyContent: 'center',
-    gap: 5,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingVertical: 9,
-    paddingHorizontal: 8,
   },
-  secondaryToolText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  sosToolBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-  },
-  sosToolText: {
-    fontSize: 12,
+  greetingTitle: {
+    fontFamily: font.displayBold,
+    fontSize: 24,
+    lineHeight: 28,
+    letterSpacing: -0.4,
+    color: '#23212C',
     fontWeight: '800',
-    color: '#DC2626',
   },
-  pressed: {
-    opacity: 0.8,
+  greetingSubtitleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(35, 33, 44, 0.08)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(35, 33, 44, 0.30)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    marginTop: 4,
+  },
+  greetingSubtitle: {
+    fontFamily: font.semibold,
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#23212C',
+    fontWeight: '700',
+  },
+  profileSwitchIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(35, 33, 44, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(35, 33, 44, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+  },
+  allergensContainer: {
+    width: '100%',
+    marginTop: 4,
+  },
+  allergensScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingVertical: 2,
+    paddingRight: 10,
+  },
+  allergenOrbItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  allergenCircleOrb: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  allergenCircleEmoji: {
+    fontSize: 18,
+  },
+  manageCircleOrb: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1.4,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(35, 33, 44, 0.50)',
+    backgroundColor: 'rgba(35, 33, 44, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyAllergensPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.70)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(35, 33, 44, 0.25)',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
+    width: '100%',
+  },
+  emptyAllergenEmoji: {
+    fontSize: 18,
+  },
+  emptyAllergenText: {
+    fontFamily: font.semibold,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#23212C',
+    flex: 1,
+  },
+  greetingTitleDark: {
+    color: '#FFFFFF',
+  },
+  greetingSubtitleBadgeDark: {
+    backgroundColor: 'rgba(241, 254, 200, 0.15)',
+    borderColor: 'rgba(241, 254, 200, 0.35)',
+  },
+  greetingSubtitleDark: {
+    color: '#F1FEC8',
+  },
+  avatarContainerDark: {
+    borderColor: 'rgba(241, 254, 200, 0.45)',
+    backgroundColor: 'transparent',
+  },
+  profileSwitchIconBoxDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    borderColor: 'rgba(255, 255, 255, 0.20)',
+  },
+  manageCircleOrbDark: {
+    borderColor: 'rgba(241, 254, 200, 0.60)',
+    backgroundColor: 'rgba(241, 254, 200, 0.12)',
+  },
+  emptyAllergensPillDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.20)',
+  },
+  emptyAllergenTextDark: {
+    color: '#FFFFFF',
+  },
+  buttonPressed: {
+    opacity: 0.82,
     transform: [{ scale: 0.98 }],
   },
 });

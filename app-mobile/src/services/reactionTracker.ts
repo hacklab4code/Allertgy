@@ -15,13 +15,20 @@ export interface ReactionEntry {
   notes?: string;
 }
 
-export const SYMPTOM_DEFINITIONS = [
-  { id: 'orticaria', label: 'Orticaria / Pomfi', emoji: '🔴' },
-  { id: 'prurito', label: 'Prurito diffuso', emoji: '🖐️' },
-  { id: 'gonfiore', label: 'Gonfiore labbra / viso', emoji: '👄' },
-  { id: 'asma', label: 'Difficoltà a respirare / Asma', emoji: '🫁' },
-  { id: 'dolore_addominale', label: 'Dolori addominali / Nausea', emoji: '🤢' },
-  { id: 'vertigini', label: 'Capogiri / Vertigini', emoji: '💫' },
+export interface SymptomDefinition {
+  id: string;
+  label: string;
+  icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap;
+  emoji?: string;
+}
+
+export const SYMPTOM_DEFINITIONS: SymptomDefinition[] = [
+  { id: 'orticaria', label: 'Orticaria / Pomfi', icon: 'bandage-outline', emoji: '🔴' },
+  { id: 'prurito', label: 'Prurito diffuso', icon: 'hand-left-outline', emoji: '🖐️' },
+  { id: 'gonfiore', label: 'Gonfiore viso / labbra', icon: 'water-outline', emoji: '👄' },
+  { id: 'asma', label: 'Difficoltà a respirare / Asma', icon: 'fitness-outline', emoji: '🫁' },
+  { id: 'dolore_addominale', label: 'Dolori addominali / Nausea', icon: 'pulse-outline', emoji: '🤢' },
+  { id: 'vertigini', label: 'Capogiri / Vertigini', icon: 'refresh-outline', emoji: '💫' },
 ];
 
 export async function loadReactions(): Promise<ReactionEntry[]> {

@@ -5,7 +5,9 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,8 +17,6 @@ import { useSession } from '../src/store/session';
 import { getSectionTitle, groupAllergensBySection, getLang, TRANSLATED_ALLERGENS } from '../src/engine/translations';
 import { toggleAllergieSelectionWithIntensities, expandAllergieCodes } from '../src/engine/allergyLinks';
 import {
-  criterioShortLabel,
-  intensityShortLabel,
   promptAllergyConfig,
 } from '../src/engine/allergyConfig';
 import type { Allergen, AllergyCriterio, AllergyIntensity } from '../src/types';
@@ -25,15 +25,15 @@ import { useTranslation } from '../src/constants/translations';
 import {
   AppText,
   DebossedInput,
-  GlassCard,
   GlassScreenScroll,
   SurfaceButton,
   Screen,
+  ScreenTopHeader,
   Section,
   AllergyChip,
   AllergyConfigModal,
 } from '../src/components/ui';
-import { colors, spacing, CHIP_MIN_HEIGHT, radius } from '../src/theme';
+import { colors, spacing, radius, softShadow } from '../src/theme';
 import { useAdaptiveMeshInk } from '../src/hooks/useMeshInk';
 
 export default function RegisterAllergiesScreen() {
@@ -50,6 +50,7 @@ export default function RegisterAllergiesScreen() {
   const [intensities, setIntensities] = useState<Record<string, AllergyIntensity>>({});
   const [criteria, setCriteria] = useState<Record<string, AllergyCriterio>>({});
   const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [aiNote, setAiNote] = useState('');
@@ -64,8 +65,34 @@ export default function RegisterAllergiesScreen() {
     api.allergens().then(setAll).catch((e) => setError(e.message));
   }, [token]);
 
+  // Categories for quick filter tabs
+  const categoryTabs = useMemo(() => [
+    { key: 'all', label: isIt ? 'Tutti gli allergeni' : 'All allergens' },
+    { key: 'ue14', label: isIt ? 'I 14 Allergeni UE' : '14 EU Allergens' },
+    { key: 'frutta_secca', label: isIt ? 'Frutta a guscio' : 'Nuts & Seeds' },
+    { key: 'glutine_cereali', label: isIt ? 'Cereali & Glutine' : 'Gluten & Grains' },
+    { key: 'latticini_uova', label: isIt ? 'Latticini & Uova' : 'Dairy & Eggs' },
+    { key: 'pesce_crostacei', label: isIt ? 'Pesce & Mare' : 'Fish & Seafood' },
+  ], [isIt]);
+
   const sections = useMemo(() => {
-    const base = groupAllergensBySection(all);
+    let base = groupAllergensBySection(all);
+
+    // Filter by quick category tab
+    if (selectedCategory === 'ue14') {
+      const ueCodes = new Set([
+        'glutine', 'crostacei', 'uova', 'pesce', 'arachidi', 'soia', 'latte',
+        'frutta_guscio', 'sedano', 'senape', 'sesamo', 'solfiti', 'lupini', 'molluschi'
+      ]);
+      base = base.map((s) => ({
+        ...s,
+        items: s.items.filter((a) => ueCodes.has(a.code.toLowerCase())),
+      })).filter((s) => s.items.length > 0);
+    } else if (selectedCategory !== 'all') {
+      base = base.filter((s) => s.key === selectedCategory);
+    }
+
+    // Filter by search query
     if (!search.trim()) return base;
     const q = search.toLowerCase().trim();
     return base
@@ -79,7 +106,7 @@ export default function RegisterAllergiesScreen() {
         ),
       }))
       .filter((s) => s.items.length > 0);
-  }, [all, search]);
+  }, [all, search, selectedCategory]);
 
   const totalFiltered = useMemo(
     () => sections.reduce((acc, s) => acc + s.items.length, 0),
@@ -109,31 +136,6 @@ export default function RegisterAllergiesScreen() {
     });
   };
 
-  const updateIntensity = (code: string, level: AllergyIntensity) => {
-    const next = new Set(selected);
-    next.add(code);
-    setSelected(next);
-    setIntensities((prev) => ({ ...prev, [code]: level }));
-    setCriteria((prev) => ({ ...prev, [code]: prev[code] || 'assoluto' }));
-  };
-
-  const updateCriterio = (code: string, criterio: AllergyCriterio) => {
-    const next = new Set(selected);
-    next.add(code);
-    setSelected(next);
-    setCriteria((prev) => ({ ...prev, [code]: criterio }));
-    setIntensities((prev) => ({ ...prev, [code]: prev[code] || 'moderata' }));
-  };
-
-  const onLongPress = (code: string, name: string) => {
-    promptAllergyConfig({
-      name,
-      isIt,
-      onIntensity: (level) => updateIntensity(code, level),
-      onCriterio: (criterio) => updateCriterio(code, criterio),
-    });
-  };
-
   const applyExtractedCodes = (codes: string[], note?: string) => {
     if (codes.length === 0) return;
     const expanded = expandAllergieCodes(codes);
@@ -159,8 +161,8 @@ export default function RegisterAllergiesScreen() {
     setAiNote(
       note
         || (isIt
-          ? `Aggiunti ${expanded.length} allergeni dal referto (inclusi correlati). Verifica la selezione.`
-          : `${expanded.length} allergens added from report (including related ones). Please verify your selection.`),
+          ? `Aggiunti ${expanded.length} allergeni dal referto con correlazioni cliniche. Verifica la selezione.`
+          : `${expanded.length} allergens added from report with clinical correlations.`),
     );
   };
 
@@ -191,8 +193,8 @@ export default function RegisterAllergiesScreen() {
           isIt ? 'Nessun allergene rilevato' : 'No allergens detected',
           res.note
             || (isIt
-              ? 'Non abbiamo trovato allergeni nel documento. Puoi selezionarli manualmente.'
-              : 'We could not find allergens in the document. You can select them manually.'),
+              ? 'Non abbiamo trovato allergeni nel documento. Puoi selezionarli comodamente a mano qui sotto.'
+              : 'We could not find allergens in the document. You can select them manually below.'),
         );
       } else {
         applyExtractedCodes(codes, res.note);
@@ -221,76 +223,132 @@ export default function RegisterAllergiesScreen() {
 
   const finishLabel = selected.size === 0
     ? (isIt ? 'Continua senza allergie' : 'Continue without allergies')
-    : (isIt ? `Continua (${selected.size} allergie)` : `Continue (${selected.size} allergies)`);
+    : (isIt ? `Continua (${selected.size} allergie selezionate)` : `Continue (${selected.size} selected)`);
 
   return (
-    <Screen edges={false} ambient>
-      <Stack.Screen
-        options={{
-          title: isIt ? 'Le tue allergie' : 'Your allergies',
-          headerBackVisible: false,
-          headerRight: () => <LanguageFlagsRow inHeader />,
-        }}
+    <Screen edges={false} ambient style={styles.screen}>
+      <ScreenTopHeader
+        title={isIt ? 'Le tue allergie' : 'Your allergies'}
+        showBack={false}
+        rightElement={<LanguageFlagsRow inHeader />}
       />
 
       <GlassScreenScroll
         headerFloat={false}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
+        {/* Progress Bar Header */}
+        <View style={styles.progressContainer}>
+          <View style={styles.progressRow}>
+            <View style={styles.stepBadge}>
+              <Ionicons name="sparkles-outline" size={13} color={colors.brand} />
+              <AppText variant="caption" color={colors.brand} style={styles.stepBadgeText}>
+                {isIt ? 'PASSO 2 DI 2 · ALLERGENI' : 'STEP 2 OF 2 · ALLERGENS'}
+              </AppText>
+            </View>
+            <AppText variant="caption" color={colors.brand} style={styles.progressPercent}>
+              100%
+            </AppText>
+          </View>
+
+          <View style={styles.progressBarTrack}>
+            <View style={styles.progressBarFill} />
+          </View>
+        </View>
+
+        {/* Intro */}
         <View ref={introRef} onLayout={onIntroLayout} style={styles.introBlock}>
-          <AppText variant="h2" color={introInk.ink} style={styles.step}>
-            {isIt ? 'Passo 2 di 2' : 'Step 2 of 2'}
+          <AppText variant="h1" color={introInk.ink} style={styles.mainHeading}>
+            {isIt ? 'Configura il tuo profilo' : 'Configure your profile'}
           </AppText>
-          <AppText variant="subtitle" color={introInk.inkMuted} style={styles.intro}>
+          <AppText variant="subtitle" color={introInk.inkMuted} style={styles.introSubtitle}>
             {isIt
-              ? 'Carica un referto per compilare in automatico, oppure cerca e seleziona le tue allergie.'
-              : 'Upload a medical report for automatic filling, or search and select your allergies.'}
+              ? 'Carica il tuo referto medico per l\'auto-compilazione istantanea con AI, oppure seleziona le tue intolleranze ed allergie.'
+              : 'Upload your medical report for instant AI auto-fill, or select your allergies and intolerances.'}
           </AppText>
         </View>
 
-        <GlassCard style={styles.uploadCard}>
-          <View style={styles.uploadIcon}>
-            <Ionicons name="document-text" size={28} color={colors.brand} />
+        {/* AI Medical Report Hero Card */}
+        <View style={[styles.uploadCard, softShadow(6)]}>
+          <View style={styles.uploadHeaderRow}>
+            <View style={styles.uploadIconCircle}>
+              <Ionicons name="cloud-upload-outline" size={24} color={colors.brand} />
+            </View>
+            <View style={styles.uploadTitleGroup}>
+              <View style={styles.uploadBadgeRow}>
+                <AppText variant="title" style={styles.uploadCardTitle}>
+                  {isIt ? 'Referto con AI' : 'Medical Report AI'}
+                </AppText>
+                <View style={styles.aiPillBadge}>
+                  <Ionicons name="sparkles-outline" size={11} color={colors.brand} />
+                  <AppText variant="caption" color={colors.brand} style={styles.aiPillText}>
+                    {isIt ? 'Automatico' : 'Instant AI'}
+                  </AppText>
+                </View>
+              </View>
+              <AppText variant="caption" color={colors.onSurfaceMuted} style={styles.uploadSub}>
+                {isIt
+                  ? 'Foto o PDF del referto: l\'AI legge e compila le tue allergie in 3 secondi.'
+                  : 'Photo or PDF report: AI parses and selects your allergens automatically.'}
+              </AppText>
+            </View>
           </View>
-          <AppText variant="title">
-            {isIt ? 'Carica referto allergologico' : 'Upload allergy report'}
-          </AppText>
-          <AppText variant="caption" color={colors.onSurfaceMuted} style={styles.uploadSub}>
-            {isIt
-              ? 'PDF o foto: l\'AI legge il documento e seleziona le allergie per te in automatico.'
-              : 'PDF or photo: AI reads the document and selects allergies for you automatically.'}
-          </AppText>
+
           <SurfaceButton
             label={uploading
-              ? (isIt ? 'Analisi in corso…' : 'Analyzing…')
-              : (isIt ? 'Carica e analizza' : 'Upload & analyze')}
+              ? (isIt ? 'Analisi referto in corso…' : 'Analyzing report…')
+              : (isIt ? 'Carica referto (PDF o Foto)' : 'Upload report (PDF / Photo)')}
             onPress={pickAndAnalyze}
             disabled={uploading || busy}
             loading={uploading}
             icon="cloud-upload-outline"
-            variant="secondary"
+            variant="soft"
           />
-        </GlassCard>
+        </View>
 
         {aiNote ? (
           <View style={styles.aiBanner}>
-            <Ionicons name="sparkles" size={18} color={colors.brand} />
-            <AppText variant="caption" style={{ flex: 1 }}>{aiNote}</AppText>
+            <Ionicons name="sparkles-outline" size={18} color={colors.brand} />
+            <AppText variant="caption" color={colors.brandDarker} style={{ flex: 1, lineHeight: 17 }}>
+              {aiNote}
+            </AppText>
           </View>
         ) : null}
 
-        {error ? <AppText variant="caption" color={colors.red}>{error}</AppText> : null}
-        {all.length === 0 && !error ? <ActivityIndicator color={colors.brand} style={{ marginTop: 24 }} /> : null}
+        {error ? (
+          <View style={styles.errorBanner}>
+            <Ionicons name="alert-circle-outline" size={18} color={colors.red} />
+            <AppText variant="caption" color={colors.red} style={{ flex: 1 }}>
+              {error}
+            </AppText>
+          </View>
+        ) : null}
+
+        {all.length === 0 && !error ? (
+          <ActivityIndicator color={colors.brand} style={{ marginTop: 24 }} />
+        ) : null}
 
         {all.length > 0 ? (
           <>
-            <Section
-              title={isIt ? 'Cerca e seleziona' : 'Search & select'}
-              subtitle={isIt
-                ? 'Tocca una pillola per selezionarla. Tieni premuta per personalizzare l\'intensità.'
-                : 'Tap a chip to select. Press & hold to customize severity.'}
-            >
+            {/* Search Bar */}
+            <View style={styles.searchSection}>
+              <View style={styles.searchHeader}>
+                <Ionicons name="search-outline" size={15} color={colors.brand} />
+                <AppText variant="caption" style={styles.searchTitle}>
+                  {isIt ? 'Cerca o filtra per categoria' : 'Search or filter by category'}
+                </AppText>
+                {selected.size > 0 && (
+                  <View style={styles.selectedCountBadge}>
+                    <Ionicons name="checkmark-circle-outline" size={13} color={colors.brand} />
+                    <AppText variant="caption" color={colors.brand} style={{ fontWeight: '800', fontSize: 11 }}>
+                      {selected.size} {isIt ? 'selezionati' : 'selected'}
+                    </AppText>
+                  </View>
+                )}
+              </View>
+
               <DebossedInput
                 value={search}
                 onChangeText={setSearch}
@@ -298,16 +356,43 @@ export default function RegisterAllergiesScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="search"
+                rightIcon={
+                  search ? (
+                    <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <Ionicons name="close-outline" size={18} color={colors.onSurfaceMuted} />
+                    </TouchableOpacity>
+                  ) : undefined
+                }
               />
-              {search.trim() !== '' && (
-                <AppText variant="caption" color={colors.onSurfaceMuted} style={{ marginTop: 4 }}>
-                  {totalFiltered > 0
-                    ? (isIt ? `${totalFiltered} trovati` : `${totalFiltered} found`)
-                    : (isIt ? 'Nessun risultato' : 'No results')}
-                </AppText>
-              )}
-            </Section>
+            </View>
 
+            {/* Category Quick Filter Pills */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryScroll}
+            >
+              {categoryTabs.map((cat) => {
+                const active = selectedCategory === cat.key;
+                return (
+                  <TouchableOpacity
+                    key={cat.key}
+                    onPress={() => setSelectedCategory(cat.key)}
+                    style={[styles.catPill, active && styles.catPillActive]}
+                  >
+                    <AppText
+                      variant="caption"
+                      color={active ? colors.brand : colors.onSurfaceMuted}
+                      style={[styles.catPillText, active && styles.catPillTextActive]}
+                    >
+                      {cat.label}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Results */}
             {sections.map((section) => (
               <Section key={section.key} title={getSectionTitle(section.key, lang)} card={false}>
                 <View style={styles.grid}>
@@ -326,21 +411,33 @@ export default function RegisterAllergiesScreen() {
                 </View>
               </Section>
             ))}
+
+            {sections.length === 0 && search.trim() !== '' && (
+              <View style={styles.emptyResults}>
+                <Ionicons name="search-outline" size={32} color={colors.onSurfaceMuted} />
+                <AppText variant="body" color={colors.onSurfaceMuted}>
+                  {isIt ? 'Nessun allergene trovato per questa ricerca' : 'No allergens found for this query'}
+                </AppText>
+              </View>
+            )}
           </>
         ) : null}
 
         <View style={{ height: 100 + insets.bottom }} />
       </GlassScreenScroll>
 
+      {/* Sticky Bottom Action Bar */}
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
         <SurfaceButton
-          label={busy ? (isIt ? 'Salvataggio…' : 'Saving…') : finishLabel}
+          label={busy ? (isIt ? 'Salvataggio profilo…' : 'Saving profile…') : finishLabel}
           onPress={finish}
           disabled={busy || uploading || (all.length === 0 && !error)}
+          icon="arrow-forward-outline"
           fullWidth
         />
       </View>
 
+      {/* Severity & Criteria Modal */}
       {configModalTarget && (
         <AllergyConfigModal
           visible={Boolean(configModalTarget)}
@@ -350,7 +447,7 @@ export default function RegisterAllergiesScreen() {
           isDiet={Boolean(configModalTarget.is_diet)}
           intensity={intensities[configModalTarget.code] || 'moderata'}
           criterio={criteria[configModalTarget.code] || 'assoluto'}
-          onSave={(intensity, criterio) => {
+          onSave={(intensity: AllergyIntensity, criterio: AllergyCriterio) => {
             if (!selected.has(configModalTarget.code)) {
               const next = new Set(selected);
               next.add(configModalTarget.code);
@@ -367,19 +464,124 @@ export default function RegisterAllergiesScreen() {
 }
 
 const styles = StyleSheet.create({
-  introBlock: { gap: 6, marginBottom: spacing.md },
-  step: { marginBottom: 2 },
-  intro: { marginBottom: spacing.sm },
-  uploadCard: { gap: spacing.sm, marginBottom: spacing.md },
-  uploadIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  screen: { flex: 1, backgroundColor: colors.surface },
+  scrollContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xl,
+  },
+  progressContainer: {
+    marginBottom: spacing.md,
+    gap: 6,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  stepBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.brand50,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.brand100,
+  },
+  stepBadgeText: {
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    fontSize: 10,
+  },
+  progressPercent: {
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  progressBarTrack: {
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.brand,
+    borderRadius: 2,
+  },
+  introBlock: {
+    gap: 6,
+    marginBottom: spacing.md,
+  },
+  mainHeading: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  introSubtitle: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  uploadCard: {
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  uploadHeaderRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+  },
+  uploadIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.brand50,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.brand100,
   },
-  uploadSub: { marginBottom: 4 },
+  uploadTitleGroup: {
+    flex: 1,
+    gap: 2,
+  },
+  uploadBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  uploadCardTitle: {
+    fontWeight: '800',
+    fontSize: 15,
+  },
+  aiPillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.brand50,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.brand100,
+  },
+  aiPillText: {
+    fontWeight: '800',
+    fontSize: 9,
+    letterSpacing: 0.3,
+  },
+  uploadSub: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
   aiBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -388,57 +590,81 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: 12,
     marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.brand100,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.redSoft ?? '#fee2e2',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.red,
+  },
+  searchSection: {
+    gap: 6,
+    marginBottom: spacing.sm,
+  },
+  searchHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  searchTitle: {
+    fontWeight: '700',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    flex: 1,
+  },
+  selectedCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.brand50,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.brand100,
+  },
+  categoryScroll: {
+    gap: 8,
+    paddingBottom: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  catPill: {
+    backgroundColor: colors.surfaceSecondary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  catPillActive: {
+    backgroundColor: colors.brand50,
+    borderColor: colors.brand,
+  },
+  catPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  catPillTextActive: {
+    fontWeight: '800',
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    borderRadius: radius.pill,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    minHeight: CHIP_MIN_HEIGHT,
+  emptyResults: {
+    alignItems: 'center',
     justifyContent: 'center',
-  },
-  chipOnLieve: {
-    borderColor: colors.yellow,
-    backgroundColor: colors.yellowSoft,
-  },
-  chipTextOnLieve: {
-    color: colors.onYellow,
-    fontWeight: '700',
-  },
-  chipOnModerata: {
-    borderColor: colors.amber,
-    backgroundColor: colors.amberBg,
-  },
-  chipTextOnModerata: {
-    color: colors.onYellow,
-    fontWeight: '700',
-  },
-  chipOnGrave: {
-    borderColor: colors.redBorder,
-    backgroundColor: colors.redSoft,
-  },
-  chipTextOnGrave: {
-    color: colors.onRed,
-    fontWeight: '700',
-  },
-  chipOnDiet: {
-    borderColor: colors.greenBorder,
-    backgroundColor: colors.greenSoft,
-  },
-  chipTextOnDiet: {
-    color: colors.onGreen,
-    fontWeight: '700',
-  },
-  chipText: {
-    color: colors.brandInk,
-    fontWeight: '500',
+    paddingVertical: spacing.xl,
+    gap: 8,
   },
   footer: {
     position: 'absolute',
@@ -447,8 +673,8 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderTopWidth: StyleSheet.hairlineWidth,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
     borderTopColor: colors.border,
   },
 });

@@ -87,28 +87,28 @@ export function getSemaforo(dish: DemoDish, selected: Set<string>): SemaforoResu
       stato: "rosso",
       match: cont,
       label: "NON IDONEO",
-      card: "border-[#FCA5A5] bg-[#FEE2E2]",
+      card: "border-[#FECACA] bg-[#FEF2F2]",
       text: "text-[#991B1B]",
-      dot: "bg-[#DC2626]",
-      badge: "bg-[#DC2626] text-white",
+      dot: "bg-[#EF4444]",
+      badge: "bg-[#EF4444] text-white",
     };
   if (trac.length > 0)
     return {
       stato: "giallo",
       match: trac,
-      label: "CON ATTENZIONE",
-      card: "border-[#FDE047] bg-[#FEF9C3]",
-      text: "text-[#854D0E]",
-      dot: "bg-[#EAB308]",
-      badge: "bg-[#EAB308] text-[#1C221F]",
+      label: "ATTENZIONE",
+      card: "border-[#FDE68A] bg-[#FFFBEB]",
+      text: "text-[#92400E]",
+      dot: "bg-[#F59E0B]",
+      badge: "bg-[#F59E0B] text-white",
     };
   return {
     stato: "verde",
     match: [],
     label: "IDONEO",
-    card: "border-[#86EFAC] bg-[#DCFCE7]",
-    text: "text-[#166534]",
-    dot: "bg-[#16A34A]",
-    badge: "bg-[#16A34A] text-white",
+    card: "border-[#A7F3D0] bg-[#ECFDF5]",
+    text: "text-[#065F46]",
+    dot: "bg-[#10B981]",
+    badge: "bg-[#10B981] text-white",
   };
 }

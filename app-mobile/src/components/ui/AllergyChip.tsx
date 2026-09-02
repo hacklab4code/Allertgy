@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { font } from '../../theme';
+import { colors, font } from '../../theme';
 import type { Allergen, AllergyCriterio, AllergyIntensity } from '../../types';
 import { TRANSLATED_ALLERGENS } from '../../engine/translations';
 
@@ -15,6 +15,17 @@ export const CATEGORY_ICONS: Record<string, string> = {
   spezie: '🧂',
   intolleranze: '🥛',
   preferenze: '🌱',
+};
+
+export const CATEGORY_OUTLINE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  ue: 'shield-checkmark-outline',
+  frutta_guscio: 'nutrition-outline',
+  frutta: 'leaf-outline',
+  verdura: 'flower-outline',
+  cereali: 'restaurant-outline',
+  spezie: 'flame-outline',
+  intolleranze: 'water-outline',
+  preferenze: 'heart-outline',
 };
 
 interface AllergyChipProps {
@@ -59,144 +70,280 @@ export function AllergyChip({
     onConfigure();
   };
 
+  const cardStyle = [
+    styles.cardBase,
+    selected
+      ? isDiet
+        ? styles.cardDiet
+        : intensity === 'lieve'
+          ? styles.cardLieve
+          : intensity === 'grave'
+            ? styles.cardGrave
+            : styles.cardMod
+      : styles.cardUnselected,
+  ];
+
   const emojiWrapStyle = [
     styles.emojiWrapBase,
     selected
       ? isDiet
         ? styles.emojiWrapDiet
         : intensity === 'lieve'
-        ? styles.emojiWrapLieve
-        : intensity === 'grave'
-        ? styles.emojiWrapGrave
-        : styles.emojiWrapMod
+          ? styles.emojiWrapLieve
+          : intensity === 'grave'
+            ? styles.emojiWrapGrave
+            : styles.emojiWrapMod
       : styles.emojiWrapUnselected,
   ];
 
   const badgeStyle = isDiet
     ? styles.badgeDiet
     : intensity === 'lieve'
-    ? styles.badgeLieve
-    : intensity === 'grave'
-    ? styles.badgeGrave
-    : styles.badgeMod;
+      ? styles.badgeLieve
+      : intensity === 'grave'
+        ? styles.badgeGrave
+        : styles.badgeMod;
 
-  const badgeIconColor = intensity === 'lieve' ? '#2A2452' : '#FFFFFF';
+  const severityLabel = isDiet
+    ? (isIt ? 'Dieta' : 'Diet')
+    : intensity === 'grave'
+      ? (isIt ? 'Grave' : 'Severe')
+      : intensity === 'lieve'
+        ? (isIt ? 'Lieve' : 'Mild')
+        : (isIt ? 'Media' : 'Moderate');
+
+  const severityTagStyle = isDiet
+    ? styles.tagDiet
+    : intensity === 'grave'
+      ? styles.tagGrave
+      : intensity === 'lieve'
+        ? styles.tagLieve
+        : styles.tagMod;
+
+  const severityTextTagStyle = isDiet
+    ? styles.tagTextDiet
+    : intensity === 'grave'
+      ? styles.tagTextGrave
+      : intensity === 'lieve'
+        ? styles.tagTextLieve
+        : styles.tagTextMod;
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.chipContainer, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.chipWrapper, pressed && styles.pressed]}
       onPress={handlePress}
       onLongPress={handleLongPress}
-      delayLongPress={260}
+      delayLongPress={280}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
-      accessibilityLabel={`${displayName}, ${selected ? 'Selezionato' : 'Non selezionato'}`}
+      accessibilityLabel={`${displayName}, ${selected ? `Selezionato (${severityLabel})` : 'Non selezionato'}`}
     >
-      <View style={emojiWrapStyle}>
-        <Text style={styles.chipEmoji}>{resolvedEmoji}</Text>
-        {selected && (
-          <View style={[styles.badge, badgeStyle]}>
-            <Ionicons name="checkmark" size={11} color={badgeIconColor} />
+      <View style={cardStyle}>
+        {/* Top Checkmark Badge */}
+        {selected ? (
+          <View style={[styles.checkBadge, badgeStyle]}>
+            <Ionicons name="checkmark-outline" size={10} color="#FFFFFF" />
           </View>
+        ) : (
+          <View style={styles.checkBadgePlaceholder} />
+        )}
+
+        {/* Emoji Bubble */}
+        <View style={emojiWrapStyle}>
+          <Text style={styles.chipEmoji}>{resolvedEmoji}</Text>
+        </View>
+
+        {/* Label */}
+        <Text
+          style={[styles.chipLabel, selected && styles.chipLabelSelected]}
+          numberOfLines={2}
+          ellipsizeMode="tail"
+        >
+          {displayName}
+        </Text>
+
+        {/* Bottom Severity Tag */}
+        {selected ? (
+          <View style={[styles.severityTag, severityTagStyle]}>
+            <Text style={[styles.severityTagText, severityTextTagStyle]}>
+              {severityLabel}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.severityTagPlaceholder} />
         )}
       </View>
-      <Text
-        style={[styles.chipLabel, selected && styles.chipLabelSelected]}
-        numberOfLines={2}
-        ellipsizeMode="tail"
-      >
-        {displayName}
-      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  chipContainer: {
-    width: '30%',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 8,
+  chipWrapper: {
+    width: '31.3%',
   },
   pressed: {
     opacity: 0.85,
     transform: [{ scale: 0.95 }],
   },
-  emojiWrapBase: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  cardBase: {
+    width: '100%',
+    minHeight: 122,
+    borderRadius: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    paddingHorizontal: 6,
     alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
+    justifyContent: 'space-between',
     position: 'relative',
   },
-  emojiWrapUnselected: {
-    backgroundColor: 'transparent',
+  cardUnselected: {
+    backgroundColor: '#FAF9FE',
+    borderWidth: 1.2,
+    borderColor: '#EAE6F5',
   },
-  emojiWrapGrave: {
-    borderWidth: 2.5,
-    borderColor: '#E5484D',
-    backgroundColor: 'rgba(229, 72, 77, 0.12)',
+  cardGrave: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
   },
-  emojiWrapMod: {
-    borderWidth: 2.5,
-    borderColor: '#F5A524',
-    backgroundColor: 'rgba(245, 165, 36, 0.12)',
+  cardMod: {
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1.5,
+    borderColor: '#FDBA74',
   },
-  emojiWrapLieve: {
-    borderWidth: 2.5,
-    borderColor: '#F7CE45',
-    backgroundColor: 'rgba(247, 206, 69, 0.15)',
+  cardLieve: {
+    backgroundColor: '#FEFCE8',
+    borderWidth: 1.5,
+    borderColor: '#FDE047',
   },
-  emojiWrapDiet: {
-    borderWidth: 2.5,
-    borderColor: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+  cardDiet: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1.5,
+    borderColor: '#86EFAC',
   },
-  chipEmoji: {
-    fontSize: 28,
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    includeFontPadding: false,
-  },
-  badge: {
+
+  checkBadge: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    top: 6,
+    right: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#F3F1FA',
+    zIndex: 2,
+  },
+  checkBadgePlaceholder: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 16,
+    height: 16,
   },
   badgeGrave: {
-    backgroundColor: '#E5484D',
+    backgroundColor: '#EF4444',
   },
   badgeMod: {
-    backgroundColor: '#F5A524',
+    backgroundColor: '#F97316',
   },
   badgeLieve: {
-    backgroundColor: '#F7CE45',
+    backgroundColor: '#EAB308',
   },
   badgeDiet: {
     backgroundColor: '#10B981',
   },
+
+  emojiWrapBase: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginTop: 2,
+  },
+  emojiWrapUnselected: {
+    backgroundColor: '#EFEBF8',
+  },
+  emojiWrapGrave: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  },
+  emojiWrapMod: {
+    backgroundColor: 'rgba(249, 115, 22, 0.15)',
+  },
+  emojiWrapLieve: {
+    backgroundColor: 'rgba(234, 179, 8, 0.18)',
+  },
+  emojiWrapDiet: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  },
+
+  chipEmoji: {
+    fontSize: 24,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+  },
+
   chipLabel: {
-    fontSize: 13.5,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 14.5,
     fontWeight: '600',
-    color: '#2A2452',
+    color: '#4A4370',
     textAlign: 'center',
     alignSelf: 'center',
     width: '100%',
+    minHeight: 29,
+    marginTop: 3,
+    marginBottom: 3,
     includeFontPadding: false,
   },
   chipLabelSelected: {
     color: '#322A63',
-    fontWeight: '700',
+    fontWeight: '800',
     fontFamily: font.bold,
   },
+
+  severityTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  severityTagPlaceholder: {
+    height: 16,
+  },
+  tagGrave: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  },
+  tagTextGrave: {
+    color: '#991B1B',
+  },
+  tagMod: {
+    backgroundColor: 'rgba(249, 115, 22, 0.15)',
+  },
+  tagTextMod: {
+    color: '#9A3412',
+  },
+  tagLieve: {
+    backgroundColor: 'rgba(234, 179, 8, 0.2)',
+  },
+  tagTextLieve: {
+    color: '#854D0E',
+  },
+  tagDiet: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  },
+  tagTextDiet: {
+    color: '#15803D',
+  },
+  severityTagText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    fontFamily: font.bold,
+    letterSpacing: 0.2,
+    textTransform: 'uppercase',
+  },
 });
+

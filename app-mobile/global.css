@@ -2,61 +2,72 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Brand AllerTgy — lavanda + violet ink (design_guidelines.json) */
+/* Brand AllerTgy — Cosmic (#23212C) & Vanilla (#F1FEC8) (design_guidelines.json) */
 @layer base {
   :root {
-    --background: 264 63% 97%;
-    --foreground: 0 0% 10%;
+    --background: 210 40% 98%;
+    --foreground: 250 16% 15%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
+    --card-foreground: 250 16% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
-    --primary: 259 43% 25%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 258 74% 86%;
-    --secondary-foreground: 259 43% 25%;
-    --muted: 262 67% 98%;
-    --muted-foreground: 262 7% 43%;
-    --accent: 258 52% 92%;
-    --accent-foreground: 259 43% 25%;
-    --destructive: 0 91% 71%;
+    --popover-foreground: 250 16% 15%;
+    --primary: 250 16% 15%;
+    --primary-foreground: 74 97% 89%;
+    --secondary: 74 97% 89%;
+    --secondary-foreground: 250 16% 15%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 74 97% 89%;
+    --accent-foreground: 250 16% 15%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 259 52% 92%;
-    --input: 259 52% 92%;
-    --ring: 259 43% 25%;
-    --radius: 0.875rem;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 250 16% 15%;
+    --radius: 1rem;
     --chart-1: 158 64% 52%;
     --chart-2: 43 96% 56%;
-    --chart-3: 0 91% 71%;
-    --chart-4: 258 74% 86%;
-    --chart-5: 259 43% 25%;
+    --chart-3: 0 84% 60%;
+    --chart-4: 250 16% 15%;
+    --chart-5: 74 97% 89%;
+
+    /* Brand Tokens CSS */
+    --color-brand-primary: #23212C;
+    --color-brand-hover: #191820;
+    --color-brand-light: #F1FEC8;
+    --color-brand-border: #E2F4A6;
+    --color-brand-ink: #23212C;
+    --color-brand-cosmic: #23212C;
+    --color-brand-vanilla: #F1FEC8;
+    --gradient-brand-premium: linear-gradient(135deg, #121118 0%, #23212C 50%, #353344 100%);
+    --gradient-brand-premium-hover: linear-gradient(135deg, #0A090E 0%, #191820 50%, #23212C 100%);
   }
 
   .dark:root {
-    --background: 259 43% 12%;
+    --background: 250 16% 10%;
     --foreground: 0 0% 98%;
-    --card: 259 35% 16%;
+    --card: 250 16% 15%;
     --card-foreground: 0 0% 98%;
-    --popover: 259 35% 16%;
+    --popover: 250 16% 15%;
     --popover-foreground: 0 0% 98%;
-    --primary: 258 74% 86%;
-    --primary-foreground: 259 43% 18%;
-    --secondary: 259 30% 22%;
+    --primary: 74 97% 89%;
+    --primary-foreground: 250 16% 15%;
+    --secondary: 250 14% 22%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 259 30% 22%;
-    --muted-foreground: 262 10% 70%;
-    --accent: 259 30% 22%;
-    --accent-foreground: 0 0% 98%;
+    --muted: 250 14% 20%;
+    --muted-foreground: 250 10% 70%;
+    --accent: 74 97% 89%;
+    --accent-foreground: 250 16% 15%;
     --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 259 25% 24%;
-    --input: 259 25% 24%;
-    --ring: 258 74% 86%;
+    --border: 250 14% 22%;
+    --input: 250 14% 22%;
+    --ring: 74 97% 89%;
     --chart-1: 158 64% 52%;
     --chart-2: 43 96% 56%;
     --chart-3: 0 91% 71%;
-    --chart-4: 258 74% 86%;
-    --chart-5: 259 43% 45%;
+    --chart-4: 74 97% 89%;
+    --chart-5: 250 14% 30%;
   }
 }
 
@@ -90,7 +101,8 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 60px; /* Squircle design */
+  border-radius: 60px;
+  /* Squircle design */
 }
 
 .tabbar-glass-wrapper {
@@ -116,15 +128,18 @@
 .glass-card {
   width: 90px;
   height: 90px;
-  background: rgba(255, 255, 255, 0.05); /* Slight white tint */
+  background: rgba(255, 255, 255, 0.05);
+  /* Slight white tint */
   border-radius: 20px;
-  backdrop-filter: blur(10px); /* The blurring magic */
+  backdrop-filter: blur(10px);
+  /* The blurring magic */
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow:
     0 8px 32px 0 rgba(0, 0, 0, 0.3),
     inset 0 0 15px rgba(255, 255, 255, 0.05);
-  z-index: 2; /* Sits on top of blobs */
+  z-index: 2;
+  /* Sits on top of blobs */
   position: relative;
 }
 
@@ -156,9 +171,11 @@
   width: 70px;
   height: 70px;
   border-radius: 50%;
-  filter: blur(10px); /* Extra soft edges */
+  filter: blur(10px);
+  /* Extra soft edges */
   opacity: 0.8;
-  z-index: 1; /* Sits behind the glass-card */
+  z-index: 1;
+  /* Sits behind the glass-card */
 }
 
 .tabbar-glass-wrapper::before,
@@ -218,16 +235,20 @@
 
 /* Animation: Moves green blob chaotically */
 @keyframes blob-one-move {
+
   0%,
   100% {
     transform: translate(0, 0) scale(1);
   }
+
   25% {
     transform: translate(40px, 15px) scale(1.1);
   }
+
   50% {
     transform: translate(20px, 45px) scale(1);
   }
+
   75% {
     transform: translate(-15px, 25px) scale(0.9);
   }
@@ -235,16 +256,20 @@
 
 /* Animation: Moves yellow blob chaotically (opposite pattern) */
 @keyframes blob-two-move {
+
   0%,
   100% {
     transform: translate(0, 0) scale(1);
   }
+
   25% {
     transform: translate(-40px, -15px) scale(1.1);
   }
+
   50% {
     transform: translate(-20px, -45px) scale(1);
   }
+
   75% {
     transform: translate(15px, -25px) scale(0.9);
   }
@@ -252,13 +277,16 @@
 
 /* Animation: Moves red blob diagonally */
 @keyframes blob-three-move {
+
   0%,
   100% {
     transform: translate(0, 0) scale(1);
   }
+
   33% {
     transform: translate(-25px, 20px) scale(1.15);
   }
+
   66% {
     transform: translate(15px, -30px) scale(0.85);
   }
@@ -266,12 +294,48 @@
 
 /* Animation: Optional text pulse */
 @keyframes text-pulse {
+
   0%,
   100% {
     opacity: 0.5;
   }
+
   50% {
     opacity: 1;
   }
 }
 
+/* Struttura base per l'effetto sfocatura (Glassmorphism da https://css.glass) */
+.css-glass,
+.glass-card {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Colore: Cosmic Glass (Scuro #23212C / RGB 35, 33, 44) */
+.card-cosmic,
+.cosmic-glass {
+  background: rgba(35, 33, 44, 0.82);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+/* Colore: Vanilla Glass (Chiaro #F1FEC8 / RGB 241, 254, 200) */
+.card-vanilla,
+.vanilla-glass {
+  background: rgba(241, 254, 200, 0.60);
+  color: #23212C;
+  border: 1px solid rgba(255, 255, 255, 0.40);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}

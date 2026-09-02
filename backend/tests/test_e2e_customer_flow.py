@@ -107,6 +107,43 @@ def test_e2e_login_favorites_plus_barcode(client, db_session):
     unlimited_remaining = client.get("/profile/barcode-scan/remaining", headers=headers)
     assert unlimited_remaining.json()["remaining"] is None
 
+    # 7. Upload foto profilo e recupero URL firmato
+    # Crea un'immagine JPEG 100x100 fittizia valida
+    import io
+    from PIL import Image
+    img = Image.new("RGB", (100, 100), color="blue")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    img_bytes = buf.getvalue()
+
+    photo_upload = client.post(
+        "/profile/photo",
+        files={"file": ("avatar.jpg", img_bytes, "image/jpeg")},
+        headers=headers,
+    )
+    assert photo_upload.status_code == 200, photo_upload.text
+    assert "photo_url" in photo_upload.json()
+    assert "/files/profile/" in photo_upload.json()["photo_url"]
+
+    # Verifica GET /profile/photo
+    photo_get = client.get("/profile/photo", headers=headers)
+    assert photo_get.status_code == 200
+    assert "photo_url" in photo_get.json()
+    assert "/files/profile/" in photo_get.json()["photo_url"]
+
+    # 8. Upload PNG (anche se il client dichiara genericamente image/jpeg)
+    buf_png = io.BytesIO()
+    img.save(buf_png, format="PNG")
+    png_bytes = buf_png.getvalue()
+
+    photo_png = client.post(
+        "/profile/photo",
+        files={"file": ("avatar.png", png_bytes, "image/png")},
+        headers=headers,
+    )
+    assert photo_png.status_code == 200, photo_png.text
+    assert "photo_url" in photo_png.json()
+
 
 def test_e2e_trial_expiry(client, db_session):
     db = db_session

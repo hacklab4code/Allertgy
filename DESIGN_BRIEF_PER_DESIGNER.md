@@ -87,15 +87,15 @@ AllerTgy adotta una differenziazione netta tra l'ambiente **Consumer (Cliente)**
 
 | Ruolo Token | Nome Token | Codice Hex | Utilizzo UI |
 |---|---|---|---|
-| **Canvas Background** | `surface` | `#F6F2FC` / `#F4F0F9` | Sfondo a schermo intero (Ice Lavender rinfrescante) |
+| **Canvas Background** | `surface` | `#F8FAFC` | Sfondo a schermo intero |
 | **Superficie Primaria** | `surfaceSecondary` | `#FFFFFF` | Card bianche ceramiche, sheet e modali |
 | **Superficie Subdued** | `surfaceTertiary` | `#F1FEC8` / `#FAFDF0` | Sezioni secondarie, capsule inattive, sfondi chip |
-| **Testo Principale / Ink** | `onSurface` / `cosmic` | `#23212C` | Titoli, testo primario, icone attive ad alto contrasto (Cosmic) |
-| **Testo Secondario** | `textSecondary` | `#675B7D` / `#6B6575` | Sottotitoli, descrizioni, label di supporto |
-| **Testo Muted** | `textMuted` | `#9084A3` / `#948E9C` | Timestamp, metadati, placeholder |
+| **Testo Principale / Ink** | `onSurface` / `cosmic` | `#23212C` | Titoli, testo primario, icone attive ad alto contrasto (Cosmic: RGB 35, 33, 44) |
+| **Testo Secondario** | `textSecondary` | `#475569` / `#64748B` | Sottotitoli, descrizioni, label di supporto |
+| **Testo Muted** | `textMuted` | `#94A3B8` / `#9CA3AF` | Timestamp, metadati, placeholder |
 | **Brand Primario (Cosmic)** | `brandPrimary` / `cosmic` | `#23212C` | Bottoni CTA primari, badge istituzionali, dock tab bar |
-| **Brand Soft / Accent (Vanilla)** | `brandSecondary` / `vanilla` | `#F1FEC8` | Glow soffusi, tint di selezione, accenti luminosi |
-| **Bordo Standard** | `border` | `#E6DFF5` / `#E8E0F2` | Bordo sottile 1px per definire card e input |
+| **Brand Soft / Accent (Vanilla)** | `brandSecondary` / `vanilla` | `#F1FEC8` | Glow soffusi, tint di selezione, accenti luminosi (Vanilla: RGB 241, 254, 200) |
+| **Bordo Standard** | `border` | `#E2E8F0` | Bordo sottile 1px per definire card e input |
 | **Bordo Enfasi** | `borderStrong` | `#23212C` | Bordo elementi selezionati / in focus |
 
 #### Token Semaforo (Verdetti):

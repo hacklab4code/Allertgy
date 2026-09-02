@@ -7,53 +7,101 @@ import { useSession, type Role } from '../src/store/session';
 import LanguageFlagsRow from '../src/components/LanguageFlagsRow';
 import { useTranslation } from '../src/constants/translations';
 import { useAdaptiveMeshInk } from '../src/hooks/useMeshInk';
-import { AppText, GlassCard, GlassScreenScroll, SurfaceButton, Screen } from '../src/components/ui';
-import { colors, spacing, radius, softShadow } from '../src/theme';
+import { AppText, GlassScreenScroll, SurfaceButton, Screen } from '../src/components/ui';
+import { colors, spacing, radius, softShadow, MIN_TOUCH_TARGET } from '../src/theme';
 
 export default function Welcome() {
-  const [step, setStep] = useState<'select_role' | 'slides'>('select_role');
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [selectedRole, setSelectedRole] = useState<Role>('customer');
   const [slide, setSlide] = useState(0);
-  const { language, setRole, role: sessionRole } = useSession();
+  const { language, setRole } = useSession();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-
-  const sessionRoleOrCustomer = (): Role => selectedRole || sessionRole || 'customer';
+  const isIt = (language || 'it').toLowerCase() === 'it';
 
   const { ref: headerRef, ink: headerInk, onLayout: onHeaderLayout } = useAdaptiveMeshInk(true);
-  const { ref: headingRef, ink: headingInk, onLayout: onHeadingLayout } = useAdaptiveMeshInk(true);
   const { ref: slideRef, ink: slideInk, onLayout: onSlideLayout } = useAdaptiveMeshInk(true);
 
   const customerSlides = [
-    { icon: 'restaurant' as const, title: t('slide_c1_title'), text: t('slide_c1_text') },
-    { icon: 'shield-checkmark' as const, title: t('slide_c2_title'), text: t('slide_c2_text') },
-    { icon: 'ellipse' as const, title: t('slide_c3_title'), text: t('slide_c3_text') },
+    {
+      icon: 'scan-outline' as const,
+      badge: isIt ? 'Scansione Istantanea' : 'Instant Scan',
+      title: t('slide_c1_title'),
+      text: t('slide_c1_text'),
+      featureTag: isIt ? '1. QR al tavolo' : '1. Table QR',
+    },
+    {
+      icon: 'sparkles-outline' as const,
+      badge: isIt ? 'Semaforo Intelligente' : 'Smart Traffic Light',
+      title: t('slide_c3_title'),
+      text: t('slide_c3_text'),
+      featureTag: isIt ? '2. Filtro su misura' : '2. Custom Filter',
+    },
+    {
+      icon: 'shield-checkmark-outline' as const,
+      badge: isIt ? 'Sicurezza & Famiglia' : 'Safety & Family',
+      title: t('slide_c2_title'),
+      text: t('slide_c2_text'),
+      featureTag: isIt ? '3. Sempre con te' : '3. Always with you',
+    },
   ];
 
   const ownerSlides = [
-    { icon: 'clipboard' as const, title: t('slide_o1_title'), text: t('slide_o1_text') },
-    { icon: 'happy' as const, title: t('slide_o2_title'), text: t('slide_o2_text') },
-    { icon: 'stats-chart' as const, title: t('slide_o3_title'), text: t('slide_o3_text') },
+    {
+      icon: 'clipboard-outline' as const,
+      badge: isIt ? 'Menù Digitale & AI' : 'Digital Menu & AI',
+      title: t('slide_o1_title'),
+      text: t('slide_o1_text'),
+      featureTag: isIt ? '1. Regolamento UE 1169' : '1. EU 1169 Ready',
+    },
+    {
+      icon: 'stats-chart-outline' as const,
+      badge: isIt ? 'QR Tavoli & Controllo' : 'Table QRs & Control',
+      title: t('slide_o3_title'),
+      text: t('slide_o3_text'),
+      featureTag: isIt ? '2. Stampa facile QR' : '2. Easy QR Print',
+    },
+    {
+      icon: 'happy-outline' as const,
+      badge: isIt ? 'Clienti Soddisfatti' : 'Happy Customers',
+      title: t('slide_o2_title'),
+      text: t('slide_o2_text'),
+      featureTag: isIt ? '3. Trasparenza totale' : '3. Total Transparency',
+    },
   ];
 
   const slides = selectedRole === 'owner' ? ownerSlides : customerSlides;
-  const current = slides[slide];
+  const current = slides[slide] || slides[0];
 
-  const handleSelectRole = (role: Role) => {
-    setSelectedRole(role);
-    setRole(role);
+  const handleSelectRole = (r: Role) => {
+    setSelectedRole(r);
+    setRole(r);
+    setSlide(0);
+  };
+
+  const handleStartRegister = () => {
+    setRole(selectedRole);
+    router.push(`/register?role=${selectedRole}` as any);
+  };
+
+  const handleGoLogin = () => {
+    setRole(selectedRole);
+    router.push('/login' as any);
   };
 
   return (
     <Screen edges={false} ambient style={styles.screen}>
+      {/* Top Header Bar */}
       <View
         ref={headerRef}
         onLayout={onHeaderLayout}
         style={[styles.topBar, { paddingTop: Math.max(insets.top, 12) }]}
       >
-        <AppText variant="h2" color={headerInk.ink} style={styles.brandTitle}>
-          AllerTgy
-        </AppText>
+        <View style={styles.brandGroup}>
+          <AppText variant="h2" color={headerInk.ink} style={styles.brandTitle}>
+            AllerTgy
+          </AppText>
+          <View style={styles.brandDot} />
+        </View>
         <LanguageFlagsRow />
       </View>
 
@@ -63,182 +111,181 @@ export default function Welcome() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {step === 'select_role' ? (
-          <View style={styles.roleArea}>
-            <View
-              ref={headingRef}
-              onLayout={onHeadingLayout}
-              style={styles.headingBox}
-            >
-              <AppText variant="caption" color={headingInk.inkMuted} style={styles.stepLabel}>
-                {language === 'it' ? '1 · Scelta account' : '1 · Account type'}
-              </AppText>
-              <AppText variant="h1" color={headingInk.ink}>{t('welcome')}</AppText>
-              <AppText variant="subtitle" color={headingInk.inkMuted} style={styles.subtitleText}>
-                {t('welcome_subtitle')}
-              </AppText>
-            </View>
+        {/* Role Switcher Pill Bar (Choose Role Once) */}
+        <View style={styles.rolePickerBox}>
+          <AppText variant="caption" color={colors.onSurfaceMuted} style={styles.rolePickerLabel}>
+            {isIt ? 'SCOPRI ALLERTGY PER:' : 'DISCOVER ALLERTGY FOR:'}
+          </AppText>
 
-            <GlassCard
-              onPress={() => handleSelectRole('customer')}
-              style={[styles.roleCard, selectedRole === 'customer' && styles.roleCardActive]}
-            >
-              <View style={[styles.roleIcon, selectedRole === 'customer' ? styles.roleIconActive : { backgroundColor: colors.brandTertiary }]}>
-                <Ionicons
-                  name="person"
-                  size={26}
-                  color={selectedRole === 'customer' ? colors.onBrand : colors.brand}
-                />
-              </View>
-              <View style={styles.roleTextGroup}>
-                <AppText
-                  variant="title"
-                  color={selectedRole === 'customer' ? colors.brand : colors.onSurface}
-                  style={{ fontWeight: '700' }}
-                >
-                  {t('role_customer')}
-                </AppText>
-                <AppText variant="subtitle" style={styles.roleDescText}>{t('role_customer_desc')}</AppText>
-              </View>
-              <View style={styles.radioBadge}>
-                {selectedRole === 'customer' ? (
-                  <Ionicons name="checkmark-circle" size={28} color={colors.brand} />
-                ) : (
-                  <View style={styles.radioBadgeEmpty} />
-                )}
-              </View>
-            </GlassCard>
-
-            <GlassCard
-              onPress={() => handleSelectRole('owner')}
-              style={[styles.roleCard, selectedRole === 'owner' && styles.roleCardActive]}
-            >
-              <View style={[styles.roleIcon, selectedRole === 'owner' ? styles.roleIconActiveOwner : { backgroundColor: colors.greenSoft }]}>
-                <Ionicons
-                  name="restaurant"
-                  size={26}
-                  color={selectedRole === 'owner' ? '#ffffff' : colors.green}
-                />
-              </View>
-              <View style={styles.roleTextGroup}>
-                <AppText
-                  variant="title"
-                  color={selectedRole === 'owner' ? colors.green : colors.onSurface}
-                  style={{ fontWeight: '700' }}
-                >
-                  {t('role_owner')}
-                </AppText>
-                <AppText variant="subtitle" style={styles.roleDescText}>{t('role_owner_desc')}</AppText>
-              </View>
-              <View style={styles.radioBadge}>
-                {selectedRole === 'owner' ? (
-                  <Ionicons name="checkmark-circle" size={28} color={colors.green} />
-                ) : (
-                  <View style={styles.radioBadgeEmpty} />
-                )}
-              </View>
-            </GlassCard>
-          </View>
-        ) : (
-          <View
-            ref={slideRef}
-            onLayout={onSlideLayout}
-            style={styles.slideArea}
-          >
+          <View style={styles.roleTabsContainer}>
             <TouchableOpacity
-              onPress={() => {
-                if (slide > 0) setSlide(slide - 1);
-                else { setStep('select_role'); setSlide(0); }
-              }}
-              style={styles.changeRoleBtn}
-              activeOpacity={0.7}
+              onPress={() => handleSelectRole('customer')}
+              activeOpacity={0.85}
+              style={[
+                styles.roleTab,
+                selectedRole === 'customer' && styles.roleTabActive,
+              ]}
             >
-              <Ionicons name="arrow-back" size={16} color={slideInk.action} />
-              <AppText variant="caption" color={slideInk.action} style={{ fontWeight: '700' }}>
-                {slide > 0 ? t('back') : (language === 'it' ? 'Cambia account' : 'Change account')}
+              <Ionicons
+                name="person-outline"
+                size={15}
+                color={selectedRole === 'customer' ? colors.brand : colors.onSurfaceMuted}
+              />
+              <AppText
+                variant="caption"
+                color={selectedRole === 'customer' ? colors.brand : colors.onSurfaceMuted}
+                style={[styles.roleTabText, selectedRole === 'customer' && styles.roleTabTextActive]}
+              >
+                {isIt ? 'Cliente / Famiglia' : 'User / Family'}
               </AppText>
             </TouchableOpacity>
 
-            <AppText variant="caption" color={slideInk.inkMuted} style={styles.stepLabel}>
-              {language === 'it'
-                ? `2 · Come funziona · ${slide + 1}/${slides.length}`
-                : `2 · How it works · ${slide + 1}/${slides.length}`}
-            </AppText>
-
-            <View style={[styles.slideHero, softShadow(8)]}>
-              <Ionicons name={current.icon} size={56} color={colors.brand} />
-            </View>
-
-            <View style={styles.slideTextBox}>
-              <AppText variant="h1" color={slideInk.ink} style={{ textAlign: 'center' }}>
-                {current.title}
+            <TouchableOpacity
+              onPress={() => handleSelectRole('owner')}
+              activeOpacity={0.85}
+              style={[
+                styles.roleTab,
+                selectedRole === 'owner' && styles.roleTabActiveOwner,
+              ]}
+            >
+              <Ionicons
+                name="restaurant-outline"
+                size={15}
+                color={selectedRole === 'owner' ? colors.green : colors.onSurfaceMuted}
+              />
+              <AppText
+                variant="caption"
+                color={selectedRole === 'owner' ? colors.green : colors.onSurfaceMuted}
+                style={[styles.roleTabText, selectedRole === 'owner' && styles.roleTabTextActiveOwner]}
+              >
+                {isIt ? 'Ristoratore' : 'Restaurant'}
               </AppText>
-              <AppText variant="body" color={slideInk.inkMuted} style={styles.slideText}>
-                {current.text}
-              </AppText>
-            </View>
-
-            <View style={styles.dots}>
-              {slides.map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.dot,
-                    { backgroundColor: slideInk.onDark ? 'rgba(255,255,255,0.35)' : colors.border },
-                    i === slide && [
-                      styles.dotActive,
-                      { backgroundColor: slideInk.onDark ? '#FFFFFF' : colors.brand },
-                    ],
-                  ]}
-                />
-              ))}
-            </View>
+            </TouchableOpacity>
           </View>
-        )}
+        </View>
+
+        {/* Guided "Come Funziona" Presentation Card */}
+        <View ref={slideRef} onLayout={onSlideLayout} style={styles.slideArea}>
+          <View style={styles.stepBadgeRow}>
+            <View style={[styles.stepBadge, selectedRole === 'owner' && styles.stepBadgeOwner]}>
+              <Ionicons
+                name="sparkles-outline"
+                size={13}
+                color={selectedRole === 'owner' ? colors.green : colors.brand}
+              />
+              <AppText
+                variant="caption"
+                color={selectedRole === 'owner' ? colors.green : colors.brand}
+                style={styles.stepBadgeText}
+              >
+                {isIt
+                  ? `COME FUNZIONA · ${slide + 1} DI ${slides.length}`
+                  : `HOW IT WORKS · ${slide + 1} OF ${slides.length}`}
+              </AppText>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleStartRegister}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <AppText variant="caption" color={colors.onSurfaceMuted} style={{ fontWeight: '600' }}>
+                {isIt ? 'Salta introduzione' : 'Skip intro'}
+              </AppText>
+            </TouchableOpacity>
+          </View>
+
+          {/* Hero Showcase Card */}
+          <View
+            style={[
+              styles.slideCard,
+              selectedRole === 'owner' ? styles.slideCardOwner : styles.slideCardCustomer,
+              softShadow(6),
+            ]}
+          >
+            {/* Hero Icon */}
+            <View
+              style={[
+                styles.slideIconCircle,
+                selectedRole === 'owner' ? styles.slideIconCircleOwner : styles.slideIconCircleCustomer,
+              ]}
+            >
+              <Ionicons
+                name={current.icon}
+                size={48}
+                color={selectedRole === 'owner' ? colors.green : colors.brand}
+              />
+            </View>
+
+            {/* Feature Tag */}
+            <View
+              style={[
+                styles.slideFeatureTag,
+                selectedRole === 'owner' && styles.slideFeatureTagOwner,
+              ]}
+            >
+              <AppText
+                variant="caption"
+                color={selectedRole === 'owner' ? colors.green : colors.brand}
+                style={styles.featureTagText}
+              >
+                {current.badge}
+              </AppText>
+            </View>
+
+            {/* Title & Description */}
+            <AppText variant="h2" color={slideInk.ink} style={styles.slideTitle}>
+              {current.title}
+            </AppText>
+            <AppText variant="body" color={slideInk.inkMuted} style={styles.slideText}>
+              {current.text}
+            </AppText>
+          </View>
+
+          {/* Dots Indicator & Step Navigation */}
+          <View style={styles.dotsRow}>
+            {slides.map((_, i) => (
+              <TouchableOpacity
+                key={i}
+                onPress={() => setSlide(i)}
+                style={[
+                  styles.dot,
+                  i === slide && (selectedRole === 'owner' ? styles.dotActiveOwner : styles.dotActive),
+                ]}
+                hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+              />
+            ))}
+          </View>
+        </View>
       </GlassScreenScroll>
 
-      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-        {step === 'select_role' ? (
-          <>
-            <SurfaceButton
-              label={t('continue')}
-              onPress={() => setStep('slides')}
-              disabled={!selectedRole}
-              icon="arrow-forward"
-            />
-            <SurfaceButton
-              label={t('already_have_account')}
-              onPress={() => {
-                const targetRole = selectedRole || sessionRoleOrCustomer();
-                router.push(`/login?role=${targetRole}` as any);
-              }}
-              variant="soft"
-            />
-          </>
-        ) : (
-          <>
-            <SurfaceButton
-              label={slide < slides.length - 1 ? t('next') : t('start')}
-              onPress={() => {
-                if (slide < slides.length - 1) {
-                  setSlide(slide + 1);
-                } else {
-                  const targetRole = selectedRole || 'customer';
-                  router.push(`/register?role=${targetRole}` as any);
-                }
-              }}
-              icon="arrow-forward"
-            />
-            <SurfaceButton
-              label={t('already_have_account')}
-              onPress={() => {
-                const targetRole = selectedRole || 'customer';
-                router.push(`/login?role=${targetRole}` as any);
-              }}
-              variant="soft"
-            />
-          </>
-        )}
+      {/* Sticky Bottom Actions */}
+      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+        <SurfaceButton
+          label={
+            slide < slides.length - 1
+              ? t('next')
+              : selectedRole === 'customer'
+                ? (isIt ? 'Inizia subito come Cliente' : 'Get started as User')
+                : (isIt ? 'Inizia subito come Ristoratore' : 'Get started as Restaurant')
+          }
+          onPress={() => {
+            if (slide < slides.length - 1) {
+              setSlide(slide + 1);
+            } else {
+              handleStartRegister();
+            }
+          }}
+          icon="arrow-forward-outline"
+        />
+        <SurfaceButton
+          label={t('already_have_account')}
+          onPress={handleGoLogin}
+          variant="soft"
+          icon="log-in-outline"
+        />
+        <AppText variant="caption" color={colors.onSurfaceMuted} style={styles.creatorNote}>
+          {isIt ? 'Progetto ideato e creato da hacklab.digital' : 'Crafted by hacklab.digital'}
+        </AppText>
       </View>
     </Screen>
   );
@@ -251,96 +298,204 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xs,
+    paddingBottom: spacing.sm,
     backgroundColor: 'transparent',
     zIndex: 10,
   },
-  brandTitle: { fontWeight: '800' },
+  brandGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  brandTitle: {
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    fontSize: 24,
+  },
+  brandDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.brand,
+    marginTop: 4,
+  },
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xs,
     paddingBottom: spacing.xl,
+    gap: spacing.md,
   },
-  headingBox: { gap: spacing.xs, marginBottom: spacing.xs },
-  stepLabel: {
-    fontWeight: '700',
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
-    fontSize: 11,
-    alignSelf: 'flex-start',
+  rolePickerBox: {
+    gap: 6,
+    marginBottom: spacing.xs,
   },
-  subtitleText: { lineHeight: 20 },
-  roleArea: { gap: spacing.md, marginTop: spacing.xs },
-  roleCard: {
+  rolePickerLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    paddingLeft: 4,
+  },
+  roleTabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: radius.pill,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 6,
+  },
+  roleTab: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderWidth: 2,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+  },
+  roleTabActive: {
     backgroundColor: colors.surface,
-  },
-  roleCardActive: {
-    borderColor: colors.brand,
-    backgroundColor: colors.brand50,
+    borderWidth: 1,
+    borderColor: colors.brand100,
     shadowColor: colors.brand,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  roleIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.md,
+  roleTabActiveOwner: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.greenBorder,
+    shadowColor: colors.green,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  roleTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  roleTabTextActive: {
+    fontWeight: '800',
+    color: colors.brand,
+  },
+  roleTabTextActiveOwner: {
+    fontWeight: '800',
+    color: colors.green,
+  },
+  slideArea: {
+    gap: spacing.md,
+  },
+  stepBadgeRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
   },
-  roleIconActive: {
-    backgroundColor: colors.brand,
-  },
-  roleIconActiveOwner: {
-    backgroundColor: colors.green,
-  },
-  roleTextGroup: { flex: 1, gap: 2 },
-  roleDescText: { fontSize: 13, color: colors.onSurfaceMuted, lineHeight: 18 },
-  radioBadge: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioBadgeEmpty: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: colors.brandInk,
-  },
-  slideArea: { gap: spacing.lg, marginTop: spacing.sm, alignItems: 'center' },
-  changeRoleBtn: {
+  stepBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    alignSelf: 'flex-start',
-    paddingVertical: 6,
+    backgroundColor: colors.brand50,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.brand100,
   },
-  slideHero: {
-    width: 120,
-    height: 120,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surfaceSecondary,
+  stepBadgeOwner: {
+    backgroundColor: colors.greenSoft,
+    borderColor: colors.greenBorder,
+  },
+  stepBadgeText: {
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    fontSize: 10,
+  },
+  slideCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.md,
+    borderWidth: 1.5,
+  },
+  slideCardCustomer: {
+    borderColor: colors.brand100,
+  },
+  slideCardOwner: {
+    borderColor: colors.greenBorder,
+  },
+  slideIconCircle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: colors.border,
+    marginBottom: spacing.xs,
   },
-  slideTextBox: { gap: spacing.xs, alignItems: 'center', paddingHorizontal: spacing.sm },
-  slideText: { textAlign: 'center', lineHeight: 22 },
-  dots: { flexDirection: 'row', gap: 8, marginTop: spacing.xs, alignItems: 'center' },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  dotActive: { width: 24 },
+  slideIconCircleCustomer: {
+    backgroundColor: colors.brand50,
+    borderColor: colors.brand100,
+  },
+  slideIconCircleOwner: {
+    backgroundColor: colors.greenSoft,
+    borderColor: colors.greenBorder,
+  },
+  slideFeatureTag: {
+    backgroundColor: colors.brand50,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.brand100,
+  },
+  slideFeatureTagOwner: {
+    backgroundColor: colors.greenSoft,
+    borderColor: colors.greenBorder,
+  },
+  featureTagText: {
+    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 0.4,
+  },
+  slideTitle: {
+    textAlign: 'center',
+    fontWeight: '800',
+    fontSize: 22,
+    lineHeight: 28,
+    letterSpacing: -0.3,
+  },
+  slideText: {
+    textAlign: 'center',
+    fontSize: 13,
+    lineHeight: 20,
+    paddingHorizontal: spacing.sm,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: spacing.xs,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.borderStrong,
+  },
+  dotActive: {
+    width: 24,
+    backgroundColor: colors.brand,
+  },
+  dotActiveOwner: {
+    width: 24,
+    backgroundColor: colors.green,
+  },
   bottomBar: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
@@ -348,5 +503,12 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
+  },
+  creatorNote: {
+    textAlign: 'center',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    paddingTop: 2,
   },
 });

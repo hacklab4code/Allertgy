@@ -41,41 +41,45 @@ module.exports = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        // Brand Action (Cosmic + Vanilla)
+        // Brand Action (Cosmic #23212C + Vanilla #F1FEC8)
         brand: {
           DEFAULT: '#23212C',
-          dark: '#1A1822',
-          hover: '#2E2B3A',
-          light: '#3D384D',
+          primary: '#23212C',
+          dark: '#191820',
+          darker: '#121118',
+          hover: '#191820',
+          light: '#F1FEC8',
+          surface: '#F7FEE7',
           soft: '#F1FEC8',
-          border: '#E6DFF5',
+          border: '#E2F4A6',
+          borderStrong: '#23212C',
           text: '#23212C',
           ink: '#23212C',
           cosmic: '#23212C',
           vanilla: '#F1FEC8',
           lavender: '#F1FEC8',
         },
-        // Semaforo Allergie (Standard globale)
+        // Semaforo Allergie (Standard Clinico Globale)
         semaforo: {
           safe: {
             DEFAULT: '#10B981',
             solid: '#10B981',
             soft: '#ECFDF5',
-            border: '#6EE7B7',
+            border: '#A7F3D0',
             text: '#065F46',
           },
           warning: {
             DEFAULT: '#F59E0B',
             solid: '#F59E0B',
             soft: '#FFFBEB',
-            border: '#FCD34D',
+            border: '#FDE68A',
             text: '#92400E',
           },
           danger: {
             DEFAULT: '#EF4444',
             solid: '#EF4444',
             soft: '#FEF2F2',
-            border: '#FCA5A5',
+            border: '#FECACA',
             text: '#991B1B',
           },
           neutral: {
@@ -86,6 +90,11 @@ module.exports = {
             text: '#334155',
           },
         },
+      },
+      backgroundImage: {
+        'brand-premium': 'linear-gradient(135deg, #121118 0%, #23212C 50%, #353344 100%)',
+        'brand-premium-hover': 'linear-gradient(135deg, #0A090E 0%, #191820 50%, #23212C 100%)',
+        'brand-vanilla': 'linear-gradient(135deg, #F1FEC8 0%, #E6F8AB 50%, #D8F18C 100%)',
       },
       borderRadius: {
         lg: 'var(--radius)',

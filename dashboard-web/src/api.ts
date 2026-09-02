@@ -1,4 +1,31 @@
-export const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+function resolveApiUrl(): string {
+  if (typeof window !== 'undefined' && window.location) {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const queryApi = params.get('api');
+      if (queryApi && (queryApi.startsWith('http://') || queryApi.startsWith('https://'))) {
+        const clean = queryApi.replace(/\/+$/, '');
+        try { window.localStorage.setItem('ALLERTGY_API_URL', clean); } catch {}
+        return clean;
+      }
+      const stored = window.localStorage.getItem('ALLERTGY_API_URL');
+      if (stored && (stored.startsWith('http://') || stored.startsWith('https://'))) {
+        return stored.replace(/\/+$/, '');
+      }
+    } catch {}
+
+    const h = window.location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1') {
+      return 'http://localhost:8000';
+    }
+    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(h)) {
+      return `http://${h}:8000`;
+    }
+  }
+  return import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+}
+
+export const API = resolveApiUrl();
 
 export interface Allergen { id: number; code: string; name_it: string; emoji: string | null; is_diet: number; category: string }
 export interface DishTranslation {

@@ -10,11 +10,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { useSession } from '../src/store/session';
-import { AppText, GlassScreenScroll, Screen, SurfaceButton, CATEGORY_ICONS } from '../src/components/ui';
-import { TRANSLATED_ALLERGENS, ALLERGEN_SECTIONS } from '../src/engine/translations';
-import { colors, radius, spacing, font, MIN_TOUCH_TARGET } from '../src/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useSession } from '../src/store/session';
+import { AppText, NavHeaderBackButton, Screen, ScreenTopHeader, SurfaceButton } from '../src/components/ui';
+import { TRANSLATED_ALLERGENS, ALLERGEN_SECTIONS } from '../src/engine/translations';
+import { font, radius } from '../src/theme';
 
 const ALLERGEN_TRANSLATIONS: Record<string, Record<string, string>> = {
   glutine: {
@@ -216,12 +216,22 @@ const LANGUAGES_LIST = [
   { code: 'jp', label: 'JP', name: '日本語', flag: '🇯🇵' },
 ];
 
+const CATEGORY_OUTLINE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  ue: 'shield-outline',
+  frutta_guscio: 'nutrition-outline',
+  frutta: 'nutrition-outline',
+  verdura: 'leaf-outline',
+  cereali: 'grid-outline',
+  spezie: 'sparkles-outline',
+  intolleranze: 'pulse-outline',
+  preferenze: 'heart-outline',
+};
+
 export default function AllergyCardScreen() {
   const navigation = useNavigation();
   const {
     allergie: primaryAllergies,
     allergyIntensities: primaryIntensities = {},
-    ingredientiEsclusi: primaryExcluded = [],
     subProfiles,
     activeProfileId,
     setActiveProfileId,
@@ -246,7 +256,7 @@ export default function AllergyCardScreen() {
       const namePart = email.split('@')[0];
       return namePart.charAt(0).toUpperCase() + namePart.slice(1);
     }
-    return 'Ospite';
+    return 'Io';
   }, [activeProfile, email]);
 
   const activeAllergies = useMemo(() => {
@@ -280,13 +290,6 @@ export default function AllergyCardScreen() {
     if (['istamina','fruttosio','sorbitolo','caffeina','alcool','nichel','solanacee','caseina','glutammato','fosfati','nitriti','lattosio','senza_lattosio'].includes(c)) return 'intolleranze';
     if (['vegano','vegetariano','halal','kosher','senza_glutine','pescetariano'].includes(c)) return 'preferenze';
     return 'ue';
-  };
-
-  const getEmojiForCode = (code: string): string => {
-    const clean = code.toLowerCase().trim();
-    if (TRANSLATED_ALLERGENS[clean]?.emoji) return TRANSLATED_ALLERGENS[clean].emoji;
-    const cat = getCategoryForKey(clean);
-    return CATEGORY_ICONS[cat] || '⚠️';
   };
 
   const formatAllergenLabel = (code: string): string => {
@@ -332,16 +335,40 @@ export default function AllergyCardScreen() {
     const isDiet = ['vegano','vegetariano','halal','kosher','senza_glutine','pescetariano'].includes(code.toLowerCase());
 
     if (isDiet) {
-      return { pillStyle: styles.pillDiet, textStyle: styles.pillDietText, suffix: '' };
+      return {
+        pillStyle: styles.pillDiet,
+        textStyle: styles.pillDietText,
+        icon: 'checkmark-circle-outline' as const,
+        iconColor: '#059669',
+        suffix: '',
+      };
     }
     if (intensity === 'grave') {
       const suf = activeLang === 'it' ? ' (GRAVE)' : activeLang === 'jp' ? '（重度）' : ' (SEVERE)';
-      return { pillStyle: styles.pillGrave, textStyle: styles.pillGraveText, suffix: suf };
+      return {
+        pillStyle: styles.pillGrave,
+        textStyle: styles.pillGraveText,
+        icon: 'warning-outline' as const,
+        iconColor: '#DC2626',
+        suffix: suf,
+      };
     }
     if (intensity === 'lieve') {
-      return { pillStyle: styles.pillLieve, textStyle: styles.pillLieveText, suffix: '' };
+      return {
+        pillStyle: styles.pillLieve,
+        textStyle: styles.pillLieveText,
+        icon: 'shield-checkmark-outline' as const,
+        iconColor: '#0D9488',
+        suffix: '',
+      };
     }
-    return { pillStyle: styles.pillMod, textStyle: styles.pillModText, suffix: '' };
+    return {
+      pillStyle: styles.pillMod,
+      textStyle: styles.pillModText,
+      icon: 'alert-circle-outline' as const,
+      iconColor: '#D97706',
+      suffix: '',
+    };
   };
 
   const getTitle = (): string => CARD_TITLES[activeLang] || CARD_TITLES.en;
@@ -349,7 +376,7 @@ export default function AllergyCardScreen() {
   const handleShareCard = async () => {
     void Haptics.selectionAsync();
     const allergenListText = activeAllergies.map((code) => `• ${formatAllergenLabel(code)}`).join('\n');
-    const message = `🍽️ AllerTgy Chef Pass — ${profileName} (${currentLangObj.name})\n\n${getTitle()}\n\n⚠️ ALLERGENI & INTOLLERANZE:\n${allergenListText}\n\n🍳 REGOLE DI CUCINA:\n• Utilizzare padelle e superfici dedicate\n• Olio di frittura non contaminato\n• Lavaggio mani e guanti puliti prima dell'impiattamento.\n\nGenerato con AllerTgy (allertgy.com)`;
+    const message = `🍽️ AllerTgy Passaporto Medico / Chef Pass — ${profileName} (${currentLangObj.name})\n\n${getTitle()}\n\n⚠️ ALLERGENI & INTOLLERANZE:\n${allergenListText}\n\n🍳 REGOLE DI CUCINA:\n• Utilizzare padelle e superfici dedicate\n• Olio di frittura non contaminato\n• Lavaggio mani e guanti puliti prima dell'impiattamento.\n\nGenerato con AllerTgy (allertgy.com)`;
 
     try {
       await Share.share({ message });
@@ -361,13 +388,12 @@ export default function AllergyCardScreen() {
   const renderPillGroup = (items: string[]) => (
     <View style={styles.pillRow}>
       {items.map((code) => {
-        const emoji = getEmojiForCode(code);
         const label = formatAllergenLabel(code);
-        const { pillStyle, textStyle, suffix } = getPillStyle(code);
+        const { pillStyle, textStyle, icon, iconColor, suffix } = getPillStyle(code);
 
         return (
           <View key={code} style={[styles.pillBase, pillStyle]}>
-            <AppText style={styles.pillEmoji}>{emoji}</AppText>
+            <Ionicons name={icon} size={14} color={iconColor} />
             <AppText style={[styles.pillText, textStyle]}>
               {label}{suffix}
             </AppText>
@@ -379,206 +405,255 @@ export default function AllergyCardScreen() {
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen
-        options={{
-          headerTitle: isIt ? 'Chef Pass Ristorante' : 'Restaurant Chef Pass',
-          headerTitleStyle: { fontFamily: font.bold, fontSize: 18, color: '#322A63' },
-          headerLeft: () => (
-            <Pressable
-              onPress={() => {
-                if (navigation.canGoBack()) navigation.goBack();
-                else router.replace('/');
-              }}
-              hitSlop={12}
-              style={{ paddingRight: 12, paddingVertical: 4 }}
-            >
-              <Ionicons name="chevron-back" size={24} color="#322A63" />
-            </Pressable>
-          ),
-          headerRight: () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Pressable onPress={handleShareCard} hitSlop={8} style={styles.topHeaderIconBtn}>
-                <Ionicons name="share-outline" size={20} color="#322A63" />
-              </Pressable>
-              <Pressable
-                style={styles.topRightLangPill}
-                onPress={() => {
-                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setLangPickerVisible(true);
-                }}
-              >
-                <AppText style={{ fontSize: 14 }}>{currentLangObj.flag}</AppText>
-                <AppText variant="caption" style={{ fontWeight: '800', color: '#2A2452' }}>
-                  {currentLangObj.label} ⌄
-                </AppText>
-              </Pressable>
-            </View>
-          ),
+      <ScreenTopHeader
+        title={isIt ? 'Passaporto Allergie' : 'Allergy Passport'}
+        onBack={() => {
+          if (navigation.canGoBack()) navigation.goBack();
+          else router.replace('/');
         }}
+        rightElement={
+          <View style={styles.headerRightRow}>
+            <Pressable onPress={handleShareCard} hitSlop={8} style={styles.topHeaderIconBtn}>
+              <Ionicons name="share-outline" size={19} color="#23212C" />
+            </Pressable>
+            <Pressable
+              style={styles.topRightLangPill}
+              onPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setLangPickerVisible(true);
+              }}
+            >
+              <AppText style={{ fontSize: 13 }}>{currentLangObj.flag}</AppText>
+              <AppText variant="caption" style={styles.langPillText}>
+                {currentLangObj.label}
+              </AppText>
+              <Ionicons name="chevron-down-outline" size={12} color="#23212C" />
+            </Pressable>
+          </View>
+        }
       />
 
-      <GlassScreenScroll insetBottom={150 + insets.bottom} headerFloat={false} showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
-        {/* SUBPROFILE SELECTOR */}
-        {subProfiles.length > 0 && (
-          <View style={styles.profileSelectorWrap}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.profileSelectorScroll}>
-              <Pressable
-                style={[styles.profilePill, !activeProfileId && styles.profilePillActive]}
-                onPress={() => {
-                  void Haptics.selectionAsync();
-                  setActiveProfileId(null);
-                }}
-              >
-                <AppText style={[styles.profilePillText, !activeProfileId && styles.profilePillTextActive]}>
-                  👤 {email ? email.split('@')[0] : 'Principale'}
+      <View style={styles.container}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 110 }]}
+        >
+          {/* 1. SELETTORE PROFILI A CHIP LINEARI */}
+          {subProfiles.length > 0 && (
+            <View style={styles.profileSelectorWrap}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.profileSelectorScroll}>
+                <Pressable
+                  style={[styles.profilePill, !activeProfileId && styles.profilePillActive]}
+                  onPress={() => {
+                    void Haptics.selectionAsync();
+                    setActiveProfileId(null);
+                  }}
+                >
+                  <Ionicons
+                    name="person-outline"
+                    size={13}
+                    color={!activeProfileId ? '#F1FEC8' : '#64748B'}
+                  />
+                  <AppText style={[styles.profilePillText, !activeProfileId && styles.profilePillTextActive]}>
+                    {email ? email.split('@')[0] : 'Io'}
+                  </AppText>
+                </Pressable>
+                {subProfiles.map((p) => {
+                  const isSelected = activeProfileId === p.id;
+                  return (
+                    <Pressable
+                      key={p.id}
+                      style={[styles.profilePill, isSelected && styles.profilePillActive]}
+                      onPress={() => {
+                        void Haptics.selectionAsync();
+                        setActiveProfileId(p.id);
+                      }}
+                    >
+                      <Ionicons
+                        name="person-outline"
+                        size={13}
+                        color={isSelected ? '#F1FEC8' : '#64748B'}
+                      />
+                      <AppText style={[styles.profilePillText, isSelected && styles.profilePillTextActive]}>
+                        {p.name}
+                      </AppText>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* 2. HERO CARD COSMIC + VANILLA */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroTopRow}>
+              <View style={styles.heroIconBadge}>
+                <Ionicons name="card-outline" size={22} color="#F1FEC8" />
+              </View>
+              <View style={styles.heroTextContainer}>
+                <AppText variant="bodyBold" style={styles.heroTitle}>
+                  {getTitle()}
                 </AppText>
-              </Pressable>
-              {subProfiles.map((p) => {
-                const isSelected = activeProfileId === p.id;
-                return (
-                  <Pressable
-                    key={p.id}
-                    style={[styles.profilePill, isSelected && styles.profilePillActive]}
-                    onPress={() => {
-                      void Haptics.selectionAsync();
-                      setActiveProfileId(p.id);
-                    }}
-                  >
-                    <AppText style={[styles.profilePillText, isSelected && styles.profilePillTextActive]}>
-                      👶 {p.name}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+                <AppText variant="caption" style={styles.heroSubtitle}>
+                  {isIt
+                    ? `Passaporto clinico digitale di ${profileName}. Mostralo al cameriere o allo chef.`
+                    : `Medical digital pass for ${profileName}. Present to server or head chef.`}
+                </AppText>
+              </View>
+            </View>
+
+            {/* QUICK META ROW */}
+            <View style={styles.heroMetaRow}>
+              <View style={styles.metaChip}>
+                <Ionicons name="language-outline" size={13} color="#F1FEC8" />
+                <AppText variant="caption" style={styles.metaChipText}>
+                  {currentLangObj.name} ({currentLangObj.flag})
+                </AppText>
+              </View>
+
+              <View style={styles.metaChip}>
+                <Ionicons name="shield-checkmark-outline" size={13} color="#F1FEC8" />
+                <AppText variant="caption" style={styles.metaChipText}>
+                  {activeAllergies.length} {isIt ? 'Allergeni attivi' : 'Active items'}
+                </AppText>
+              </View>
+            </View>
           </View>
-        )}
 
-        {/* SUBTITLE */}
-        <AppText style={styles.subtitleText}>
-          {isIt
-            ? `Pass digitale medico per sala e cucina di ${profileName}. Mostralo al cameriere o allo chef.`
-            : `Medical digital pass for kitchen and waitstaff of ${profileName}. Show it to the server or chef.`}
-        </AppText>
-
-        {/* CRITICAL BANNER FIRST */}
-        <View style={styles.criticalBanner}>
-          <AppText style={styles.criticalIcon}>⚠️</AppText>
-          <View style={styles.criticalTextWrap}>
-            {severeAllergies.length > 0 ? (
-              <AppText style={styles.criticalText}>
-                <AppText style={styles.criticalBoldRed}>
+          {/* 3. CRITICAL BANNER (SEVERITÀ / ALLERTA CUCINA) */}
+          <View style={styles.criticalBanner}>
+            <Ionicons name="warning-outline" size={20} color="#DC2626" />
+            <View style={styles.criticalTextWrap}>
+              {severeAllergies.length > 0 ? (
+                <AppText style={styles.criticalText}>
+                  <AppText style={styles.criticalBoldRed}>
+                    {activeLang === 'it'
+                      ? `ALLERGIA GRAVE: ${severeAllergies.map((c) => formatAllergenLabel(c)).join(', ')}. `
+                      : activeLang === 'jp'
+                      ? `重度アレルギー: ${severeAllergies.map((c) => formatAllergenLabel(c)).join('、')}。`
+                      : `SEVERE ALLERGY: ${severeAllergies.map((c) => formatAllergenLabel(c)).join(', ')}. `}
+                  </AppText>
                   {activeLang === 'it'
-                    ? `ALLERGIA GRAVE: ${severeAllergies.map((c) => formatAllergenLabel(c)).join(', ')}. `
+                    ? 'Il contatto anche minimo con questi alimenti o la cottura negli stessi oli/padelle può provocare shock anafilattico.'
                     : activeLang === 'jp'
-                    ? `重度アレルギー: ${severeAllergies.map((c) => formatAllergenLabel(c)).join('、')}。`
-                    : `SEVERE ALLERGY: ${severeAllergies.map((c) => formatAllergenLabel(c)).join(', ')}. `}
+                    ? '微量の混入や同一の揚げ油・調理器具の使用でもアナフィラキシーショックを引き起こす危険があります。'
+                    : 'Even minimal cross-contact or cooking in shared fryers/pans can trigger anaphylaxis.'}
                 </AppText>
-                {activeLang === 'it'
-                  ? 'Il contatto anche minimo con questi alimenti o la cottura negli stessi oli/padelle può provocare shock anafilattico.'
-                  : activeLang === 'jp'
-                  ? '微量の混入や同一の揚げ油・調理器具の使用でもアナフィラキシーショックを引き起こす危険があります。'
-                  : 'Even minimal cross-contact or cooking in shared fryers/pans can trigger anaphylaxis.'}
-              </AppText>
-            ) : (
-              <AppText style={styles.criticalText}>
-                <AppText style={styles.criticalBoldRed}>
-                  {activeLang === 'it' ? 'Avviso per la cucina: ' : activeLang === 'jp' ? '調理スタッフへの重要なお願い: ' : 'Kitchen Alert: '}
+              ) : (
+                <AppText style={styles.criticalText}>
+                  <AppText style={styles.criticalBoldRed}>
+                    {activeLang === 'it' ? 'Avviso per la cucina: ' : activeLang === 'jp' ? '調理スタッフへの重要なお願い: ' : 'Kitchen Alert: '}
+                  </AppText>
+                  {activeLang === 'it'
+                    ? 'Si prega di verificare con la massima cura che le preparazioni non contengano gli allergeni indicati sotto.'
+                    : activeLang === 'jp'
+                    ? '下記の特定原材料・アレルゲンが料理に含まれないよう厳重にご確認ください。'
+                    : 'Please verify with utmost care that dishes do not contain the allergens listed below.'}
                 </AppText>
-                {activeLang === 'it'
-                  ? 'Si prega di verificare con la massima cura che le preparazioni non contengano gli allergeni indicati sotto.'
-                  : activeLang === 'jp'
-                  ? '下記の特定原材料・アレルゲンが料理に含まれないよう厳重にご確認ください。'
-                  : 'Please verify with utmost care that dishes do not contain the allergens listed below.'}
+              )}
+            </View>
+          </View>
+
+          {/* 4. KITCHEN CONTAMINATION RULES CARD */}
+          <View style={styles.kitchenRulesCard}>
+            <View style={styles.kitchenRulesHead}>
+              <Ionicons name="restaurant-outline" size={17} color="#B45309" />
+              <AppText style={styles.kitchenRulesTitle}>
+                {activeLang === 'it' ? 'Regole di Non Contaminazione in Cucina' : activeLang === 'jp' ? '厨房内での混入防止ルール' : 'Kitchen Non-Contamination Rules'}
               </AppText>
-            )}
-          </View>
-        </View>
-
-        {/* KITCHEN CONTAMINATION RULES CARD */}
-        <View style={styles.kitchenRulesCard}>
-          <View style={styles.kitchenRulesHead}>
-            <Ionicons name="restaurant-outline" size={18} color="#D97706" />
-            <AppText style={styles.kitchenRulesTitle}>
-              {activeLang === 'it' ? 'Regole di Non Contaminazione in Cucina' : activeLang === 'jp' ? '厨房内での混入防止ルール' : 'Kitchen Non-Contamination Rules'}
-            </AppText>
-          </View>
-          <View style={styles.kitchenRulesList}>
-            {Object.keys(KITCHEN_RULES_TRANSLATIONS).map((key) => {
-              const rDict = KITCHEN_RULES_TRANSLATIONS[key];
-              const rule = rDict[activeLang] || rDict.en || rDict.it;
-              const iconName = key === 'surfaces' ? 'flame-outline' : key === 'oil' ? 'water-outline' : key === 'gloves' ? 'hand-left-outline' : 'cut-outline';
-              return (
-                <View key={key} style={styles.kitchenRuleItem}>
-                  <View style={styles.kitchenRuleIconCircle}>
-                    <Ionicons name={iconName as any} size={15} color="#B45309" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <AppText style={styles.kitchenRuleItemTitle}>{rule.title}</AppText>
-                    <AppText style={styles.kitchenRuleItemDesc}>{rule.desc}</AppText>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* ALLERGENS LIST */}
-        {activeAllergies.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <AppText variant="caption" color="#6B6690">
-              {isIt ? 'Nessun allergene configurato nel profilo selezionato.' : 'No allergens configured in this profile.'}
-            </AppText>
-          </View>
-        ) : (
-          <View style={styles.listCard}>
-            {groupedAllergies.map((group, idx) => {
-              const catIcon = CATEGORY_ICONS[group.key] || '🏷️';
-              const secDict = ALLERGEN_SECTIONS[group.key] as Record<string, string> | undefined;
-              const catTitle = secDict?.[activeLang] || secDict?.it || group.key.toUpperCase();
-              const isLastGroup = idx === groupedAllergies.length - 1;
-
-              return (
-                <View key={group.key} style={[styles.group, isLastGroup && styles.groupLast]}>
-                  <View style={styles.groupHead}>
-                    <View style={styles.groupTitleRow}>
-                      <AppText style={styles.groupIconText}>{catIcon}</AppText>
-                      <AppText style={styles.groupTitleText}>{catTitle}</AppText>
+            </View>
+            <View style={styles.kitchenRulesList}>
+              {Object.keys(KITCHEN_RULES_TRANSLATIONS).map((key) => {
+                const rDict = KITCHEN_RULES_TRANSLATIONS[key];
+                const rule = rDict[activeLang] || rDict.en || rDict.it;
+                const iconName: keyof typeof Ionicons.glyphMap =
+                  key === 'surfaces' ? 'flame-outline' :
+                  key === 'oil' ? 'water-outline' :
+                  key === 'gloves' ? 'hand-left-outline' : 'cut-outline';
+                return (
+                  <View key={key} style={styles.kitchenRuleItem}>
+                    <View style={styles.kitchenRuleIconCircle}>
+                      <Ionicons name={iconName} size={14} color="#B45309" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <AppText style={styles.kitchenRuleItemTitle}>{rule.title}</AppText>
+                      <AppText style={styles.kitchenRuleItemDesc}>{rule.desc}</AppText>
                     </View>
                   </View>
-                  {renderPillGroup(group.items)}
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
           </View>
-        )}
 
-        <View style={{ height: 140 + insets.bottom }} />
-      </GlassScreenScroll>
+          {/* 5. ALLERGENS LIST CATEGORIZZATA */}
+          {activeAllergies.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="shield-checkmark-outline" size={42} color="#10B981" />
+              <AppText variant="bodyBold" style={{ color: '#23212C', marginTop: 10 }}>
+                {isIt ? 'Nessun allergene configurato' : 'No allergens configured'}
+              </AppText>
+              <AppText variant="caption" color="#64748B" style={{ textAlign: 'center', marginTop: 4 }}>
+                {isIt ? 'Aggiungi i tuoi allergeni nelle impostazioni profilo.' : 'Add your allergens in profile settings.'}
+              </AppText>
+            </View>
+          ) : (
+            <View style={styles.listCard}>
+              <View style={styles.listCardHeader}>
+                <Ionicons name="shield-outline" size={16} color="#23212C" />
+                <AppText variant="bodyBold" style={{ color: '#23212C', fontSize: 14 }}>
+                  {isIt ? 'Dettaglio Allergeni & Intolleranze' : 'Allergen & Intolerance Detail'}
+                </AppText>
+              </View>
 
-      {/* FLOATING CTA FOOTER */}
-      <View style={[styles.ctaWrap, { paddingBottom: Math.max(insets.bottom + 16, 24) }]}>
-        <SurfaceButton
-          label={isIt ? 'Mostra Pass a Schermo Intero' : 'Show Full-Screen Pass'}
+              {groupedAllergies.map((group, idx) => {
+                const iconName = CATEGORY_OUTLINE_ICONS[group.key] || 'nutrition-outline';
+                const secDict = ALLERGEN_SECTIONS[group.key] as Record<string, string> | undefined;
+                const catTitle = secDict?.[activeLang] || secDict?.it || group.key.toUpperCase();
+                const isLastGroup = idx === groupedAllergies.length - 1;
+
+                return (
+                  <View key={group.key} style={[styles.group, isLastGroup && styles.groupLast]}>
+                    <View style={styles.groupHead}>
+                      <View style={styles.groupTitleRow}>
+                        <Ionicons name={iconName} size={15} color="#23212C" />
+                        <AppText style={styles.groupTitleText}>{catTitle}</AppText>
+                      </View>
+                    </View>
+                    {renderPillGroup(group.items)}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
+      </View>
+
+      {/* FLOATING CTA FOOTER CON VANILLA */}
+      <View style={[styles.ctaWrap, { paddingBottom: Math.max(insets.bottom + 12, 20) }]}>
+        <Pressable
+          style={styles.ctaButton}
           onPress={() => {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             setFullScreenVisible(true);
           }}
-          fullWidth
-          style={styles.ctaButton}
-        />
+        >
+          <Ionicons name="expand-outline" size={18} color="#23212C" />
+          <AppText variant="bodyBold" color="#23212C">
+            {isIt ? 'Mostra Pass a Schermo Intero' : 'Show Full-Screen Pass'}
+          </AppText>
+        </Pressable>
       </View>
 
       {/* LANGUAGE PICKER MODAL */}
       <Modal visible={langPickerVisible} animationType="fade" transparent onRequestClose={() => setLangPickerVisible(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setLangPickerVisible(false)} />
-        <View style={[styles.sheetContainer, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
+        <View style={[styles.sheetContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
           <View style={styles.sheetHandle} />
           <AppText variant="title" style={styles.sheetTitle}>
             {isIt ? 'Seleziona Lingua del Pass' : 'Select Pass Language'}
           </AppText>
-          <AppText variant="caption" color="#6B6690" style={styles.sheetSubtitle}>
-            {isIt ? 'Il pass e le istruzioni di cucina verranno tradotti istantaneamente' : 'Pass and kitchen rules will translate instantly'}
+          <AppText variant="caption" color="#64748B" style={styles.sheetSubtitle}>
+            {isIt ? 'Il pass e le regole per lo chef verranno tradotti istantaneamente.' : 'The pass and kitchen rules will be instantly translated.'}
           </AppText>
 
           <ScrollView style={styles.sheetList} showsVerticalScrollIndicator={false}>
@@ -597,11 +672,11 @@ export default function AllergyCardScreen() {
                   >
                     <AppText style={{ fontSize: 22 }}>{langObj.flag}</AppText>
                     <View style={{ flex: 1 }}>
-                      <AppText variant="bodyBold" color={selected ? colors.brand : '#2A2452'}>
+                      <AppText variant="bodyBold" color={selected ? '#23212C' : '#475569'}>
                         {langObj.name}
                       </AppText>
                     </View>
-                    {selected && <Ionicons name="checkmark-circle" size={20} color={colors.brand} />}
+                    {selected && <Ionicons name="checkmark-circle-outline" size={20} color="#23212C" />}
                   </Pressable>
                 );
               })}
@@ -612,7 +687,7 @@ export default function AllergyCardScreen() {
 
       {/* FULL-SCREEN PASS MODAL */}
       <Modal visible={fullScreenVisible} animationType="slide" transparent={false}>
-        <View style={styles.fullScreenBg}>
+        <View style={[styles.fullScreenBg, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
           <View style={styles.fsTopBar}>
             <Pressable
               style={styles.fsLangBtn}
@@ -621,13 +696,13 @@ export default function AllergyCardScreen() {
                 setLangPickerVisible(true);
               }}
             >
-              <AppText style={{ fontSize: 18 }}>{currentLangObj.flag}</AppText>
-              <AppText variant="bodyBold" color="#FFFFFF">{currentLangObj.label}</AppText>
-              <Ionicons name="chevron-down" size={14} color="#94A3B8" />
+              <AppText style={{ fontSize: 16 }}>{currentLangObj.flag}</AppText>
+              <AppText variant="bodyBold" color="#F1FEC8">{currentLangObj.label}</AppText>
+              <Ionicons name="chevron-down-outline" size={13} color="#F1FEC8" />
             </Pressable>
 
             <Pressable style={styles.closeBtn} onPress={() => setFullScreenVisible(false)}>
-              <Ionicons name="close" size={22} color="#FFFFFF" />
+              <Ionicons name="close-outline" size={20} color="#FFFFFF" />
               <AppText variant="bodyBold" color="#FFFFFF">{isIt ? 'Chiudi' : 'Close'}</AppText>
             </Pressable>
           </View>
@@ -639,7 +714,7 @@ export default function AllergyCardScreen() {
             </AppText>
 
             <View style={styles.fsCriticalBanner}>
-              <AppText style={styles.criticalIcon}>⚠️</AppText>
+              <Ionicons name="warning-outline" size={18} color="#DC2626" />
               <View style={{ flex: 1 }}>
                 {severeAllergies.length > 0 ? (
                   <AppText style={styles.fsCriticalText}>
@@ -671,10 +746,10 @@ export default function AllergyCardScreen() {
               </View>
             </View>
 
-            <ScrollView style={{ width: '100%', maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ width: '100%', flex: 1 }} showsVerticalScrollIndicator={false}>
               <View style={styles.fsListCard}>
                 {groupedAllergies.map((group, idx) => {
-                  const catIcon = CATEGORY_ICONS[group.key] || '🏷️';
+                  const iconName = CATEGORY_OUTLINE_ICONS[group.key] || 'nutrition-outline';
                   const fsSecDict = ALLERGEN_SECTIONS[group.key] as Record<string, string> | undefined;
                   const catTitle = fsSecDict?.[activeLang] || fsSecDict?.it || group.key.toUpperCase();
                   const isLast = idx === groupedAllergies.length - 1;
@@ -683,7 +758,7 @@ export default function AllergyCardScreen() {
                     <View key={group.key} style={[styles.group, isLast && styles.groupLast]}>
                       <View style={styles.groupHead}>
                         <View style={styles.groupTitleRow}>
-                          <AppText style={styles.groupIconText}>{catIcon}</AppText>
+                          <Ionicons name={iconName} size={15} color="#23212C" />
                           <AppText style={styles.groupTitleText}>{catTitle}</AppText>
                         </View>
                       </View>
@@ -694,7 +769,7 @@ export default function AllergyCardScreen() {
               </View>
             </ScrollView>
 
-            <AppText variant="caption" color="#6B6690" style={styles.fsFooter}>
+            <AppText variant="caption" color="#64748B" style={styles.fsFooter}>
               {isIt ? 'Mostra questo schermo al cameriere o allo chef.' : activeLang === 'jp' ? 'この画面を給仕スタッフまたは料理長にご提示ください。' : 'Show this screen to waitstaff or head chef.'}
             </AppText>
           </View>
@@ -706,43 +781,22 @@ export default function AllergyCardScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
+    flex: 1,
+    paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 160,
   },
-  profileSelectorWrap: {
-    marginBottom: 12,
+  scrollContent: {
+    gap: 14,
+    paddingTop: 4,
   },
-  profileSelectorScroll: {
+  navBackBtn: {
+    paddingRight: 12,
+    paddingVertical: 4,
+  },
+  headerRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
-  },
-  profilePill: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.72)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-  },
-  profilePillActive: {
-    backgroundColor: '#1E1B4B',
-    borderColor: '#1E1B4B',
-  },
-  profilePillText: {
-    fontSize: 13,
-    fontFamily: font.semibold,
-    color: '#4B4668',
-  },
-  profilePillTextActive: {
-    color: '#FFFFFF',
-    fontFamily: font.bold,
-  },
-  subtitleText: {
-    fontSize: 14,
-    color: '#6B6690',
-    lineHeight: 20,
-    marginBottom: 16,
-    fontFamily: font.regular,
   },
   topHeaderIconBtn: {
     width: 36,
@@ -751,66 +805,155 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#322A63',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   topRightLangPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 100,
-    shadowColor: '#322A63',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  langPillText: {
+    fontWeight: '800',
+    color: '#23212C',
+    fontSize: 12,
+  },
+
+  // PROFILI
+  profileSelectorWrap: {
+    marginBottom: 2,
+  },
+  profileSelectorScroll: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  profilePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  profilePillActive: {
+    backgroundColor: '#23212C',
+    borderColor: '#23212C',
+  },
+  profilePillText: {
+    fontSize: 12,
+    fontFamily: font.semibold,
+    color: '#475569',
+  },
+  profilePillTextActive: {
+    color: '#F1FEC8',
+    fontFamily: font.bold,
+  },
+
+  // HERO CARD
+  heroCard: {
+    backgroundColor: '#23212C',
+    borderRadius: 24,
+    padding: 20,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.2)',
+    shadowColor: '#23212C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  heroIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(241, 254, 200, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.3)',
+  },
+  heroTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+  },
+  heroSubtitle: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  heroMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+  },
+  metaChipText: {
+    fontSize: 11.5,
+    color: 'rgba(255, 255, 255, 0.85)',
   },
 
   // CRITICAL BANNER
   criticalBanner: {
-    backgroundColor: '#FCE9EA',
-    borderLeftWidth: 4,
-    borderLeftColor: '#E5484D',
-    borderRadius: 14,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 18,
     padding: 16,
     flexDirection: 'row',
     gap: 12,
     alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  criticalIcon: {
-    fontSize: 20,
-    lineHeight: 24,
   },
   criticalTextWrap: {
     flex: 1,
   },
   criticalText: {
-    fontSize: 13.5,
-    lineHeight: 20,
-    color: '#2A2452',
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#334155',
     fontFamily: font.regular,
   },
   criticalBoldRed: {
     fontWeight: '800',
-    color: '#E5484D',
+    color: '#DC2626',
     fontFamily: font.bold,
   },
 
   // KITCHEN CONTAMINATION RULES CARD
   kitchenRulesCard: {
     backgroundColor: '#FFFBEB',
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#FDE68A',
     padding: 16,
-    marginBottom: 16,
     gap: 12,
   },
   kitchenRulesHead: {
@@ -820,7 +963,7 @@ const styles = StyleSheet.create({
   },
   kitchenRulesTitle: {
     fontFamily: font.bold,
-    fontSize: 14,
+    fontSize: 13.5,
     color: '#92400E',
   },
   kitchenRulesList: {
@@ -842,7 +985,7 @@ const styles = StyleSheet.create({
   },
   kitchenRuleItemTitle: {
     fontFamily: font.bold,
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#78350F',
     marginBottom: 1,
   },
@@ -856,47 +999,56 @@ const styles = StyleSheet.create({
   // LIST CARD
   listCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    shadowColor: '#322A63',
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
   },
-  emptyBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 24,
+  listCardHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   group: {
-    paddingTop: 16,
-    paddingBottom: 20,
+    paddingTop: 14,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F2F8',
+    borderBottomColor: '#F1F5F9',
   },
   groupLast: {
     borderBottomWidth: 0,
-    paddingBottom: 14,
+    paddingBottom: 4,
   },
   groupHead: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   groupTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  groupIconText: {
-    fontSize: 16,
+    gap: 6,
   },
   groupTitleText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#322A63',
-    letterSpacing: 0.6,
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#23212C',
+    letterSpacing: 0.3,
     fontFamily: font.bold,
   },
 
@@ -910,51 +1062,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  pillEmoji: {
-    fontSize: 15,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
   },
   pillText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     fontFamily: font.semibold,
   },
   pillGrave: {
-    backgroundColor: '#FCE9EA',
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#F8B4B8',
+    borderColor: '#FECACA',
   },
   pillGraveText: {
-    color: '#C92A2A',
+    color: '#DC2626',
     fontWeight: '800',
     fontFamily: font.bold,
   },
   pillMod: {
-    backgroundColor: '#F3F2F8',
+    backgroundColor: '#FFFBEB',
     borderWidth: 1,
-    borderColor: '#E6E4F0',
+    borderColor: '#FDE68A',
   },
   pillModText: {
-    color: '#2A2452',
+    color: '#B45309',
+    fontWeight: '700',
   },
   pillLieve: {
-    backgroundColor: '#FAFAFD',
+    backgroundColor: '#F0FDFA',
     borderWidth: 1,
-    borderColor: '#EDEBF5',
+    borderColor: '#CCFBF1',
   },
   pillLieveText: {
-    color: '#6B6690',
+    color: '#0F766E',
+    fontWeight: '700',
   },
   pillDiet: {
-    backgroundColor: '#E6F6EC',
+    backgroundColor: '#ECFDF5',
     borderWidth: 1,
-    borderColor: '#B7E4C7',
+    borderColor: '#A7F3D0',
   },
   pillDietText: {
-    color: '#2B8A3E',
+    color: '#059669',
     fontWeight: '700',
   },
 
@@ -964,21 +1115,30 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
-    backgroundColor: 'transparent',
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(248, 250, 252, 0.85)',
   },
   ctaButton: {
-    shadowColor: '#1E1B4B',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#F1FEC8',
+    borderWidth: 1,
+    borderColor: '#E2F4A6',
+    paddingVertical: 14,
+    borderRadius: 16,
+    shadowColor: '#F1FEC8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
 
   // MODAL / SHEET
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 12, 41, 0.45)',
+    backgroundColor: 'rgba(35, 33, 44, 0.65)',
   },
   sheetContainer: {
     position: 'absolute',
@@ -989,7 +1149,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     maxHeight: '75%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
@@ -1000,23 +1160,23 @@ const styles = StyleSheet.create({
   sheetHandle: {
     width: 36,
     height: 4,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#CBD5E1',
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 16,
   },
   sheetTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: font.bold,
-    color: '#1E1B4B',
+    color: '#23212C',
     marginBottom: 4,
   },
   sheetSubtitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     marginBottom: 16,
   },
   sheetList: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sheetGrid: {
     gap: 8,
@@ -1026,24 +1186,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     borderRadius: 14,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
   },
   langSheetOptionSelected: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#3B82F6',
+    backgroundColor: '#F1FEC8',
+    borderColor: '#E2F4A6',
   },
 
   // FULLSCREEN
   fullScreenBg: {
     flex: 1,
-    backgroundColor: '#0F0C29',
+    backgroundColor: '#23212C',
     paddingHorizontal: 16,
-    paddingTop: 54,
-    paddingBottom: 24,
     justifyContent: 'space-between',
   },
   fsTopBar: {
@@ -1058,8 +1216,10 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: 'rgba(255,255,255,0.12)',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
   },
   closeBtn: {
     flexDirection: 'row',
@@ -1076,44 +1236,44 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
   fsTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: font.bold,
-    color: '#1E1B4B',
+    color: '#23212C',
     textAlign: 'center',
     marginBottom: 2,
   },
   fsSubtitle: {
     fontSize: 13,
     fontFamily: font.semibold,
-    color: '#6B6690',
+    color: '#64748B',
     marginBottom: 12,
   },
   fsCriticalBanner: {
-    backgroundColor: '#FCE9EA',
-    borderLeftWidth: 4,
-    borderLeftColor: '#E5484D',
-    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 14,
     padding: 12,
     flexDirection: 'row',
     gap: 10,
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 14,
     width: '100%',
   },
   fsCriticalText: {
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: '#2A2452',
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#334155',
   },
   fsListCard: {
     width: '100%',
   },
   fsFooter: {
     textAlign: 'center',
-    marginTop: 8,
-    fontSize: 12,
+    marginTop: 12,
+    fontSize: 11.5,
+    color: '#64748B',
   },
 });

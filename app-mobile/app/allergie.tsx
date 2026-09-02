@@ -27,23 +27,25 @@ import {
   DebossedInput,
   GlassScreenScroll,
   Screen,
+  ScreenTopHeader,
   SurfaceButton,
   AllergyChip,
   AllergyConfigModal,
   CATEGORY_ICONS,
+  CATEGORY_OUTLINE_ICONS,
 } from '../src/components/ui';
 import { font, spacing } from '../src/theme';
 
-const CATEGORY_TABS = [
-  { key: 'tutti', label_it: 'Tutti', label_en: 'All', icon: '✨' },
-  { key: 'ue', label_it: 'UE', label_en: 'EU', icon: '🛡️' },
-  { key: 'frutta_guscio', label_it: 'Noci', label_en: 'Nuts', icon: '🌰' },
-  { key: 'frutta', label_it: 'Frutta', label_en: 'Fruit', icon: '🍓' },
-  { key: 'verdura', label_it: 'Verdura', label_en: 'Veggie', icon: '🥦' },
-  { key: 'cereali', label_it: 'Cereali', label_en: 'Grains', icon: '🌾' },
-  { key: 'spezie', label_it: 'Spezie', label_en: 'Spices', icon: '🧂' },
-  { key: 'intolleranze', label_it: 'Intolleranze', label_en: 'Intolerances', icon: '🥛' },
-  { key: 'preferenze', label_it: 'Diete', label_en: 'Diets', icon: '🌱' },
+const CATEGORY_TABS: { key: string; label_it: string; label_en: string; iconName: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'tutti', label_it: 'Tutti', label_en: 'All', iconName: 'sparkles-outline' },
+  { key: 'ue', label_it: 'UE', label_en: 'EU', iconName: 'shield-checkmark-outline' },
+  { key: 'frutta_guscio', label_it: 'Noci', label_en: 'Nuts', iconName: 'nutrition-outline' },
+  { key: 'frutta', label_it: 'Frutta', label_en: 'Fruit', iconName: 'leaf-outline' },
+  { key: 'verdura', label_it: 'Verdura', label_en: 'Veggie', iconName: 'flower-outline' },
+  { key: 'cereali', label_it: 'Cereali', label_en: 'Grains', iconName: 'restaurant-outline' },
+  { key: 'spezie', label_it: 'Spezie', label_en: 'Spices', iconName: 'flame-outline' },
+  { key: 'intolleranze', label_it: 'Intolleranze', label_en: 'Intolerances', iconName: 'water-outline' },
+  { key: 'preferenze', label_it: 'Diete', label_en: 'Diets', iconName: 'heart-outline' },
 ];
 
 export default function Allergie() {
@@ -279,26 +281,14 @@ export default function Allergie() {
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen
-        options={{
-          headerTitle: isIt ? 'Allergie e intolleranze' : 'Allergies & Intolerances',
-          headerTitleAlign: 'center',
-          headerTitleStyle: { fontFamily: font.bold, fontSize: 18, color: '#322A63' },
-          headerLeft: () => (
-            <Pressable
-              onPress={() => {
-                if (navigation.canGoBack()) {
-                  navigation.goBack();
-                } else {
-                  router.replace('/');
-                }
-              }}
-              hitSlop={12}
-              style={{ paddingRight: 12, paddingVertical: 4 }}
-            >
-              <Ionicons name="chevron-back" size={24} color="#322A63" />
-            </Pressable>
-          ),
+      <ScreenTopHeader
+        title={isIt ? 'Allergie e intolleranze' : 'Allergies & Intolerances'}
+        onBack={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          } else {
+            router.replace('/');
+          }
         }}
       />
 
@@ -342,7 +332,7 @@ export default function Allergie() {
                   : 'allergens selected'}
               </AppText>
               {filterTab === 'attivi' && (
-                <Ionicons name="checkmark-circle" size={15} color="#322A63" style={{ marginLeft: 2 }} />
+                <Ionicons name="checkmark-circle-outline" size={15} color="#322A63" style={{ marginLeft: 2 }} />
               )}
             </Pressable>
 
@@ -398,13 +388,13 @@ export default function Allergie() {
                     pressed && styles.pressed,
                   ]}
                 >
-                  <View style={[styles.pillDot, { backgroundColor: '#F5A524' }]} />
+                  <View style={[styles.pillDot, { backgroundColor: '#F97316' }]} />
                   <AppText style={[
                     styles.severityPillText,
-                    { color: '#B45309' },
+                    { color: '#9A3412' },
                     filterTab === 'moderata' && styles.pillTextActiveModerata
                   ]}>
-                    {stats.moderata} {stats.moderata === 1 ? (isIt ? 'Moderato' : 'Moderate') : (isIt ? 'Moderati' : 'Moderate')}
+                    {stats.moderata} {stats.moderata === 1 ? (isIt ? 'Media' : 'Moderate') : (isIt ? 'Medie' : 'Moderate')}
                   </AppText>
                 </Pressable>
               )}
@@ -446,7 +436,7 @@ export default function Allergie() {
                     pressed && styles.pressed,
                   ]}
                 >
-                  <AppText style={styles.pillEmojiText}>🌱</AppText>
+                  <Ionicons name="heart-outline" size={13} color="#15803D" />
                   <AppText style={[
                     styles.severityPillText,
                     { color: '#15803D' },
@@ -465,7 +455,7 @@ export default function Allergie() {
                   }}
                   style={({ pressed }) => [styles.resetFilterPill, pressed && styles.pressed]}
                 >
-                  <Ionicons name="close-circle" size={14} color="#6B6690" />
+                  <Ionicons name="close-circle-outline" size={14} color="#6B6690" />
                   <AppText style={styles.resetFilterText}>{isIt ? 'Mostra tutti' : 'Show all'}</AppText>
                 </Pressable>
               )}
@@ -491,7 +481,7 @@ export default function Allergie() {
                   }}
                   hitSlop={8}
                 >
-                  <Ionicons name="close-circle" size={18} color="#6B6690" />
+                  <Ionicons name="close-circle-outline" size={18} color="#6B6690" />
                 </Pressable>
               ) : (
                 <Ionicons name="search-outline" size={18} color="#9CA3AF" />
@@ -530,8 +520,13 @@ export default function Allergie() {
                     setCategoryFilter(cat.key);
                   }}
                 >
+                  <Ionicons
+                    name={cat.iconName}
+                    size={14}
+                    color={isActive ? '#FFFFFF' : '#6B6690'}
+                  />
                   <AppText style={isActive ? styles.catTextActive : styles.catText}>
-                    {cat.icon} {isIt ? cat.label_it : cat.label_en}
+                    {isIt ? cat.label_it : cat.label_en}
                   </AppText>
                 </Pressable>
               );
@@ -556,22 +551,27 @@ export default function Allergie() {
           <View style={styles.listCard}>
             {sections.map((section, index) => {
               const sectionSelectedCount = section.items.filter((item) => selected.has(item.code)).length;
-              const catIcon = CATEGORY_ICONS[section.key] || '🏷️';
+              const catOutlineIcon = CATEGORY_OUTLINE_ICONS[section.key] || 'shield-checkmark-outline';
               const isLastGroup = index === sections.length - 1;
 
               return (
                 <View key={section.key} style={[styles.group, isLastGroup && styles.groupLast]}>
                   <View style={styles.groupHead}>
                     <View style={styles.groupTitleRow}>
-                      <AppText style={styles.groupIconText}>{catIcon}</AppText>
+                      <View style={styles.groupIconBadge}>
+                        <Ionicons name={catOutlineIcon} size={15} color="#322A63" />
+                      </View>
                       <AppText style={styles.groupTitleText}>
                         {getSectionTitle(section.key, lang)}
                       </AppText>
                     </View>
                     {sectionSelectedCount > 0 ? (
-                      <AppText style={styles.groupBadge}>
-                        {sectionSelectedCount} {isIt ? 'attivi' : 'active'}
-                      </AppText>
+                      <View style={styles.groupBadgeWrap}>
+                        <Ionicons name="checkmark-circle-outline" size={13} color="#322A63" />
+                        <AppText style={styles.groupBadge}>
+                          {sectionSelectedCount} {isIt ? 'attivi' : 'active'}
+                        </AppText>
+                      </View>
                     ) : null}
                   </View>
 
@@ -630,7 +630,9 @@ export default function Allergie() {
           isDiet={Boolean(configModalTarget.is_diet)}
           intensity={intensities[configModalTarget.code] || 'moderata'}
           criterio={criteria[configModalTarget.code] || 'assoluto'}
-          onSave={(intensity, criterio) => updateConfig(configModalTarget.code, intensity, criterio)}
+          onSave={(intensity: AllergyIntensity, criterio: AllergyCriterio) =>
+            updateConfig(configModalTarget.code, intensity, criterio)
+          }
           isIt={isIt}
         />
       )}
@@ -774,14 +776,14 @@ const styles = StyleSheet.create({
   pillTextActiveGrave: {
     fontWeight: '800',
   },
-  // MODERATA
+  // MODERATA / MEDIA
   pillModerata: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FEF3C7',
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FFEDD5',
   },
   pillModerataActive: {
-    backgroundColor: '#FEF3C7',
-    borderColor: '#F5A524',
+    backgroundColor: '#FFEDD5',
+    borderColor: '#F97316',
   },
   pillTextActiveModerata: {
     fontWeight: '800',
@@ -843,56 +845,65 @@ const styles = StyleSheet.create({
   },
   catnavWrap: {
     position: 'relative',
-    paddingTop: 4,
+    paddingTop: 2,
     paddingBottom: 10,
   },
   catnavContent: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    gap: 16,
+    gap: 8,
   },
   catnavFade: {
     position: 'absolute',
     right: 0,
     top: 0,
     bottom: 10,
-    width: 36,
+    width: 32,
     backgroundColor: '#F3F1FA',
     opacity: 0.85,
   },
   catPill: {
-    paddingBottom: 8,
-    borderBottomWidth: 2.5,
-    borderBottomColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6.5,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E4E0F5',
   },
   catPillActive: {
-    borderBottomColor: '#322A63',
+    backgroundColor: '#322A63',
+    borderColor: '#322A63',
   },
   catText: {
-    fontSize: 14.5,
+    fontSize: 13,
     fontWeight: '700',
     color: '#6B6690',
     fontFamily: font.semibold,
   },
   catTextActive: {
-    fontSize: 14.5,
+    fontSize: 13,
     fontWeight: '800',
-    color: '#322A63',
+    color: '#FFFFFF',
     fontFamily: font.bold,
   },
 
   // SCROLL CONTENT & CARD
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
     paddingBottom: 160,
   },
   listCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingHorizontal: 20,
+    borderRadius: 20,
+    paddingHorizontal: 14,
     paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E8E4F5',
     shadowColor: '#322A63',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -900,40 +911,53 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   group: {
-    paddingTop: 22,
-    paddingBottom: 26,
+    paddingTop: 20,
+    paddingBottom: 22,
     borderBottomWidth: 1,
-    borderBottomColor: '#E4E0F5',
+    borderBottomColor: '#EBE7F7',
   },
   groupLast: {
     borderBottomWidth: 0,
-    paddingBottom: 14,
+    paddingBottom: 10,
   },
   groupHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 18,
+    marginBottom: 14,
   },
   groupTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  groupIconText: {
-    fontSize: 14,
-    textAlign: 'center',
+  groupIconBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F0ECFA',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   groupTitleText: {
     fontSize: 12.5,
-    letterSpacing: 0.8,
+    letterSpacing: 0.7,
     fontWeight: '800',
-    color: '#6B6690',
+    color: '#4A4370',
     textTransform: 'uppercase',
     fontFamily: font.bold,
   },
+  groupBadgeWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F0ECFA',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
   groupBadge: {
-    fontSize: 13.5,
+    fontSize: 12,
     fontWeight: '800',
     color: '#322A63',
     fontFamily: font.bold,
@@ -942,7 +966,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'flex-start',
-    gap: 14,
+    gap: 8,
   },
 
   // CTA FOOTER

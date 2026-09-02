@@ -8,9 +8,12 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..database import get_db
-from ..models import PasswordResetToken, User
+from typing import Optional
+
+from ..models import MedicalDocument, PasswordResetToken, Restaurant, User
 from ..schemas import (
     ChangePasswordIn,
+    DeleteAccountIn,
     ForgotPasswordIn,
     LoginIn,
     RegisterIn,
@@ -20,6 +23,7 @@ from ..schemas import (
 from ..security import create_token, get_current_user, hash_password, verify_password
 from ..rate_limit import rate_limiter
 from ..legal import LEGAL_TERMS_VERSION, PRIVACY_VERSION
+from ..services import storage
 from ..services.emailer import send_password_reset
 from ..services.referrals import ensure_customer_invite_code
 
@@ -143,3 +147,58 @@ def change_password(
     user.password_hash = hash_password(data.new_password)
     db.commit()
     return {"detail": "Password aggiornata."}
+
+
+@router.delete("/delete-account", dependencies=[Depends(rate_limiter(5, 300))])
+@router.post("/delete-account", dependencies=[Depends(rate_limiter(5, 300))])
+def delete_account(
+    data: Optional[DeleteAccountIn] = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cancellazione definitiva dell'account e di tutti i dati personali e sanitari (GDPR & Apple Guideline 5.1.1(v))."""
+    if data and data.password:
+        if not verify_password(data.password, user.password_hash):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Password non corretta")
+
+    # 1. Cancellazione file fisici dei documenti medici dell'utente
+    docs = db.scalars(select(MedicalDocument).where(MedicalDocument.user_id == user.id)).all()
+    for doc in docs:
+        if doc.file_key:
+            try:
+                storage.delete(doc.file_key)
+            except Exception:
+                pass
+
+    # 2. Cancellazione foto profilo se presente
+    if user.photo_key:
+        try:
+            storage.delete(user.photo_key)
+        except Exception:
+            pass
+
+    # 3. Se ristoratore, pulizia ristoranti e logo
+    if user.role == "owner":
+        restaurants = db.scalars(select(Restaurant).where(Restaurant.owner_id == user.id)).all()
+        for rest in restaurants:
+            if rest.logo_key:
+                try:
+                    storage.delete(rest.logo_key)
+                except Exception:
+                    pass
+            db.delete(rest)
+
+    # 4. Cancellazione sottoscrizioni Stripe se presenti
+    if settings.stripe_configured and user.customer_stripe_subscription_id:
+        try:
+            import stripe
+            stripe.api_key = settings.stripe_secret_key
+            stripe.Subscription.delete(user.customer_stripe_subscription_id)
+        except Exception:
+            pass
+
+    # 5. Cancellazione dell'utente (triggera cascate FK per allergeni, profili, reazioni, dispensa, preferiti)
+    db.delete(user)
+    db.commit()
+
+    return {"detail": "Account e tutti i dati sanitari e personali sono stati eliminati definitivamente."}

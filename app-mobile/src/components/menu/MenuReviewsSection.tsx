@@ -92,13 +92,13 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
         <View style={styles.header}>
           <View style={styles.headingGroup}>
             <View style={styles.headingIcon}>
-              <Ionicons name="star" size={15} color="#A66B00" />
+              <Ionicons name="star-outline" size={15} color="#A66B00" />
             </View>
             <Text style={styles.title}>{t('reviews', language)}</Text>
           </View>
           {reviews.length > 0 && (
             <View style={styles.avg}>
-              <Ionicons name="star" size={13} color="#A66B00" />
+              <Ionicons name="star-outline" size={13} color="#A66B00" />
               <Text style={styles.avgText}>
                 {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
               </Text>
@@ -113,7 +113,7 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
                 <Ionicons name="logo-google" size={15} color="#2563eb" />
                 <Text style={styles.sourceName}>Google</Text>
                 <Text style={[styles.sourceRating, { color: '#2563eb' }]}>{menu.google_rating}</Text>
-                <Ionicons name="star" size={12} color="#2563eb" />
+                <Ionicons name="star-outline" size={12} color="#2563eb" />
                 <Text style={styles.sourceCount}>{menu.google_reviews_count}</Text>
               </View>
             ) : null}
@@ -122,7 +122,7 @@ export default function MenuReviewsSection({ menu, language, canSubmit, state }:
                 <Ionicons name="earth-outline" size={15} color="#059669" />
                 <Text style={styles.sourceName}>TripAdvisor</Text>
                 <Text style={[styles.sourceRating, { color: '#059669' }]}>{menu.tripadvisor_rating}</Text>
-                <Ionicons name="star" size={12} color="#059669" />
+                <Ionicons name="star-outline" size={12} color="#059669" />
                 <Text style={styles.sourceCount}>{menu.tripadvisor_reviews_count}</Text>
               </View>
             ) : null}

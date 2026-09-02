@@ -1,5 +1,5 @@
 import React, { useEffect, useId } from 'react';
-import { Image, type ImageSourcePropType, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -12,6 +12,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, {
   Circle,
   ClipPath,
@@ -27,15 +28,12 @@ import { colors, spacing, WIREFRAME_MODE } from '../../theme';
 import { wireBox } from '../../wireframe';
 import { AppText } from './AppText';
 
-const OWNER_TAB_ICONS = {
-  locali: require('../../../assets/owner_tab_locali.png'),
-  menu: require('../../../assets/owner_tab_menu.png'),
-  qr: require('../../../assets/owner_tab_qr.png'),
-  account: require('../../../assets/owner_tab_account.png'),
-} as const satisfies Record<string, ImageSourcePropType>;
-
-const TAB_ICON_SIZE = 34;
-const TAB_ICON_SIZE_ACTIVE = 34;
+const OWNER_ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> = {
+  locali: { active: 'storefront-outline', inactive: 'storefront-outline' },
+  menu: { active: 'restaurant-outline', inactive: 'restaurant-outline' },
+  qr: { active: 'qr-code-outline', inactive: 'qr-code-outline' },
+  account: { active: 'person-outline', inactive: 'person-outline' },
+};
 
 const OWNER_SLOTS = [
   { name: 'locali', label: 'Attività' },
@@ -154,10 +152,10 @@ function OwnerTabItem({
       style={styles.tabHit}
     >
       <Animated.View style={[styles.iconWrap, iconStyle]}>
-        <Image
-          source={OWNER_TAB_ICONS[slot.name]}
-          style={[styles.tabIcon, focused && styles.tabIconActive]}
-          resizeMode="contain"
+        <Ionicons
+          name={focused ? OWNER_ICONS[slot.name].active : OWNER_ICONS[slot.name].inactive}
+          size={focused ? 24 : 22}
+          color={focused ? '#F1FEC8' : 'rgba(255, 255, 255, 0.72)'}
         />
       </Animated.View>
     </Pressable>
@@ -316,16 +314,6 @@ const styles = StyleSheet.create({
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  tabIcon: {
-    width: TAB_ICON_SIZE,
-    height: TAB_ICON_SIZE,
-    opacity: 0.92,
-  },
-  tabIconActive: {
-    width: TAB_ICON_SIZE_ACTIVE,
-    height: TAB_ICON_SIZE_ACTIVE,
-    opacity: 1,
   },
   wfBar: {
     flexDirection: 'row',

@@ -209,7 +209,7 @@ export function AddDishModal({
       >
         <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 10) }]}>
           <TouchableOpacity onPress={onClose} hitSlop={12} style={styles.iconBtn} disabled={busy}>
-            <Ionicons name="close" size={22} color={colors.brandInk} />
+            <Ionicons name="close-outline" size={22} color={colors.brandInk} />
           </TouchableOpacity>
           <AppText variant="h2" style={{ fontSize: 17, flex: 1, textAlign: 'center' }}>
             Nuovo piatto
@@ -399,7 +399,7 @@ export function AddDishModal({
               ]}
             >
               {draft.kitchen_protocol_confirmed === 1 ? (
-                <Ionicons name="checkmark" size={14} color="#FFF" />
+                <Ionicons name="checkmark-outline" size={14} color="#FFF" />
               ) : null}
             </View>
             <View style={{ flex: 1 }}>

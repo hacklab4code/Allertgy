@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '../src/store/session';
-import { AppText, Screen } from '../src/components/ui';
+import { AppText, NavHeaderBackButton, Screen, ScreenTopHeader } from '../src/components/ui';
 import { colors, font, radius, spacing } from '../src/theme';
 import {
   OFFICIAL_FOOD_RECALLS,
@@ -23,24 +23,30 @@ import { loadPantryItems, loadProductFavorites } from '../src/services/productSt
 
 export default function RecallsScreen() {
   const insets = useSafeAreaInsets();
-  const { language, allergie } = useSession();
+  const { allergie, subProfiles, language } = useSession();
   const isIt = (language || 'it').toLowerCase() === 'it';
 
-  const [pantryNames, setPantryNames] = useState<string[]>([]);
+  const [pantryBarcodes, setPantryBarcodes] = useState<string[]>([]);
+  const [favoriteBarcodes, setFavoriteBarcodes] = useState<string[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<string>('tutti');
 
   useEffect(() => {
-    async function loadUserProducts() {
-      const [pantry, favs] = await Promise.all([loadPantryItems(), loadProductFavorites()]);
-      const names = [...pantry.map((p) => p.name), ...favs.map((f) => f.name)];
-      setPantryNames(names);
+    async function loadData() {
+      const pantry = await loadPantryItems();
+      const favs = await loadProductFavorites();
+      setPantryBarcodes(pantry.map((p) => p.barcode));
+      setFavoriteBarcodes(favs.map((f) => f.barcode));
     }
-    void loadUserProducts();
+    void loadData();
   }, []);
 
   const analyzedRecalls = useMemo(() => {
-    return checkUserRecalls(OFFICIAL_FOOD_RECALLS, allergie, pantryNames);
-  }, [allergie, pantryNames]);
+    return checkUserRecalls(
+      OFFICIAL_FOOD_RECALLS,
+      allergie,
+      pantryBarcodes
+    );
+  }, [allergie, pantryBarcodes]);
 
   const urgentAlerts = useMemo(() => {
     return analyzedRecalls.filter((r) => r.matchedPantryItem || r.matchedAllergen);
@@ -57,31 +63,60 @@ export default function RecallsScreen() {
     { id: 'pericolo', label: isIt ? '⚠️ Rilevanti per te' : '⚠️ Relevant for you' },
     { id: 'glutine', label: '🌾 Glutine' },
     { id: 'latte', label: '🥛 Latte' },
-    { id: 'frutta_a_guscio', label: '🌰 Frutta guscio' },
-    { id: 'uova', label: '🥚 Uova' },
+    { id: 'frutta_a_guscio', label: 'Frutta a guscio' },
+    { id: 'uova', label: 'Uova' },
   ];
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen
-        options={{
-          headerTitle: isIt ? 'Richiami Ministeriali' : 'Food Recalls Feed',
-          headerTitleStyle: { fontFamily: font.bold, fontSize: 18, color: '#1E1B4B' },
-          headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12, paddingVertical: 4 }}>
-              <Ionicons name="chevron-back" size={24} color="#1E1B4B" />
-            </Pressable>
-          ),
-        }}
+      <ScreenTopHeader
+        title={isIt ? 'Richiami Ministeriali' : 'Food Recalls Feed'}
       />
 
-      <View style={[styles.container, { paddingTop: insets.top + 48 }]}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+      <View style={styles.container}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
+          {/* HERO SUMMARY CARD COSMIC + VANILLA */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroTopRow}>
+              <View style={styles.heroIconBadge}>
+                <Ionicons name="alert-circle-outline" size={22} color="#F1FEC8" />
+              </View>
+              <View style={styles.heroTextContainer}>
+                <AppText variant="bodyBold" style={styles.heroTitle}>
+                  {isIt ? 'Allerta Sicurezza Alimentare' : 'Food Safety Alerts'}
+                </AppText>
+                <AppText variant="caption" style={styles.heroSubtitle}>
+                  {isIt
+                    ? 'Monitoraggio in tempo reale dei ritiri ministeriali per allergeni e contaminazioni.'
+                    : 'Real-time monitoring of Ministry recalls for undeclared allergens and cross-contamination.'}
+                </AppText>
+              </View>
+            </View>
+
+            {/* QUICK STATS */}
+            <View style={styles.statsContainer}>
+              <View style={styles.statBox}>
+                <Ionicons name="documents-outline" size={14} color="#F1FEC8" />
+                <AppText variant="caption" style={styles.statLabel}>
+                  {isIt ? 'Totale attivi' : 'Active'}: <AppText variant="caption" style={styles.statValue}>{analyzedRecalls.length}</AppText>
+                </AppText>
+              </View>
+              {urgentAlerts.length > 0 && (
+                <View style={[styles.statBox, styles.statBoxAlert]}>
+                  <Ionicons name="warning-outline" size={14} color="#FCA5A5" />
+                  <AppText variant="caption" style={[styles.statLabel, { color: '#FECACA' }]}>
+                    {isIt ? 'Tuoi allergeni' : 'Your allergens'}: <AppText variant="caption" style={[styles.statValue, { color: '#FECACA' }]}>{urgentAlerts.length}</AppText>
+                  </AppText>
+                </View>
+              )}
+            </View>
+          </View>
+
           {/* URGENT PANTRY WARNING */}
           {urgentAlerts.length > 0 && (
             <View style={styles.urgentBanner}>
               <View style={styles.urgentBannerHead}>
-                <Ionicons name="warning" size={22} color="#DC2626" />
+                <Ionicons name="warning-outline" size={22} color="#DC2626" />
                 <AppText variant="bodyBold" style={{ color: '#991B1B', flex: 1 }}>
                   {isIt
                     ? `Attenzione: ${urgentAlerts.length} richiami attivi per i tuoi allergeni!`
@@ -123,7 +158,7 @@ export default function RecallsScreen() {
               <View key={recall.id} style={[styles.recallCard, (matchedAllergen || matchedPantryItem) && styles.recallCardDanger]}>
                 <View style={styles.recallCardHead}>
                   <View style={[styles.hazardPill, recall.hazardLevel === 'ALTO' ? styles.hazardHigh : styles.hazardMed]}>
-                    <Ionicons name="shield-checkmark" size={12} color="#FFFFFF" />
+                    <Ionicons name="shield-checkmark-outline" size={12} color="#FFFFFF" />
                     <AppText style={styles.hazardText}>{recall.hazardLevel}</AppText>
                   </View>
                   <AppText variant="caption" color="#64748B">
@@ -133,23 +168,24 @@ export default function RecallsScreen() {
 
                 {matchedPantryItem && (
                   <View style={styles.matchedPantryBanner}>
-                    <Ionicons name="basket" size={14} color="#DC2626" />
+                    <Ionicons name="basket-outline" size={14} color="#DC2626" />
                     <AppText variant="caption" style={{ color: '#DC2626', fontWeight: '800' }}>
                       {isIt ? `Presente nella tua dispensa: ${matchedPantryItem}` : `Found in your pantry: ${matchedPantryItem}`}
                     </AppText>
                   </View>
                 )}
 
-                <AppText variant="title" style={{ color: '#1E1B4B', fontSize: 16, marginTop: 4 }}>
+                <AppText variant="title" style={{ color: '#23212C', fontSize: 16, marginTop: 4 }}>
                   {recall.productName}
                 </AppText>
-                <AppText variant="caption" color="#4B5563" style={{ fontWeight: '700' }}>
+                <AppText variant="caption" color="#475569" style={{ fontWeight: '700' }}>
                   {recall.brand} · {recall.manufacturer}
                 </AppText>
 
                 <View style={styles.reasonBox}>
+                  <Ionicons name="warning-outline" size={14} color="#92400E" />
                   <AppText variant="caption" style={styles.reasonText}>
-                    ⚠️ {recall.reason}
+                    {recall.reason}
                   </AppText>
                 </View>
 
@@ -167,8 +203,9 @@ export default function RecallsScreen() {
                 </View>
 
                 <View style={styles.instructionsBox}>
+                  <Ionicons name="bulb-outline" size={14} color="#64748B" />
                   <AppText variant="caption" style={styles.instructionsText}>
-                    💡 {recall.instructions}
+                    {recall.instructions}
                   </AppText>
                 </View>
               </View>
@@ -184,14 +221,94 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 16,
+    paddingTop: 8,
   },
+  scrollContent: {
+    gap: 14,
+    paddingTop: 4,
+  },
+  navBackBtn: {
+    paddingRight: 12,
+    paddingVertical: 4,
+  },
+
+  // HERO SUMMARY CARD COSMIC + VANILLA
+  heroCard: {
+    backgroundColor: '#23212C',
+    borderRadius: 24,
+    padding: 20,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.2)',
+    shadowColor: '#23212C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  heroIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(241, 254, 200, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(241, 254, 200, 0.3)',
+  },
+  heroTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 16.5,
+  },
+  heroSubtitle: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+  },
+  statBoxAlert: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  statValue: {
+    fontWeight: '700',
+    color: '#F1FEC8',
+  },
+
   urgentBanner: {
     backgroundColor: '#FEF2F2',
     borderWidth: 1.5,
     borderColor: '#FECACA',
     borderRadius: 18,
     padding: 16,
-    marginBottom: 16,
   },
   urgentBannerHead: {
     flexDirection: 'row',
@@ -199,10 +316,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   filterScroll: {
-    marginBottom: 14,
+    marginBottom: 2,
   },
   filterScrollContent: {
     gap: 8,
+    paddingVertical: 2,
   },
   filterChip: {
     paddingHorizontal: 14,
@@ -213,16 +331,17 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   filterChipActive: {
-    backgroundColor: '#1E1B4B',
-    borderColor: '#1E1B4B',
+    backgroundColor: '#23212C',
+    borderColor: '#23212C',
   },
   filterChipText: {
     fontSize: 12.5,
     fontFamily: font.semibold,
-    color: '#4B5563',
+    color: '#475569',
   },
   filterChipTextActive: {
-    color: '#FFFFFF',
+    color: '#F1FEC8',
+    fontWeight: '700',
   },
   recallList: {
     gap: 14,
@@ -231,7 +350,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 16,
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -280,6 +401,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   reasonBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
     backgroundColor: '#FFFBEB',
     borderRadius: 12,
     padding: 10,
@@ -287,8 +411,10 @@ const styles = StyleSheet.create({
     borderColor: '#FDE68A',
   },
   reasonText: {
+    flex: 1,
     color: '#92400E',
     fontWeight: '700',
+    fontSize: 12,
     lineHeight: 16,
   },
   lotBox: {
@@ -298,10 +424,15 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   instructionsBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingTop: 4,
   },
   instructionsText: {
-    color: '#4B5563',
+    flex: 1,
+    color: '#475569',
     lineHeight: 16,
+    fontSize: 12,
   },
 });

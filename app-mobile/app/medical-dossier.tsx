@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '../src/store/session';
-import { AppText, Screen, SurfaceButton } from '../src/components/ui';
+import { AppText, NavHeaderBackButton, Screen, ScreenTopHeader, SurfaceButton } from '../src/components/ui';
 import { colors, font, radius, spacing } from '../src/theme';
 import {
   generateReportText,
@@ -111,24 +111,16 @@ export default function MedicalDossierScreen() {
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen
-        options={{
-          headerTitle: isIt ? 'Fascicolo Medico PDF' : 'Medical Report PDF',
-          headerTitleStyle: { fontFamily: font.bold, fontSize: 18, color: '#1E1B4B' },
-          headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12, paddingVertical: 4 }}>
-              <Ionicons name="chevron-back" size={24} color="#1E1B4B" />
-            </Pressable>
-          ),
-          headerRight: () => (
-            <Pressable onPress={handleShare} hitSlop={8} style={styles.topActionBtn}>
-              <Ionicons name="share-outline" size={18} color="#1E1B4B" />
-            </Pressable>
-          ),
-        }}
+      <ScreenTopHeader
+        title={isIt ? 'Fascicolo Medico PDF' : 'Medical Report PDF'}
+        rightElement={
+          <Pressable onPress={handleShare} hitSlop={8} style={styles.topActionBtn}>
+            <Ionicons name="share-outline" size={18} color="#1E1B4B" />
+          </Pressable>
+        }
       />
 
-      <View style={[styles.container, { paddingTop: insets.top + 48 }]}>
+      <View style={styles.container}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
           {/* PROFILE SELECTOR */}
           {subProfiles.length > 0 && (

@@ -59,12 +59,9 @@ export default function HomeRecentScansWidget({ isIt = true }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <View style={styles.titleWithIcon}>
-          <Ionicons name="barcode-outline" size={20} color="#23212C" />
-          <AppText variant="h2" style={styles.sectionTitle}>
-            {isIt ? 'Spesa Sicura & Recenti' : 'Safe Grocery & Recent'}
-          </AppText>
-        </View>
+        <AppText variant="h2" style={styles.sectionTitle}>
+          {isIt ? 'Spesa Sicura & Recenti' : 'Safe Grocery & Recent'}
+        </AppText>
         <Pressable onPress={handleOpenPantry} hitSlop={8}>
           <AppText style={styles.seeAll}>
             {isIt ? 'Vedi dispensa' : 'View pantry'}
@@ -157,26 +154,26 @@ const styles = StyleSheet.create({
   seeAll: {
     fontSize: 13.5,
     fontWeight: '600',
-    color: '#6366F1',
+    color: '#23212C',
   },
   cardContainer: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 2,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
     borderWidth: 1,
     borderColor: '#EDE8F5',
     shadowColor: '#23212C',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 5,
+    shadowRadius: 6,
     elevation: 2,
   },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 11,
+    paddingVertical: 12,
     gap: 8,
   },
   borderBottom: {
@@ -191,9 +188,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   iconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -217,9 +214,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statusPill: {
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
     borderWidth: 1,
   },
   statusPillText: {

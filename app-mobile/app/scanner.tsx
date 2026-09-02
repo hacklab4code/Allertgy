@@ -155,6 +155,7 @@ export default function Scanner() {
   const lastBatchScanRef = useRef<{ barcode: string; time: number }>({ barcode: '', time: 0 });
   const [notFoundBarcode, setNotFoundBarcode] = useState<string | null>(null);
   const [labelCaptureMode, setLabelCaptureMode] = useState(false);
+  const [paperMenuCaptureMode, setPaperMenuCaptureMode] = useState(false);
   const [analyzingLabel, setAnalyzingLabel] = useState(false);
   const [analyzingPaperMenu, setAnalyzingPaperMenu] = useState(false);
   const [paperMenuDishes, setPaperMenuDishes] = useState<any[]>([]);
@@ -270,17 +271,31 @@ export default function Scanner() {
 
   const { t } = useTranslation();
   const isIt = (language || 'it').toLowerCase().startsWith('it');
-  const scanningDisabled = !isFocused || !!activeProduct || analyzingLabel || labelCaptureMode || analyzingPaperMenu || manualExpanded;
+  const scanningDisabled =
+    !isFocused ||
+    !!activeProduct ||
+    analyzingLabel ||
+    labelCaptureMode ||
+    analyzingPaperMenu ||
+    paperMenuCaptureMode ||
+    manualExpanded;
   const bottomInset = insets.bottom + spacing.md;
-  const frameWidth = labelCaptureMode
+  const frameWidth = paperMenuCaptureMode
+    ? Math.min(SCREEN_WIDTH - 36, 360)
+    : labelCaptureMode
     ? Math.min(SCREEN_WIDTH - 40, 350)
     : Math.min(SCREEN_WIDTH - 48, 320);
-  const frameHeight = labelCaptureMode ? 210 : Math.min(SCREEN_WIDTH - 48, 320);
+  const frameHeight = paperMenuCaptureMode
+    ? Math.min(SCREEN_HEIGHT * 0.44, 360)
+    : labelCaptureMode
+    ? 210
+    : Math.min(SCREEN_WIDTH - 48, 320);
 
   const applyPaperMenuResult = useCallback((res: { piatti?: any[]; note?: string } | null, emptyMessage: string) => {
     if (res?.piatti && res.piatti.length > 0) {
       setPaperMenuDishes(res.piatti);
       setShowPaperMenuModal(true);
+      setPaperMenuCaptureMode(false);
       return;
     }
     Alert.alert(
@@ -311,10 +326,10 @@ export default function Scanner() {
   }, [applyPaperMenuResult, isIt]);
 
   const capturePaperMenuPhoto = useCallback(async () => {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || analyzingPaperMenu) return;
     try {
       setAnalyzingPaperMenu(true);
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
       if (!photo?.uri) throw new Error(isIt ? 'Foto non acquisita' : 'Photo not captured');
       await analyzePaperMenuFromUri(photo.uri, 'menu_paper.jpg');
@@ -326,7 +341,7 @@ export default function Scanner() {
     } finally {
       setAnalyzingPaperMenu(false);
     }
-  }, [analyzePaperMenuFromUri, isIt]);
+  }, [analyzePaperMenuFromUri, analyzingPaperMenu, isIt]);
 
   const pickPaperMenuFromGallery = useCallback(async () => {
     try {
@@ -850,7 +865,7 @@ export default function Scanner() {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
         <View style={[styles.iconWrap, softShadow(8)]}>
-          <Ionicons name="scan" size={40} color={colors.brand} />
+          <Ionicons name="scan-outline" size={40} color={colors.brand} />
         </View>
         <AppText variant="h2" style={{ textAlign: 'center', marginTop: spacing.lg }}>
           {t('grocery_scanner_desc')}
@@ -893,41 +908,61 @@ export default function Scanner() {
 
       <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => {
+            if (paperMenuCaptureMode) {
+              void Haptics.selectionAsync();
+              setPaperMenuCaptureMode(false);
+            } else {
+              router.back();
+            }
+          }}
           style={styles.topBtn}
           hitSlop={8}
           accessibilityLabel={isIt ? 'Chiudi' : 'Close'}
         >
-          <Ionicons name="close" size={22} color="#FFF" />
+          <Ionicons
+            name={paperMenuCaptureMode ? 'arrow-back-outline' : 'close-outline'}
+            size={22}
+            color="#FFF"
+          />
         </Pressable>
 
-        {/* MODE SWITCHER */}
-        <View style={styles.modeSwitcherWrap}>
-          <Pressable
-            style={[styles.modeTabBtn, scanMode === 'single' && styles.modeTabBtnActive]}
-            onPress={() => {
-              void Haptics.selectionAsync();
-              setScanMode('single');
-            }}
-          >
-            <Ionicons name="scan-outline" size={13} color={scanMode === 'single' ? '#1E1B4B' : '#FFF'} />
-            <AppText variant="caption" style={[styles.modeTabText, scanMode === 'single' && styles.modeTabTextActive]}>
-              {isIt ? 'Singolo' : 'Single'}
+        {/* MODE SWITCHER OR TITLE */}
+        {paperMenuCaptureMode ? (
+          <View style={styles.menuCaptureTitleBadge}>
+            <Ionicons name="restaurant-outline" size={15} color="#FFF" />
+            <AppText variant="caption" color="#FFF" style={styles.menuCaptureTitleText}>
+              {isIt ? 'Scatta Foto Menù' : 'Scan Menu Photo'}
             </AppText>
-          </Pressable>
-          <Pressable
-            style={[styles.modeTabBtn, scanMode === 'batch' && styles.modeTabBtnActive]}
-            onPress={() => {
-              void Haptics.selectionAsync();
-              setScanMode('batch');
-            }}
-          >
-            <Ionicons name="cart-outline" size={13} color={scanMode === 'batch' ? '#1E1B4B' : '#FFF'} />
-            <AppText variant="caption" style={[styles.modeTabText, scanMode === 'batch' && styles.modeTabTextActive]}>
-              {isIt ? 'Spesa' : 'Batch'}
-            </AppText>
-          </Pressable>
-        </View>
+          </View>
+        ) : (
+          <View style={styles.modeSwitcherWrap}>
+            <Pressable
+              style={[styles.modeTabBtn, scanMode === 'single' && styles.modeTabBtnActive]}
+              onPress={() => {
+                void Haptics.selectionAsync();
+                setScanMode('single');
+              }}
+            >
+              <Ionicons name="scan-outline" size={13} color={scanMode === 'single' ? '#1E1B4B' : '#FFF'} />
+              <AppText variant="caption" style={[styles.modeTabText, scanMode === 'single' && styles.modeTabTextActive]}>
+                {isIt ? 'Singolo' : 'Single'}
+              </AppText>
+            </Pressable>
+            <Pressable
+              style={[styles.modeTabBtn, scanMode === 'batch' && styles.modeTabBtnActive]}
+              onPress={() => {
+                void Haptics.selectionAsync();
+                setScanMode('batch');
+              }}
+            >
+              <Ionicons name="cart-outline" size={13} color={scanMode === 'batch' ? '#1E1B4B' : '#FFF'} />
+              <AppText variant="caption" style={[styles.modeTabText, scanMode === 'batch' && styles.modeTabTextActive]}>
+                {isIt ? 'Spesa' : 'Batch'}
+              </AppText>
+            </Pressable>
+          </View>
+        )}
 
         <Pressable
           onPress={() => setTorch((v) => !v)}
@@ -936,7 +971,7 @@ export default function Scanner() {
           accessibilityLabel={isIt ? 'Torcia' : 'Torch'}
         >
           <Ionicons
-            name={torch ? 'flash' : 'flash-outline'}
+            name={torch ? 'flash-outline' : 'flash-off-outline'}
             size={20}
             color={torch ? colors.brandDark : '#FFF'}
           />
@@ -976,14 +1011,22 @@ export default function Scanner() {
           )}
         </View>
 
-        {(!notFoundBarcode || labelCaptureMode) ? (
+        {(!notFoundBarcode || labelCaptureMode || paperMenuCaptureMode) ? (
           <>
             <AppText variant="bodyBold" color="#FFF" style={styles.scanHint}>
-              {labelCaptureMode
+              {paperMenuCaptureMode
+                ? (isIt ? 'Inquadra il menù cartaceo' : 'Frame the paper menu')
+                : labelCaptureMode
                 ? (isIt ? 'Lista ingredienti nel riquadro' : 'Ingredients list in the frame')
                 : (isIt ? 'Inquadra QR o codice a barre' : 'Frame QR or barcode')}
             </AppText>
-            {labelCaptureMode ? (
+            {paperMenuCaptureMode ? (
+              <AppText variant="caption" color="rgba(255,255,255,0.88)" style={styles.scanHintSub}>
+                {isIt
+                  ? 'Tocca il pulsante in basso per scattare la foto'
+                  : 'Tap the button below to take a photo'}
+              </AppText>
+            ) : labelCaptureMode ? (
               <AppText variant="caption" color="rgba(255,255,255,0.82)" style={styles.scanHintSub}>
                 {isIt
                   ? 'Verifica sempre l’etichetta fisica'
@@ -996,7 +1039,7 @@ export default function Scanner() {
         {invalidHint && !notFoundBarcode ? (
           <View style={[styles.scanBanner, styles.scanBannerError]}>
             <View style={styles.scanBannerIconError}>
-              <Ionicons name="alert-circle" size={18} color={colors.onRed} />
+              <Ionicons name="alert-circle-outline" size={18} color={colors.onRed} />
             </View>
             <View style={styles.scanBannerCopy}>
               <AppText variant="bodyBold" style={[styles.scanBannerTitle, styles.hintTextError]}>
@@ -1017,6 +1060,14 @@ export default function Scanner() {
             </AppText>
           </View>
         )}
+        {analyzingPaperMenu && (
+          <View style={styles.aiLoading}>
+            <ActivityIndicator color="#FFF" size="small" />
+            <AppText variant="caption" color="#FFF">
+              {isIt ? 'Analisi menù con AI…' : 'Analyzing menu with AI…'}
+            </AppText>
+          </View>
+        )}
       </View>
 
       {!activeProduct && notFoundBarcode && !labelCaptureMode && !showProModal && (
@@ -1033,7 +1084,7 @@ export default function Scanner() {
                 hitSlop={10}
                 accessibilityLabel={isIt ? 'Chiudi' : 'Close'}
               >
-                <Ionicons name="close" size={18} color={colors.onSurfaceMuted} />
+                <Ionicons name="close-outline" size={18} color={colors.onSurfaceMuted} />
               </Pressable>
             </View>
 
@@ -1106,7 +1157,7 @@ export default function Scanner() {
               style={styles.labelCancelButton}
               disabled={analyzingLabel}
             >
-              <Ionicons name="arrow-back" size={18} color="#FFF" />
+              <Ionicons name="arrow-back-outline" size={18} color="#FFF" />
               <AppText variant="caption" color="#FFF">
                 {isIt ? 'Indietro' : 'Back'}
               </AppText>
@@ -1119,7 +1170,7 @@ export default function Scanner() {
               {analyzingLabel ? (
                 <ActivityIndicator color={colors.brandDark} size="small" />
               ) : (
-                <Ionicons name="sparkles" size={20} color={colors.brandDark} />
+                <Ionicons name="sparkles-outline" size={20} color={colors.brandDark} />
               )}
               <AppText variant="bodyBold" color={colors.brandDark}>
                 {analyzingLabel
@@ -1131,7 +1182,7 @@ export default function Scanner() {
         </View>
       )}
 
-      {!activeProduct && !notFoundBarcode && !manualExpanded && scanHistory.length > 0 && (
+      {!activeProduct && !notFoundBarcode && !manualExpanded && !paperMenuCaptureMode && scanHistory.length > 0 && (
         <View style={[styles.historyPanel, { bottom: bottomInset + 78 }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyRow}>
             {scanHistory.slice(0, 8).map((item) => (
@@ -1149,7 +1200,72 @@ export default function Scanner() {
         </View>
       )}
 
-      {!activeProduct && !notFoundBarcode && !labelCaptureMode && (
+      {/* PAPER MENU PHOTO SHUTTER DOCK */}
+      {!activeProduct && !notFoundBarcode && !labelCaptureMode && paperMenuCaptureMode && (
+        <View style={[styles.shutterDock, { bottom: bottomInset }]}>
+          <View style={styles.shutterRow}>
+            {/* Gallery button */}
+            <Pressable
+              onPress={() => {
+                void pickPaperMenuFromGallery();
+              }}
+              style={styles.shutterSideBtn}
+              disabled={analyzingPaperMenu}
+              accessibilityLabel={isIt ? 'Carica da galleria' : 'Upload from gallery'}
+            >
+              <View style={styles.shutterSideIconWrap}>
+                <Ionicons name="images-outline" size={20} color="#FFF" />
+              </View>
+              <AppText variant="caption" color="#FFF" style={styles.shutterSideLabel}>
+                {isIt ? 'Galleria' : 'Gallery'}
+              </AppText>
+            </Pressable>
+
+            {/* Shutter Button (Tasto per scattare la foto) */}
+            <Pressable
+              onPress={() => {
+                void capturePaperMenuPhoto();
+              }}
+              disabled={analyzingPaperMenu}
+              style={({ pressed }) => [
+                styles.shutterButtonOuter,
+                pressed && !analyzingPaperMenu && styles.shutterButtonPressed,
+                analyzingPaperMenu && styles.shutterButtonDisabled,
+              ]}
+              accessibilityLabel={isIt ? 'Scatta foto menù' : 'Take menu photo'}
+              accessibilityRole="button"
+            >
+              <View style={styles.shutterButtonInner}>
+                {analyzingPaperMenu ? (
+                  <ActivityIndicator color={colors.brand} size="small" />
+                ) : (
+                  <Ionicons name="camera-outline" size={28} color={colors.brand} />
+                )}
+              </View>
+            </Pressable>
+
+            {/* Cancel / Close button */}
+            <Pressable
+              onPress={() => {
+                void Haptics.selectionAsync();
+                setPaperMenuCaptureMode(false);
+              }}
+              style={styles.shutterSideBtn}
+              disabled={analyzingPaperMenu}
+              accessibilityLabel={isIt ? 'Annulla' : 'Cancel'}
+            >
+              <View style={styles.shutterSideIconWrap}>
+                <Ionicons name="close-outline" size={20} color="#FFF" />
+              </View>
+              <AppText variant="caption" color="#FFF" style={styles.shutterSideLabel}>
+                {isIt ? 'Annulla' : 'Cancel'}
+              </AppText>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {!activeProduct && !notFoundBarcode && !labelCaptureMode && !paperMenuCaptureMode && (
         <>
           {!manualExpanded ? (
             <View style={[styles.bottomDock, { bottom: bottomInset }]}>
@@ -1219,7 +1335,7 @@ export default function Scanner() {
                       hitSlop={10}
                       accessibilityLabel={isIt ? 'Chiudi' : 'Close'}
                     >
-                      <Ionicons name="close" size={18} color={colors.onSurfaceMuted} />
+                      <Ionicons name="close-outline" size={18} color={colors.onSurfaceMuted} />
                     </Pressable>
                   </View>
                 </View>
@@ -1332,7 +1448,7 @@ export default function Scanner() {
                 <View style={styles.sheetHeader}>
                   <View style={styles.sheetHandle} />
                   <Pressable onPress={closeProductSheet} style={styles.sheetCloseBtn} hitSlop={10}>
-                    <Ionicons name="close" size={18} color={colors.onSurfaceMuted} />
+                    <Ionicons name="close-outline" size={18} color={colors.onSurfaceMuted} />
                   </Pressable>
                 </View>
 
@@ -1347,7 +1463,7 @@ export default function Scanner() {
                         <Image source={{ uri: activeProduct.image }} style={styles.productImage} />
                       ) : (
                         <View style={styles.productImagePlaceholder}>
-                          <Ionicons name={activeProduct.isCosmetic ? 'sparkles' : 'cube-outline'} size={28} color={colors.onSurfaceMuted} />
+                          <Ionicons name={activeProduct.isCosmetic ? 'sparkles-outline' : 'cube-outline'} size={28} color={colors.onSurfaceMuted} />
                         </View>
                       )}
                     </View>
@@ -1499,7 +1615,9 @@ export default function Scanner() {
         visible={showMenuScanModal}
         initialMode={menuScanModalInitialMode}
         onClose={() => setShowMenuScanModal(false)}
-        onSelectPhoto={() => { void capturePaperMenuPhoto(); }}
+        onSelectPhoto={() => {
+          setPaperMenuCaptureMode(true);
+        }}
         onSelectGallery={() => { void pickPaperMenuFromGallery(); }}
         onAnalyzeUrl={(url) => { void handlePaperMenuUrl(url); }}
         analyzing={analyzingPaperMenu}
@@ -1516,7 +1634,7 @@ export default function Scanner() {
           }}
         >
           <View style={styles.batchFloatingLeft}>
-            <Ionicons name="cart" size={18} color="#FFFFFF" />
+            <Ionicons name="cart-outline" size={18} color="#FFFFFF" />
             <AppText variant="bodyBold" color="#FFFFFF" style={{ fontSize: 13.5 }}>
               {batchItems.length} {isIt ? 'prodotti' : 'items'}
             </AppText>
@@ -1576,7 +1694,7 @@ export default function Scanner() {
 
             {batchItems.some((b) => b.status === 'rosso') && (
               <View style={styles.batchWarningBanner}>
-                <Ionicons name="warning" size={16} color="#DC2626" />
+                <Ionicons name="warning-outline" size={16} color="#DC2626" />
                 <AppText variant="caption" color="#991B1B" style={{ fontWeight: '700', flex: 1 }}>
                   {isIt
                     ? 'Attenzione: ci sono prodotti nel carrello con allergeni vietati!'
@@ -1859,6 +1977,84 @@ const styles = StyleSheet.create({
     left: spacing.lg,
     right: spacing.lg,
     zIndex: 12,
+  },
+  shutterDock: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    zIndex: 15,
+    alignItems: 'center',
+  },
+  shutterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: spacing.md,
+  },
+  shutterButtonOuter: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.85)',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...softShadow(14),
+  },
+  shutterButtonInner: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...softShadow(6),
+  },
+  shutterButtonPressed: {
+    transform: [{ scale: 0.92 }],
+    borderColor: '#FFFFFF',
+  },
+  shutterButtonDisabled: {
+    opacity: 0.7,
+  },
+  shutterSideBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 64,
+    gap: 4,
+  },
+  shutterSideIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shutterSideLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  menuCaptureTitleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+  },
+  menuCaptureTitleText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFF',
   },
   labelCaptureRow: {
     flexDirection: 'row',

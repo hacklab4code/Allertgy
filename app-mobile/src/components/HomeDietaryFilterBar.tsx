@@ -81,30 +81,40 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: radius.pill,
+    borderRadius: 16,
     borderWidth: 1,
   },
   chipUnselected: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB', // border-gray-200
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    borderColor: 'rgba(255, 255, 255, 0.85)',
+    shadowColor: 'rgba(0, 0, 0, 0.04)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 6,
   },
   chipSelected: {
-    backgroundColor: '#000000', // bg-black
-    borderColor: '#000000',
+    backgroundColor: 'rgba(35, 33, 44, 0.85)',
+    borderColor: 'rgba(241, 254, 200, 0.35)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 30,
   },
   pressed: {
     opacity: 0.8,
+    transform: [{ scale: 0.97 }],
   },
   label: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
   },
   labelUnselected: {
-    color: '#374151', // text-gray-700
+    color: '#475569',
   },
   labelSelected: {
-    color: '#FFFFFF', // text-white
+    color: '#F1FEC8',
+    fontWeight: '700',
   },
 });

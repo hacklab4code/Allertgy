@@ -8,7 +8,7 @@ import { api, type Extraction, type MedicalDocument } from '../src/api/client';
 import { useSession } from '../src/store/session';
 import { TRANSLATED_ALLERGENS } from '../src/engine/translations';
 import { expandAllergieCodes, toggleAllergieSelection } from '../src/engine/allergyLinks';
-import { AppText, GlassScreenScroll, HeaderAddButton, SurfaceButton, Screen, Section } from '../src/components/ui';
+import { AppText, GlassScreenScroll, HeaderAddButton, SurfaceButton, Screen, ScreenTopHeader, Section } from '../src/components/ui';
 import { colors, radius, spacing } from '../src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -114,13 +114,11 @@ export default function Documenti() {
 
   return (
     <Screen edges={false} ambient>
-      <Stack.Screen
-        options={{
-          title: 'Documenti sanitari',
-          headerRight: () => (
-            <HeaderAddButton onPress={pickAndUpload} accessibilityLabel="Carica documento" />
-          ),
-        }}
+      <ScreenTopHeader
+        title="Documenti sanitari"
+        rightElement={
+          <HeaderAddButton onPress={pickAndUpload} accessibilityLabel="Carica documento" />
+        }
       />
       <GlassScreenScroll headerFloat={false} showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
         <Section title="Documentazione medica" subtitle="Carica referti allergologici (PDF o immagini). Privati e decifrabili su richiesta.">

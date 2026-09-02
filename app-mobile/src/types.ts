@@ -241,6 +241,10 @@ export interface SubProfile {
   id: number;
   name: string;
   relationship: string;
+  photo_uri?: string | null;
+  image_url?: string | null;
+  custom_emoji?: string | null;
+  custom_color?: string | null;
   allergens: SubProfileAllergen[];
   created_at: string;
 }
@@ -248,6 +252,10 @@ export interface SubProfile {
 export interface SubProfileIn {
   name: string;
   relationship: string;
+  photo_uri?: string | null;
+  image_url?: string | null;
+  custom_emoji?: string | null;
+  custom_color?: string | null;
   allergens: {
     code: string;
     intensity: 'lieve' | 'moderata' | 'grave';

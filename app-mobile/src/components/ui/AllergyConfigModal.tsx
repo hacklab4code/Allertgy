@@ -120,7 +120,7 @@ export function AllergyConfigModal({
               </View>
             </View>
             <Pressable onPress={handleCloseAttempt} style={styles.closeBtn} hitSlop={8}>
-              <Ionicons name="close" size={22} color={colors.onSurfaceMuted} />
+              <Ionicons name="close-outline" size={22} color={colors.onSurfaceMuted} />
             </Pressable>
           </View>
 
@@ -147,24 +147,24 @@ export function AllergyConfigModal({
                   onPress={() => handleSelectIntensity('lieve')}
                 >
                   <View style={styles.optionRow}>
-                    <View style={[styles.dot, { backgroundColor: colors.yellow }]} />
+                    <View style={[styles.dot, { backgroundColor: '#EAB308' }]} />
                     <View style={{ flex: 1 }}>
-                      <AppText variant="bodyBold" color={intensity === 'lieve' ? colors.onYellow : colors.ink}>
+                      <AppText variant="bodyBold" color={intensity === 'lieve' ? '#854D0E' : colors.ink}>
                         {isIt ? 'Lieve (Giallo)' : 'Mild (Yellow)'}
                       </AppText>
                       <AppText variant="caption" color={colors.onSurfaceMuted}>
                         {isIt
-                          ? 'Reazione moderata o semplice fastidio. Mostra avviso di attenzione.'
+                          ? 'Reazione lieve o semplice fastidio. Mostra avviso di attenzione giallo.'
                           : 'Mild reaction or discomfort. Displays a yellow warning.'}
                       </AppText>
                     </View>
                     {intensity === 'lieve' && (
-                      <Ionicons name="checkmark-circle" size={22} color={colors.amber} />
+                      <Ionicons name="checkmark-circle-outline" size={22} color="#EAB308" />
                     )}
                   </View>
                 </Pressable>
 
-                {/* MODERATA */}
+                {/* MODERATA / MEDIA */}
                 <Pressable
                   style={({ pressed }) => [
                     styles.optionCard,
@@ -174,19 +174,19 @@ export function AllergyConfigModal({
                   onPress={() => handleSelectIntensity('moderata')}
                 >
                   <View style={styles.optionRow}>
-                    <View style={[styles.dot, { backgroundColor: colors.amber }]} />
+                    <View style={[styles.dot, { backgroundColor: '#F97316' }]} />
                     <View style={{ flex: 1 }}>
-                      <AppText variant="bodyBold" color={intensity === 'moderata' ? colors.onYellow : colors.ink}>
-                        {isIt ? 'Moderata (Standard)' : 'Moderate (Standard)'}
+                      <AppText variant="bodyBold" color={intensity === 'moderata' ? '#9A3412' : colors.ink}>
+                        {isIt ? 'Media (Arancione)' : 'Moderate (Orange)'}
                       </AppText>
                       <AppText variant="caption" color={colors.onSurfaceMuted}>
                         {isIt
-                          ? 'Sensibilità o intolleranza standard. Evidenzia nei filtri di ricerca.'
-                          : 'Standard sensitivity or intolerance. Highlighted in search filters.'}
+                          ? 'Sensibilità o intolleranza media. Evidenziata in arancione nei filtri di ricerca.'
+                          : 'Medium sensitivity or intolerance. Highlighted in orange.'}
                       </AppText>
                     </View>
                     {intensity === 'moderata' && (
-                      <Ionicons name="checkmark-circle" size={22} color={colors.amber} />
+                      <Ionicons name="checkmark-circle-outline" size={22} color="#F97316" />
                     )}
                   </View>
                 </Pressable>
@@ -201,19 +201,19 @@ export function AllergyConfigModal({
                   onPress={() => handleSelectIntensity('grave')}
                 >
                   <View style={styles.optionRow}>
-                    <View style={[styles.dot, { backgroundColor: colors.red }]} />
+                    <View style={[styles.dot, { backgroundColor: '#EF4444' }]} />
                     <View style={{ flex: 1 }}>
-                      <AppText variant="bodyBold" color={intensity === 'grave' ? colors.onRed : colors.ink}>
+                      <AppText variant="bodyBold" color={intensity === 'grave' ? '#991B1B' : colors.ink}>
                         {isIt ? 'Grave / Anafilassi (Rosso)' : 'Severe / Anaphylaxis (Red)'}
                       </AppText>
                       <AppText variant="caption" color={colors.onSurfaceMuted}>
                         {isIt
-                          ? 'Alto rischio o choc anafilattico. Esclude categoricamente i piatti a rischio.'
+                          ? 'Alto rischio o shock anafilattico. Esclude categoricamente i piatti a rischio.'
                           : 'High risk or anaphylaxis. Strictly excludes non-compliant dishes.'}
                       </AppText>
                     </View>
                     {intensity === 'grave' && (
-                      <Ionicons name="alert-circle" size={22} color={colors.red} />
+                      <Ionicons name="alert-circle-outline" size={22} color="#EF4444" />
                     )}
                   </View>
                 </Pressable>
@@ -253,7 +253,7 @@ export function AllergyConfigModal({
                         </AppText>
                       </View>
                       {criterio === 'assoluto' && (
-                        <Ionicons name="checkmark" size={20} color={colors.brand} />
+                        <Ionicons name="checkmark-outline" size={20} color={colors.brand} />
                       )}
                     </View>
                   </Pressable>
@@ -280,7 +280,7 @@ export function AllergyConfigModal({
                         </AppText>
                       </View>
                       {criterio === 'crudo' && (
-                        <Ionicons name="checkmark" size={20} color={colors.brand} />
+                        <Ionicons name="checkmark-outline" size={20} color={colors.brand} />
                       )}
                     </View>
                   </Pressable>
@@ -307,7 +307,7 @@ export function AllergyConfigModal({
                         </AppText>
                       </View>
                       {criterio === 'cotto' && (
-                        <Ionicons name="checkmark" size={20} color={colors.brand} />
+                        <Ionicons name="checkmark-outline" size={20} color={colors.brand} />
                       )}
                     </View>
                   </Pressable>
@@ -421,16 +421,16 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   optionCardLieve: {
-    backgroundColor: colors.yellowSoft,
-    borderColor: colors.yellow,
+    backgroundColor: '#FEFCE8',
+    borderColor: '#FACC15',
   },
   optionCardModerata: {
-    backgroundColor: colors.amberBg,
-    borderColor: colors.amberBorder,
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FB923C',
   },
   optionCardGrave: {
-    backgroundColor: colors.redSoft,
-    borderColor: colors.redBorder,
+    backgroundColor: '#FEF2F2',
+    borderColor: '#F87171',
   },
   optionCardActive: {
     backgroundColor: colors.brand50,

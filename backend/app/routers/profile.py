@@ -147,6 +147,16 @@ def update_profile(
     return user
 
 
+@router.delete("")
+def delete_profile(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cancellazione definitiva profilo e dati sanitari ex GDPR e Apple Guidelines."""
+    from .auth import delete_account
+    return delete_account(data=None, user=user, db=db)
+
+
 @router.get("/referral", response_model=ReferralStatsOut)
 def get_referral_stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Codice invito e statistiche referral per clienti che portano commercianti."""
@@ -476,16 +486,14 @@ async def upload_profile_photo(
     db: Session = Depends(get_db),
 ):
     """Carica la foto profilo: resize a 512px, storage privato, URL firmato 1h."""
-    mime_type = (file.content_type or "").lower()
-    if mime_type not in PHOTO_ALLOWED_TYPES:
-        raise HTTPException(415, "Carica un'immagine JPG, PNG o WebP")
     content = await file.read()
     if not content:
         raise HTTPException(400, "Il file immagine è vuoto")
     if len(content) > PHOTO_MAX_BYTES:
         raise HTTPException(413, "Immagine troppo grande: massimo 5 MB")
-    _validate_magic(content, mime_type)
 
+    # Elaborazione e validazione robusta con Pillow
+    processed_content = None
     try:
         from PIL import Image, ImageOps
         img = Image.open(BytesIO(content))
@@ -493,15 +501,23 @@ async def upload_profile_photo(
         img.thumbnail((512, 512))
         out = BytesIO()
         img.save(out, format="JPEG", quality=85)
-        content = out.getvalue()
-    except ImportError:
-        pass  # Pillow assente: salva l'originale (già validato per tipo e dimensione)
+        processed_content = out.getvalue()
     except Exception:
-        raise HTTPException(400, "Immagine non valida o corrotta")
+        # Fallback se Pillow non riesce: verifica magic bytes JPG/PNG/WebP
+        mime_type = (file.content_type or "").lower()
+        is_known_image = (
+            content.startswith(b"\xff\xd8\xff")  # JPEG
+            or content.startswith(b"\x89PNG")    # PNG
+            or (content.startswith(b"RIFF") and len(content) > 12 and content[8:12] == b"WEBP")  # WebP
+            or mime_type in PHOTO_ALLOWED_TYPES
+        )
+        if not is_known_image:
+            raise HTTPException(400, "Formato immagine non supportato o corrotto. Carica un file JPG, PNG o WebP.")
+        processed_content = content
 
     old_key = user.photo_key
     key = f"profile/{user.id}/{uuid.uuid4()}.jpg"
-    storage.put_bytes(key, content, "image/jpeg")
+    storage.put_bytes(key, processed_content, "image/jpeg")
     user.photo_key = key
     db.commit()
     if old_key:

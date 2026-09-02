@@ -39,7 +39,9 @@ assert.equal(normalizeSemaforoStatus('non idoneo'), 'danger');
 assert.equal(normalizeSemaforoStatus('unknown'), 'neutral');
 assert.equal(normalizeSemaforoStatus(null), 'neutral');
 
-// 3. Brand action (Cosmic / Violet Precision)
+// 3. Brand action (Cosmic #23212C + Vanilla #F1FEC8)
 assert.equal(BRAND_TOKENS.primary, '#23212C', 'Brand primary deve essere Cosmic #23212C');
+assert.equal(BRAND_TOKENS.light, '#F1FEC8', 'Brand light deve essere Vanilla #F1FEC8');
+assert.deepEqual(BRAND_TOKENS.premiumGradient, ['#121118', '#23212C', '#353344'], 'Premium gradient deve essere cosmic dark');
 
-console.log('✅ Tutti i test sui Token Semaforo e Normalizzazione sono superati!');
+console.log('✅ Tutti i test sui Token Semaforo, Brand Tokens e Normalizzazione sono superati!');

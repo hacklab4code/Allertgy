@@ -51,12 +51,32 @@ function isTailscaleCgnatHost(host: string): boolean {
  * Con tunnel Expo (solo porta Metro) resta EXPO_PUBLIC_API_URL (es. Tailscale).
  */
 function resolveApiUrl(): string {
-  const envUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
   if (typeof window !== 'undefined' && window.location) {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const queryApi = params.get('api');
+      if (queryApi && (queryApi.startsWith('http://') || queryApi.startsWith('https://'))) {
+        const clean = queryApi.replace(/\/+$/, '');
+        try { window.localStorage.setItem('ALLERTGY_API_URL', clean); } catch {}
+        return clean;
+      }
+      const stored = window.localStorage.getItem('ALLERTGY_API_URL');
+      if (stored && (stored.startsWith('http://') || stored.startsWith('https://'))) {
+        return stored.replace(/\/+$/, '');
+      }
+    } catch {}
+
+    const h = window.location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1') {
       return 'http://localhost:8000';
     }
+    // Se aperto via IP LAN (192.168.x.x / 10.x.x.x) o Tailscale (100.x.x.x) in HTTP
+    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(h)) {
+      return `http://${h}:8000`;
+    }
   }
+
+  const envUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
   if (__DEV__) {
     const host = getDevPackagerHost();
     if (
@@ -85,7 +105,7 @@ export function resolveApiMediaUrl(url?: string | null): string | null {
       const hostMismatch = parsed.host !== api.host;
       const isLocalHost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
       const apiIsRemote = api.hostname !== 'localhost' && api.hostname !== '127.0.0.1';
-      if (__DEV__ && isSignedFile && (hostMismatch || (isLocalHost && apiIsRemote))) {
+      if (isSignedFile && (hostMismatch || (isLocalHost && apiIsRemote) || isLocalHost)) {
         return `${API}${parsed.pathname}${parsed.search}`;
       }
     } catch {
@@ -360,6 +380,14 @@ export const api = {
         new_password: newPassword,
       }),
     }),
+  deleteAccount: (password?: string) =>
+    req<{ detail: string }>('/auth/delete-account', {
+      method: 'DELETE',
+      body: JSON.stringify({
+        password: password || undefined,
+        confirm: true,
+      }),
+    }),
 
   /* ---------- cliente ---------- */
   listRestaurants: () => req<Menu[]>('/restaurants'),
@@ -482,9 +510,18 @@ export const api = {
   },
 
   /* ---------- foto profilo ---------- */
-  uploadProfilePhoto: (fileUri: string, mimeType = 'image/jpeg') => {
+  uploadProfilePhoto: (fileUri: string, mimeType?: string) => {
+    const rawExt = (fileUri.split('.').pop() || 'jpg').toLowerCase();
+    const ext = rawExt.includes('?') ? rawExt.split('?')[0] : rawExt;
+    const finalMime = mimeType || (ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg');
+    const finalExt = ext === 'png' ? 'png' : ext === 'webp' ? 'webp' : 'jpg';
+
     const fd = new FormData();
-    fd.append('file', { uri: fileUri, name: 'avatar.jpg', type: mimeType } as any);
+    fd.append('file', {
+      uri: fileUri,
+      name: `avatar.${finalExt}`,
+      type: finalMime,
+    } as any);
     return req<{ photo_url: string }>('/profile/photo', { method: 'POST', body: fd });
   },
   getProfilePhoto: () => req<{ photo_url: string }>('/profile/photo'),
@@ -544,9 +581,6 @@ export const api = {
   /* ---------- documenti legali ---------- */
   legalDoc: (doc: string) =>
     req<{ doc: string; title: string; version: string; content_markdown: string }>(`/legal/${doc}`),
-
-  /* ---------- cancellazione account (GDPR) ---------- */
-  deleteAccount: () => req<void>('/profile', { method: 'DELETE' }),
 
   /* ---------- ristoratore ---------- */
   myRestaurants: () => req<Restaurant[]>('/admin/restaurants'),
